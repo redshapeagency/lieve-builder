@@ -2,7 +2,7 @@
 Contributors: lieve-builder
 Requires at least: 6.5
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,10 @@ No. Output page metadata starts off. Lieve defers output to recognized active SE
 Lieve's original code is GPLv2 or later; see LICENSE.txt. Bundled GSAP assets have a separate license and distribution gate; see assets/vendor/gsap/NOTICE.md. The theme license does not authorize their redistribution in this product.
 
 == Changelog ==
+
+= 1.0.1 =
+* Fixed Custom Code preview initialization and dynamic data context after PHP queries.
+* Improved draft recovery startup and consistent widget card sizing.
 
 = 1.0.0 =
 * Initial commit.

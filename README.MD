@@ -1,6 +1,6 @@
 # Lieve Builder
 
-[![Version 1.0.0](https://img.shields.io/badge/version-1.0.0-8044E3?style=flat-square)](#changelog)
+[![Version 1.0.1](https://img.shields.io/badge/version-1.0.1-8044E3?style=flat-square)](#changelog)
 [![WordPress 6.5+](https://img.shields.io/badge/WordPress-6.5%2B-21759B?style=flat-square&logo=wordpress&logoColor=white)](https://wordpress.org/)
 [![PHP 7.4+](https://img.shields.io/badge/PHP-7.4%2B-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
 [![Original code license: GPL-2.0-or-later](https://img.shields.io/badge/Original_code-GPL--2.0--or--later-16C6C0?style=flat-square)](LICENSE.txt)
@@ -140,6 +140,11 @@ Development tests and release tooling belong to the development source, not the 
 Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Bundled GSAP assets are separately licensed; see the [GSAP notice](assets/vendor/gsap/NOTICE.md). The theme license does not authorize their redistribution in this product.
 
 ## Changelog
+
+### 1.0.1
+
+- Fixed Custom Code preview initialization and dynamic data context after PHP queries.
+- Improved draft recovery startup and consistent widget card sizing.
 
 ### 1.0.0
 
