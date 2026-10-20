@@ -12,7 +12,7 @@
 		( top.getElementById( 'lieve-builder-app' ) || top.body ).appendChild( layer );
 		function bindFrame( frame, record ) {
 			frame.removeAttribute( 'data-lieve-code-source' ); frame.style.visibility = 'hidden'; frame.setAttribute( 'aria-hidden', 'true' ); frame.tabIndex = -1;
-			if ( record.height ) frame.style.height = record.height;
+			frame.style.height = record.height || 'calc(32px * var(--lv-canvas-ui-scale, 1))';
 			record.frame = frame; frames.set( frame, record ); observer?.observe( frame );
 			if ( record.error ) frame.after( record.error );
 		}
@@ -26,7 +26,7 @@
 				const next = replacements.find( item => ! frames.has( item ) && item.dataset.lieveCodeChannel === frame.dataset.lieveCodeChannel && item.dataset.lieveCodeNode === frame.dataset.lieveCodeNode && item.getAttribute( 'data-lieve-code-source' ) === record.source );
 				observer?.unobserve( frame ); frames.delete( frame );
 				if ( next ) { bindFrame( next, record ); }
-				else { record.error?.remove(); record.portal.remove(); }
+				else { window.clearTimeout( record.timeout ); record.pending?.remove(); record.error?.remove(); record.portal.remove(); }
 			} );
 		}
 		function layout() {
@@ -38,7 +38,9 @@
 			const viewport = outer.getBoundingClientRect(), sx = viewport.width / outer.clientWidth, sy = viewport.height / outer.clientHeight;
 			frames.forEach( ( record, frame ) => {
 				const rect = frame.getBoundingClientRect();
-				Object.assign( record.portal.style, { left: viewport.left + rect.left * sx + 'px', top: viewport.top + rect.top * sy + 'px', width: frame.offsetWidth + 'px', height: frame.offsetHeight + 'px', transform: 'scale(' + sx + ',' + sy + ')' } );
+				const left = viewport.left + rect.left * sx + 'px', top = viewport.top + rect.top * sy + 'px';
+				Object.assign( record.portal.style, { left, top, width: frame.offsetWidth + 'px', height: frame.offsetHeight + 'px', transform: 'scale(' + sx + ',' + sy + ')' } );
+				if ( record.pending ) Object.assign( record.pending.style, { left, top, width: frame.offsetWidth * sx + 'px', height: frame.offsetHeight * sy + 'px' } );
 			} );
 		}
 		const observer = typeof ResizeObserver === 'function' ? new ResizeObserver( layout ) : null;
@@ -57,23 +59,36 @@
 			const signature = JSON.stringify( { variables, inherited } );
 			if ( ! force && record.context === signature ) return;
 			record.context = signature;
-			record.portal.contentWindow?.postMessage( { lieveCodePreview: frame.dataset.lieveCodeChannel, type: 'context', variables, inherited }, '*' );
+			record.revision++;
+			record.portal.contentWindow?.postMessage( { lieveCodePreview: frame.dataset.lieveCodeChannel, type: 'context', variables, inherited, revision: record.revision }, '*' );
 		};
+		function reportError( frame, record, message ) {
+			if ( ! record.error ) { record.error = owner.createElement( 'p' ); record.error.className = 'lieve-code-preview-error'; record.error.dataset.editorUi = ''; record.error.setAttribute( 'role', 'status' ); frame.after( record.error ); }
+			record.error.textContent = String( message || 'JavaScript preview error.' ).slice( 0, 240 ); record.resize?.();
+			return record.error;
+		}
 		window.addEventListener( 'message', event => {
 			prune();
 			for ( const [ frame, record ] of frames ) {
 				if ( event.source !== record.portal.contentWindow || event.data?.lieveCodePreview !== frame.dataset.lieveCodeChannel ) continue;
 				const data = event.data;
 				if ( data.type === 'ready' ) context( frame, true );
-				if ( data.type === 'size' && typeof data.height === 'number' && Number.isFinite( data.height ) ) {
+				if ( data.type === 'size' && data.ready === true && data.revision === record.revision && typeof data.height === 'number' && Number.isFinite( data.height ) ) {
 					const height = Math.max( 24, Math.min( 10000, data.height ) ) + 'px';
 					record.height = height;
 					if ( frame.style.height !== height ) { frame.style.height = height; layout(); record.resize?.(); }
+					if ( ! record.shown ) {
+						// Reveal parsed content with its current inherited CSS and measured
+						// geometry, without waiting for unrelated fonts or external resources.
+						record.shown = true; window.clearTimeout( record.timeout );
+						record.portal.style.visibility = 'visible'; record.portal.removeAttribute( 'aria-hidden' ); record.portal.tabIndex = 0;
+						record.pending?.remove(); record.pending = null;
+						if ( record.initializationError ) { record.initializationError.remove(); record.error = null; record.initializationError = null; }
+					}
 				}
-				if ( data.type === 'select' ) record.select?.( frame.dataset.lieveCodeNode );
+				if ( data.type === 'select' && record.shown ) record.select?.( frame.dataset.lieveCodeNode );
 				if ( data.type === 'error' ) {
-					if ( ! record.error ) { record.error = owner.createElement( 'p' ); record.error.className = 'lieve-code-preview-error'; record.error.dataset.editorUi = ''; record.error.setAttribute( 'role', 'status' ); frame.after( record.error ); }
-					record.error.textContent = String( data.message || 'JavaScript preview error.' ).slice( 0, 240 ); record.resize?.();
+					record.initializationError = null; reportError( frame, record, data.message );
 				}
 			}
 		} );
@@ -81,9 +96,11 @@
 			mount( root, callbacks ) {
 				prune(); root.querySelectorAll( 'iframe[data-lieve-code-preview]' ).forEach( frame => {
 					if ( ! frames.has( frame ) ) {
-						const portal = top.createElement( 'iframe' ); portal.className = 'lieve-code-preview-portal'; portal.title = frame.title || 'Custom Code preview'; portal.setAttribute( 'sandbox', 'allow-scripts' ); portal.referrerPolicy = 'no-referrer';
-						const source = frame.getAttribute( 'data-lieve-code-source' ); const record = { ...callbacks, portal, source };
-						bindFrame( frame, record ); portal.addEventListener( 'load', () => { context( record.frame, true ); layout(); } ); portal.srcdoc = source || ''; layer.appendChild( portal );
+						const portal = top.createElement( 'iframe' ); portal.className = 'lieve-code-preview-portal'; portal.title = frame.title || 'Custom Code preview'; portal.setAttribute( 'sandbox', 'allow-scripts' ); portal.setAttribute( 'aria-hidden', 'true' ); portal.tabIndex = -1; portal.referrerPolicy = 'no-referrer';
+						const pending = top.createElement( 'div' ); pending.className = 'lieve-code-preview-loading lieve-code-preview-pending'; pending.setAttribute( 'role', 'status' ); pending.setAttribute( 'aria-label', 'Loading Custom Code preview' ); pending.innerHTML = '<span aria-hidden="true"></span>';
+						const source = frame.getAttribute( 'data-lieve-code-source' ); const record = { ...callbacks, portal, source, pending, revision: 0, shown: false };
+						bindFrame( frame, record ); portal.addEventListener( 'load', () => { context( record.frame, true ); layout(); } ); portal.srcdoc = source || ''; layer.appendChild( pending ); layer.appendChild( portal );
+						record.timeout = window.setTimeout( () => { if ( ! record.shown && frames.has( record.frame ) ) { record.pending?.remove(); record.pending = null; record.initializationError = reportError( record.frame, record, 'Custom Code preview could not initialize. Check its scripts or resources and try again.' ); } }, 15000 );
 					} else { Object.assign( frames.get( frame ), callbacks ); } context( frame );
 				} ); layout();
 			},

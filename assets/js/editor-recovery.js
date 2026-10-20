@@ -23,7 +23,7 @@
 		const interval = setInterval( () => flush().catch( error => notify( error.message, true ) ), 15000 );
 		document.addEventListener( 'visibilitychange', () => { if ( document.hidden ) { flush().catch( () => {} ); } } );
 		const requestedEpoch = noticeEpoch;
-		request( 'GET' ).then( result => {
+		function showDrafts( result ) {
 			if ( stopped || requestedEpoch !== noticeEpoch ) return;
 			const drafts = ( result.drafts || [] ).filter( entry => entry.session !== session ).reverse(); if ( ! drafts.length ) { return; }
 			const notice = document.createElement( 'div' ); notice.className = 'lieve-recovery-notice'; notice.setAttribute( 'role', 'region' ); notice.setAttribute( 'aria-label', 'Draft recovery' );
@@ -67,18 +67,35 @@
 			dismiss.addEventListener( 'click', () => remove() );
 			function update() { text.textContent = drafts[ Number( select.value ) ]?.baseRevision === base() ? 'A private recovery copy is available. Restoring does not publish it.' : 'The saved page has changed since this copy. Restore only to review and merge your unsaved work before saving.'; }
 			select.addEventListener( 'change', update ); update();
-			apply.addEventListener( 'click', () => { if ( dirty() && ! window.confirm( 'Replace the current unsaved page draft with this recovery copy?' ) ) { return; } const draft = drafts[ Number( select.value ) ]; restore( JSON.stringify( draft.snapshot ) ); restoredSession = draft.session; remove(); notify( 'Draft restored for review. Save when ready.' ); } );
+			function setBusy( value ) { busy = value; apply.disabled = discard.disabled = cancel.disabled = close.disabled = value; picker?.setDisabled( value ); select.disabled = value; dialog.setAttribute( 'aria-busy', String( value ) ); }
+			apply.addEventListener( 'click', async () => {
+				if ( busy || dirty() && ! window.confirm( 'Replace the current unsaved page draft with this recovery copy?' ) ) { return; }
+				let draft = drafts[ Number( select.value ) ]; const restoreEpoch = noticeEpoch;
+				setBusy( true );
+				try {
+					// Bootstrap contains summaries, not up to 8 MB of private snapshots.
+					// Retrieve the selected current copy only after an explicit Restore.
+					if ( ! draft.snapshot ) { const result = await request( 'GET' ); if ( stopped || restoreEpoch !== noticeEpoch ) return; draft = ( result.drafts || [] ).find( entry => entry.session === draft.session ); }
+					if ( ! draft?.snapshot?.document ) { throw new Error( 'This recovery copy is no longer available. Close this dialog and reload the editor to refresh the available copies.' ); }
+					restore( JSON.stringify( draft.snapshot ) ); restoredSession = draft.session; remove(); notify( 'Draft restored for review. Save when ready.' );
+				} catch ( error ) { if ( ! stopped && restoreEpoch === noticeEpoch ) notify( 'Draft could not be restored: ' + error.message, true ); }
+				finally { setBusy( false ); }
+			} );
 			discard.addEventListener( 'click', async () => {
-				busy = true; apply.disabled = discard.disabled = cancel.disabled = close.disabled = true; picker?.setDisabled( true ); select.disabled = true;
+				if ( busy ) return; setBusy( true );
 				try { await request( 'DELETE', { session: drafts[ Number( select.value ) ].session } ); drafts.splice( Number( select.value ), 1 ); if ( ! drafts.length ) { remove(); } else { select.replaceChildren(); drafts.forEach( ( entry, index ) => { const option = document.createElement( 'option' ); option.value = index; option.textContent = new Date( entry.updated * 1000 ).toLocaleString(); select.appendChild( option ); } ); picker?.refresh(); update(); } }
 				catch ( error ) { notify( error.message, true ); }
-				finally { busy = false; apply.disabled = discard.disabled = cancel.disabled = close.disabled = false; select.disabled = false; picker?.setDisabled( false ); }
+				finally { setBusy( false ); }
 			} );
 			( app.querySelector( '.lieve-stage-wrap' ) || app ).prepend( notice );
 			onLayout();
 			picker = window.LieveDesignSystem?.createSelect( select, app, layer, { lazy: true } );
 			if ( picker ) { label.htmlFor = select.id + '-trigger'; }
-		} ).catch( error => notify( 'Recovery is unavailable: ' + error.message, true ) );
+		}
+		// Resolve presence before the workspace's first paint. Older bootstraps
+		// retain their asynchronous fallback, without delaying the current editor.
+		if ( Array.isArray( config.recoveryDrafts ) ) { showDrafts( { drafts: config.recoveryDrafts } ); }
+		else { request( 'GET' ).then( showDrafts ).catch( error => notify( 'Recovery is unavailable: ' + error.message, true ) ); }
 		window.addEventListener( 'pagehide', () => { stopped = true; clearInterval( interval ); } );
 		return { flush, clear };
 	} };

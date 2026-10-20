@@ -22,13 +22,13 @@ body.lieve-preview-document #lieve-canvas .lieve-editor-preview-message {
 	max-width: 100%; font-size: calc(11px * var(--lv-canvas-ui-scale, 1)); overflow-wrap: anywhere;
 }
 /* Quiet initial code loading: no text/card flash, and no spinner for fast responses. */
-body.lieve-preview-document #lieve-canvas .lieve-code-preview-loading {
+.lieve-workspace .lieve-code-preview-loading {
 	display: grid;
 	place-items: center;
 	min-block-size: calc(32px * var(--lv-canvas-ui-scale, 1));
 	pointer-events: none;
 }
-body.lieve-preview-document #lieve-canvas .lieve-code-preview-loading > span {
+.lieve-workspace .lieve-code-preview-loading > span {
 	width: calc(18px * var(--lv-canvas-ui-scale, 1));
 	height: calc(18px * var(--lv-canvas-ui-scale, 1));
 	border-radius: 50%;
@@ -74,7 +74,7 @@ body.lieve-preview-document #lieve-canvas .lieve-canvas-empty .lieve-button-prim
 }
 @media (prefers-reduced-motion: reduce) {
 	.lieve-viewport-frame { transition: none; }
-	body.lieve-preview-document #lieve-canvas .lieve-code-preview-loading > span { animation: lieve-code-loading-reveal .15s linear .18s both; }
+	.lieve-workspace .lieve-code-preview-loading > span { animation: lieve-code-loading-reveal .15s linear .18s both; }
 }
 /* The popup hint fits the dialog, not the entire composition viewport. */
 body.lieve-preview-document #lieve-canvas [data-editor-popup-shell] .lieve-canvas-empty { min-height: calc(180px * var(--lv-canvas-ui-scale,1)); padding: calc(24px * var(--lv-canvas-ui-scale,1)) min(6vw, calc(24px * var(--lv-canvas-ui-scale,1))); }

@@ -45,7 +45,8 @@
 #lieve-canvas iframe[data-lieve-code-preview] { display: block; width: 100%; min-height: 24px; border: 0; background: transparent; }
 .lieve-code-preview-layer { position: fixed; z-index: 24; inset: 0; pointer-events: none; }
 .lieve-code-preview-layer[hidden] { display: none; }
-.lieve-code-preview-portal { position: fixed; display: block; max-width: none; margin: 0; padding: 0; border: 0; background: transparent; transform-origin: top left; pointer-events: auto; }
+.lieve-code-preview-portal { position: fixed; display: block; visibility: hidden; max-width: none; margin: 0; padding: 0; border: 0; background: transparent; transform-origin: top left; pointer-events: auto; }
+.lieve-code-preview-pending { position: fixed; pointer-events: none; }
 #lieve-canvas .lieve-code-preview-error { margin: 8px 0; padding: 10px 12px; border: 1px solid #e6b8b8; border-radius: 6px; color: #8a2424; background: #fff5f5; font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .lieve-workspace .lieve-header-actions :is(.lieve-button-primary, .lieve-button-secondary) { min-height: 40px; gap: 6px; font-size: 13px; font-weight: 500; }
 .lieve-header-actions > :is(button,a) > svg { width: 16px; height: 16px; flex-shrink: 0; }

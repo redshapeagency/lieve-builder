@@ -42,6 +42,18 @@ function lieve_recovery_entries( $user_id = 0 ) {
 	$entries = get_user_meta( $user_id ?: get_current_user_id(), '_lieve_editor_recovery', true );
 	return array_slice( array_values( array_filter( is_array( $entries ) ? $entries : array(), static function( $entry ) { return is_array( $entry ) && ( $entry['updated'] ?? 0 ) > time() - 7 * DAY_IN_SECONDS; } ) ), -10 );
 }
+
+/** First-paint recovery metadata only; private snapshots stay out of the editor HTML. */
+function lieve_recovery_draft_summaries( $post_id ) {
+	if ( ! current_user_can( 'edit_post', $post_id ) ) { return array(); }
+	$drafts = array();
+	foreach ( lieve_recovery_entries() as $entry ) {
+		if ( (int) ( $entry['postId'] ?? 0 ) !== (int) $post_id || ! is_array( $entry['snapshot']['document'] ?? null ) || ! is_string( $entry['session'] ?? null ) || ! preg_match( '/^[a-zA-Z0-9_-]{16,80}$/D', $entry['session'] ) || ! is_string( $entry['baseRevision'] ?? null ) || ! preg_match( '/^[a-f0-9]{64}$/D', $entry['baseRevision'] ) ) { continue; }
+		$drafts[] = array( 'session' => $entry['session'], 'updated' => (int) $entry['updated'], 'baseRevision' => $entry['baseRevision'] );
+	}
+	return $drafts;
+}
+
 function lieve_rest_document_recovery( $request ) {
 	$id = (int) $request['id']; $method = $request->get_method();
 	return lieve_with_template_lock( 'recovery:' . get_current_user_id(), static function() use ( $id, $method, $request ) {

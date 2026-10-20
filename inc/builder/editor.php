@@ -313,6 +313,7 @@ function lieve_editor_assets( $hook_suffix ) {
 			'seoContext'                => $is_template ? array() : lieve_seo_context( $post_id ),
 			'restUrl'                   => esc_url_raw( rest_url( 'lieve/v1/page/' . $post_id ) ),
 			'recoveryUrl'               => esc_url_raw( rest_url( 'lieve/v1/recovery/' . $post_id ) ),
+			'recoveryDrafts'            => lieve_recovery_draft_summaries( $post_id ),
 			'templatesUrl'              => esc_url_raw( rest_url( 'lieve/v1/templates' ) ),
 			'queryChoicesUrl'           => esc_url_raw( add_query_arg( 'postId', $post_id, rest_url( 'lieve/v1/queries/choices' ) ) ),
 			'queryBuilderUrl'           => current_user_can( 'manage_options' ) ? admin_url( 'admin.php?page=lieve-query-builder' ) : '',
