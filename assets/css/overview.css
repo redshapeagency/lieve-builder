@@ -1,0 +1,101 @@
+/* Overview extends the existing management-page vocabulary, without a JS boot phase. */
+.lieve-overview-page { margin-top: 32px; margin-bottom: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; }
+.lieve-overview-page .lieve-admin-title-wrap p { color: var(--lieve-text-2); }
+.lieve-overview-page ::selection { background: rgba(var(--lieve-accent-end-rgb,128,68,227),.18); color: var(--lieve-text); }
+.lieve-overview-workspace { display: grid; margin-top: 28px; border: 1px solid var(--lieve-border); border-radius: var(--lieve-radius-lg); background: var(--lieve-surface); }
+.lieve-overview-workspace.has-support { grid-template-columns: minmax(0, 1fr) minmax(320px, 35%); }
+.lieve-overview-recent, .lieve-overview-support { min-width: 0; }
+.lieve-overview-support { border-inline-start: 1px solid var(--lieve-border-soft); }
+.lieve-overview-section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px; flex-wrap: wrap; }
+.lieve-overview-section-head > div { min-width: 0; }
+.lieve-overview-page h2 { margin: 0; color: var(--lieve-text); font-size: 16px; font-weight: 600; line-height: 1.5; }
+.lieve-overview-section-head p { margin: 4px 0 0; color: var(--lieve-text-2); font-size: 13px; line-height: 1.6; }
+.lieve-overview-page .lieve-admin-button { min-height: 40px; gap: 6px; border-color: var(--lieve-border); background: transparent; color: var(--lieve-text-2); font-weight: 500; line-height: 1.5; transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-overview-resume { flex-shrink: 0; }
+/* Outrank the legacy borderless admin reset, just as the Template controls do. */
+.lieve-overview-page .lieve-admin-button:not(.lieve-admin-button-primary),
+.lieve-overview-page .lieve-admin-button:not(.lieve-admin-button-primary):is(:hover, :focus, :active) { position: relative; isolation: isolate; border: 1px solid var(--lieve-border) !important; background: transparent; box-shadow: none; transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-overview-page .lieve-admin-button:not(.lieve-admin-button-primary)::before { position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--lieve-gradient-soft); opacity: 0; pointer-events: none; content: ''; transition: opacity .15s; }
+.lieve-overview-page .lieve-admin-button:not(.lieve-admin-button-primary):is(:hover, :focus-visible) { border-color: var(--lieve-accent-border,#d0c0ed) !important; color: var(--lieve-accent-ink,#7040c1); }
+.lieve-overview-page .lieve-admin-button:not(.lieve-admin-button-primary):is(:hover, :focus-visible)::before { opacity: 1; }
+/* Resume is the sole emphasized action; secondary navigation keeps the neutral skin. */
+.lieve-overview-page .lieve-admin-button.lieve-overview-resume:not(.lieve-admin-button-primary) { border-color: var(--lieve-accent-border,#d0c0ed) !important; background: var(--lieve-gradient-faint); color: var(--lieve-accent-ink-strong,#5b26a8); font-weight: 600; }
+.lieve-overview-page .lieve-admin-button svg { flex-shrink: 0; }
+.lieve-overview-documents { margin: 0; padding: 0 12px 12px; list-style: none; }
+.lieve-overview-documents li { margin: 0; }
+.lieve-overview-documents li + li { border-top: 1px solid var(--lieve-border-soft); }
+.lieve-overview-document { display: flex; min-width: 0; min-height: 88px; padding: 18px 12px; align-items: center; gap: 14px; border-radius: var(--lieve-radius-sm); color: var(--lieve-text); text-decoration: none; transition: background .15s, color .15s; }
+.lieve-overview-document:hover { background: var(--lieve-gradient-faint); color: var(--lieve-text); }
+.lieve-overview-document-icon { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: var(--lieve-radius-sm); background: var(--lieve-surface-3); color: var(--lieve-text-2); }
+.lieve-overview-document-icon svg { width: 20px; height: 20px; }
+.lieve-overview-document-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 5px; }
+.lieve-overview-document-copy strong { color: inherit; font-size: 14px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.lieve-overview-document-copy > span { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--lieve-text-2); font-size: 12px; line-height: 1.6; }
+.lieve-overview-document-copy time { font-variant-numeric: tabular-nums; }
+.lieve-overview-document .lieve-template-state { flex-shrink: 0; }
+.lieve-overview-document-arrow { display: flex; flex-shrink: 0; color: var(--lieve-text-2); }
+.lieve-overview-document:hover .lieve-overview-document-arrow { color: var(--lieve-accent-ink,#7040c1); }
+.lieve-overview-content { padding: 22px 24px 24px; border-top: 1px solid var(--lieve-border-soft); }
+.lieve-overview-content h3 { margin: 0 0 12px; color: var(--lieve-text); font-size: 13px; font-weight: 600; line-height: 1.5; }
+.lieve-overview-content-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.lieve-overview-content-links a { max-width: 100%; overflow-wrap: anywhere; }
+.lieve-overview-libraries { padding-bottom: 16px; }
+.lieve-overview-libraries .lieve-overview-section-head { padding-bottom: 12px; }
+.lieve-overview-libraries ul { margin: 0; padding: 0 12px; list-style: none; }
+.lieve-overview-libraries li { margin: 0; }
+.lieve-overview-libraries li + li { margin-top: 4px; }
+.lieve-overview-library { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; border-radius: var(--lieve-radius-sm); color: var(--lieve-text); text-decoration: none; transition: background .15s, color .15s; }
+.lieve-overview-library:hover { background: var(--lieve-gradient-faint); color: var(--lieve-accent-ink,#7040c1); }
+.lieve-overview-library-icon { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; border-radius: 6px; background: var(--lieve-surface-3); color: var(--lieve-text-2); }
+.lieve-overview-library-icon svg { width: 18px; height: 18px; }
+.lieve-overview-library > span:nth-child(2) { flex: 1; min-width: 0; }
+.lieve-overview-library strong, .lieve-overview-library small { display: block; overflow-wrap: anywhere; }
+.lieve-overview-library strong { font-size: 13px; font-weight: 600; line-height: 1.5; }
+.lieve-overview-library small { margin-top: 2px; color: var(--lieve-text-2); font-size: 12px; line-height: 1.5; }
+.lieve-overview-library > svg { flex-shrink: 0; color: var(--lieve-text-2); }
+.lieve-overview-configuration { border-top: 1px solid var(--lieve-border-soft); }
+.lieve-overview-configuration .lieve-overview-section-head { padding-bottom: 8px; }
+.lieve-overview-configuration dl { margin: 0; padding: 0 24px 18px; }
+.lieve-overview-configuration dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 10px 0; }
+.lieve-overview-configuration dl > div + div { border-top: 1px solid var(--lieve-border-soft); }
+.lieve-overview-configuration dt, .lieve-overview-configuration dd { min-width: 0; margin: 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.lieve-overview-configuration dt { flex: 1; color: var(--lieve-text-2); }
+.lieve-overview-configuration dd { flex: 1; color: var(--lieve-text); font-weight: 500; text-align: end; }
+.lieve-overview-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--lieve-border-soft); }
+.lieve-overview-tools > .lieve-admin-button { flex: 1 0 auto; min-width: 0; max-width: 100%; padding-inline: 8px; white-space: nowrap; }
+.lieve-overview-empty { display: flex; min-height: 320px; padding: 40px 24px; align-items: center; justify-content: center; flex-direction: column; text-align: center; }
+.lieve-overview-empty > span { display: grid; width: 48px; height: 48px; margin-bottom: 18px; place-items: center; border-radius: var(--lieve-radius); background: var(--lieve-surface-3); color: var(--lieve-text-2); }
+.lieve-overview-empty svg { width: 24px; height: 24px; }
+.lieve-overview-empty h3 { margin: 0; color: var(--lieve-text); font-size: 16px; font-weight: 600; line-height: 1.5; }
+.lieve-overview-empty p { max-width: 48ch; margin: 8px 0 0; color: var(--lieve-text-2); font-size: 13px; line-height: 1.7; }
+.lieve-overview-page a:focus-visible { outline: 2px solid var(--lieve-violet); outline-offset: 2px; box-shadow: none; }
+@media (max-width: 1100px) {
+	.lieve-overview-workspace.has-support { grid-template-columns: minmax(0, 1fr); }
+	.lieve-overview-support { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-inline-start: 0; border-top: 1px solid var(--lieve-border-soft); }
+	.lieve-overview-configuration { border-top: 0; border-inline-start: 1px solid var(--lieve-border-soft); }
+}
+@media (max-width: 620px) {
+	.lieve-overview-page { margin-top: 20px; }
+	.lieve-overview-workspace { margin-top: 24px; }
+	.lieve-overview-section-head { padding: 20px 16px; gap: 12px; }
+	.lieve-overview-recent .lieve-overview-section-head .lieve-admin-button { width: 100%; }
+	.lieve-overview-documents { padding-inline: 8px; }
+	.lieve-overview-document { position: relative; padding: 16px 8px; gap: 10px; flex-wrap: wrap; }
+	.lieve-overview-document-copy { flex-basis: calc(100% - 50px); }
+	.lieve-overview-document .lieve-template-state { margin-inline-start: 50px; }
+	.lieve-overview-document-arrow { margin-inline-start: auto; }
+	.lieve-overview-content { padding: 20px 16px; }
+	.lieve-overview-support { display: block; }
+	.lieve-overview-configuration { border-inline-start: 0; border-top: 1px solid var(--lieve-border-soft); }
+	.lieve-overview-libraries ul { padding-inline: 8px; }
+	.lieve-overview-library { padding-inline: 8px; }
+	.lieve-overview-configuration dl { padding-inline: 16px; }
+	.lieve-overview-tools { padding-inline: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.lieve-overview-page :is(a, .lieve-admin-button, .lieve-admin-button-primary),
+	.lieve-overview-page .lieve-admin-button:is(:hover, :focus, :active),
+	.lieve-overview-page .lieve-admin-button:not(.lieve-admin-button-primary),
+	.lieve-overview-page .lieve-admin-button:not(.lieve-admin-button-primary):is(:hover, :focus, :active),
+	.lieve-overview-page .lieve-admin-button:not(.lieve-admin-button-primary)::before { transition: none !important; }
+}

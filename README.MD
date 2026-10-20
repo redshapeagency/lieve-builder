@@ -22,6 +22,8 @@ A lightweight WordPress theme by TheOneWP with an integrated visual builder for 
 
 Activating the theme changes the site's presentation. Builder pages have no automatic header or footer unless matching templates or explicit assignments provide them.
 
+**LieveBuilder → Overview** reopens recently updated builder content and links to content lists, design libraries and current configuration. Content and tools follow your editing permissions.
+
 ## The builder
 
 - **Left panel:** Elements, Structure, SEO and Markup. Find and pin widgets, organize nested content, set page metadata and override page markup/head output.
@@ -145,6 +147,7 @@ Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Bundled G
 
 - Fixed Custom Code preview initialization and dynamic data context after PHP queries.
 - Improved draft recovery startup and consistent widget card sizing.
+- Replaced the initial Overview with a permission-aware operational dashboard.
 
 ### 1.0.0
 

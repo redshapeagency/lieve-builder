@@ -71,36 +71,6 @@ function lieve_render_template_library_header() {
 }
 
 /**
- * Render a small dashboard with direct template actions.
- */
-function lieve_render_dashboard_page() {
-	?>
-	<div class="wrap lieve-admin-page">
-		<header class="lieve-admin-header">
-			<div class="lieve-admin-logo" aria-hidden="true"><?php echo lieve_brand_logo(); ?></div>
-			<div class="lieve-admin-title-wrap">
-				<h1>Lieve<span>Builder</span></h1>
-				<p><?php esc_html_e( 'Visual design, templates, and conditions in one workspace.', 'lieve-builder' ); ?></p>
-			</div>
-		</header>
-		<section class="lieve-admin-hero">
-			<div>
-				<span class="lieve-admin-eyebrow"><?php esc_html_e( 'Overview', 'lieve-builder' ); ?></span>
-				<h2><?php esc_html_e( 'Design once, reuse everywhere.', 'lieve-builder' ); ?></h2>
-				<p><?php esc_html_e( 'Create visual layouts, organize templates, and control where each one appears.', 'lieve-builder' ); ?></p>
-			</div>
-			<div class="lieve-admin-hero-mark" aria-hidden="true"><?php echo lieve_brand_logo(); ?></div>
-		</section>
-		<div class="lieve-admin-feature-grid">
-			<article><span>01</span><h2><?php esc_html_e( 'Create', 'lieve-builder' ); ?></h2><p><?php esc_html_e( 'Choose the template name and type on a dedicated screen.', 'lieve-builder' ); ?></p></article>
-			<article><span>02</span><h2><?php esc_html_e( 'Design', 'lieve-builder' ); ?></h2><p><?php esc_html_e( 'Open the visual builder and compose the layout on the canvas.', 'lieve-builder' ); ?></p></article>
-			<article><span>03</span><h2><?php esc_html_e( 'Publish', 'lieve-builder' ); ?></h2><p><?php esc_html_e( 'Apply a layout manually or use a display condition.', 'lieve-builder' ); ?></p></article>
-		</div>
-	</div>
-	<?php
-}
-
-/**
  * Render the dedicated template creation and completion screens.
  */
 function lieve_render_new_template_page() {

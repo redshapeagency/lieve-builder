@@ -200,126 +200,6 @@
 	cursor: default;
 }
 
-/* Dashboard. */
-.lieve-admin-hero {
-	position: relative;
-	display: grid;
-	min-height: 192px;
-	padding: 30px 34px;
-	align-items: center;
-	grid-template-columns: minmax(0, 1fr) auto;
-	gap: 36px;
-	border: 1px solid var(--lieve-border);
-	border-radius: var(--lieve-radius-lg);
-	background: var(--lieve-surface);
-	box-shadow: var(--lieve-shadow);
-	overflow: hidden;
-}
-
-.lieve-admin-hero::before {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 4px;
-	background: var(--lieve-gradient);
-	content: "";
-}
-
-.lieve-admin-eyebrow {
-	display: inline-flex;
-	min-height: 24px;
-	margin-bottom: 12px;
-	padding: 0 10px;
-	align-items: center;
-	border: 1px solid rgba(var(--lieve-accent-end-rgb,128,68,227),0.22);
-	border-radius: 999px;
-	background: var(--lieve-gradient-soft);
-	color: var(--lieve-accent-ink-strong,#5b26a8);
-	font-size: 10px;
-	font-weight: 700;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-}
-
-/* The Overview label follows the compact 6px pill shape used by TheOneWP. */
-.lieve-admin-hero .lieve-admin-eyebrow {
-	border-radius: 6px;
-}
-
-.lieve-admin-hero h2 {
-	margin: 0;
-	color: var(--lieve-text);
-	font-size: 27px;
-	font-weight: 800;
-	line-height: 1.15;
-	letter-spacing: -0.025em;
-}
-
-.lieve-admin-hero p {
-	max-width: 720px;
-	margin: 10px 0 0;
-	color: var(--lieve-text-2);
-	font-size: 14px;
-	line-height: 1.6;
-}
-
-.lieve-admin-hero-mark {
-	display: block;
-	width: 112px;
-	height: 112px;
-}
-
-.lieve-admin-feature-grid {
-	display: grid;
-	margin-top: 16px;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 8px;
-}
-
-.lieve-admin-feature-grid article {
-	padding: 22px;
-	border: 1px solid var(--lieve-border);
-	border-radius: var(--lieve-radius);
-	background: var(--lieve-surface);
-	box-shadow: var(--lieve-shadow);
-	transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
-}
-
-.lieve-admin-feature-grid article:hover {
-	border-color: var(--lieve-accent-border,#d0c0ed);
-	background: var(--lieve-accent-surface,#edecf1);
-	box-shadow: var(--lieve-shadow);
-	transform: translateY(-1px);
-}
-
-.lieve-admin-feature-grid article > span {
-	display: grid;
-	width: 30px;
-	height: 30px;
-	place-items: center;
-	border: 1px solid rgba(var(--lieve-accent-end-rgb,128,68,227),0.22);
-	border-radius: var(--lieve-radius-sm);
-	background: var(--lieve-gradient-soft);
-	color: var(--lieve-accent-ink-strong,#5b26a8);
-	font-size: 10px;
-	font-weight: 700;
-}
-
-.lieve-admin-feature-grid h2 {
-	margin: 16px 0 6px;
-	color: var(--lieve-text);
-	font-size: 17px;
-}
-
-.lieve-admin-feature-grid p {
-	margin: 0;
-	color: var(--lieve-text-2);
-	font-size: 13px;
-	line-height: 1.55;
-}
-
-
 /* Shared server-rendered header; keep WordPress' list controls below it. */
 .edit-php.post-type-lieve_template #wpbody-content > .wrap.lieve-template-library-heading {
 	margin: 28px 20px 0 0;
@@ -673,9 +553,6 @@
 		margin: 14px 0 0 104px;
 	}
 
-	.lieve-admin-feature-grid {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
 }
 
 @media (max-width: 782px) {
@@ -702,14 +579,6 @@
 		margin-left: 72px;
 	}
 
-	.lieve-admin-hero {
-		padding: 26px;
-		grid-template-columns: 1fr;
-	}
-
-	.lieve-admin-hero-mark {
-		display: none;
-	}
 }
 
 @media (max-width: 620px) {
@@ -719,10 +588,6 @@
 
 	.lieve-admin-header > .lieve-admin-actions {
 		margin-left: 0;
-	}
-
-	.lieve-admin-feature-grid {
-		grid-template-columns: 1fr;
 	}
 
 }
@@ -933,8 +798,6 @@
 	opacity: 0.85;
 }
 
-.lieve-admin-feature-grid article { transition: none !important; }
-.lieve-admin-feature-grid article:hover { transform: none !important; }
 
 .lieve-admin-button:not(.lieve-admin-button-primary) {
 	background: #f1f2f4;

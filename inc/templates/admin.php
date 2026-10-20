@@ -187,6 +187,10 @@ function lieve_template_admin_assets( $hook_suffix ) {
 	}
 
 	wp_enqueue_style( 'lieve-builder-admin', LIEVE_URL . 'assets/css/admin.css', array( 'lieve-brand' ), lieve_asset_version( 'assets/css/admin.css' ) );
+	if ( 'toplevel_page_lieve-dashboard' === $hook_suffix ) {
+		wp_enqueue_style( 'lieve-overview', LIEVE_URL . 'assets/css/overview.css', array( 'lieve-builder-admin' ), lieve_asset_version( 'assets/css/overview.css' ) );
+		return; // Overview has no modal, asynchronous data or client-side startup.
+	}
 	wp_enqueue_style( 'lieve-builder-conditions', LIEVE_URL . 'assets/css/conditions.css', array( 'lieve-builder-admin' ), lieve_asset_version( 'assets/css/conditions.css' ) );
 	if ( 'edit.php' === $hook_suffix && $screen && LIEVE_TEMPLATE_POST_TYPE === $screen->post_type ) {
 		// Loaded in the document head: native list markup needs no client-side reparenting.

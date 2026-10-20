@@ -14,6 +14,7 @@ Lieve Builder combines a live visual canvas, nested Structure tree and responsiv
 
 Main features:
 
+* Operational Overview with recent builder content, library links and current configuration.
 * Responsive styling, configurable breakpoints, states and reusable CSS classes.
 * Variables, light/dark color palettes, linked scales and locally hosted fonts.
 * Conditional templates, Pop Ups and linked components with exposed properties and named slots.
@@ -72,6 +73,7 @@ Lieve's original code is GPLv2 or later; see LICENSE.txt. Bundled GSAP assets ha
 = 1.0.1 =
 * Fixed Custom Code preview initialization and dynamic data context after PHP queries.
 * Improved draft recovery startup and consistent widget card sizing.
+* Replaced the initial Overview with a permission-aware operational dashboard.
 
 = 1.0.0 =
 * Initial commit.

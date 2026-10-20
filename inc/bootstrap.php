@@ -31,6 +31,7 @@ require_once __DIR__ . '/design/design-system.php';
 require_once __DIR__ . '/design/classes.php';
 require_once __DIR__ . '/design/fonts.php';
 require_once __DIR__ . '/design/fonts-admin.php';
+require_once __DIR__ . '/admin/overview.php';
 require_once __DIR__ . '/frontend/frontend-assets.php';
 require_once __DIR__ . '/frontend/css-loading.php';
 require_once __DIR__ . '/frontend/css-retention.php';
