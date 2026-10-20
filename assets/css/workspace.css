@@ -127,20 +127,23 @@
 .lieve-element-category-heading { display: flex; min-height: 28px; align-items: center; gap: 8px; padding-bottom: 8px; }
 .lieve-element-category-name { min-width: 0; margin: 0; color: var(--lv-text-2); font: 600 12px/1.5 var(--lv-font-ui); }
 .lieve-element-category-count { display: grid; min-width: 22px; height: 20px; margin-left: auto; padding: 0 5px; flex-shrink: 0; place-items: center; border-radius: 5px; background: var(--lv-surface-3); color: var(--lv-muted); font-size: var(--lv-ui-meta-size); font-weight: 500; font-variant-numeric: tabular-nums; }
-.lieve-workspace .lieve-block-library { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; gap: 8px; }
-.lieve-element-tile { position: relative; min-width: 0; }
+/* One card contract across categories, filters and cloned Pinned items. Reserve
+   the optional dependency row too, so icons and labels never move between cards. */
+.lieve-workspace .lieve-block-library { --lv-widget-card-height: 104px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: var(--lv-widget-card-height); align-items: stretch; padding: 0; gap: 8px; }
+.lieve-element-tile { position: relative; min-width: 0; min-height: 0; height: 100%; border-radius: var(--lv-radius-sm); }
 .lieve-element-tile[hidden] { display: none !important; }
-.lieve-workspace .lieve-block-library [data-add-block] { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 72px; padding: 10px 8px; gap: 6px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: var(--lv-surface); box-shadow: none; color: var(--lv-text-2); font-family: inherit; font-size: 11px; line-height: 1.4; transition: border-color .15s, background .15s, color .15s; }
+.lieve-element-tile[tabindex]:focus-visible { outline: 2px solid var(--lv-violet); outline-offset: 2px; }
+.lieve-workspace .lieve-block-library [data-add-block] { position: relative; display: grid; box-sizing: border-box; grid-template-rows: 26px 36px 14px; align-content: center; align-items: center; justify-items: center; width: 100%; height: 100%; min-width: 0; min-height: 0; margin: 0; padding: 8px; gap: 4px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: var(--lv-surface); box-shadow: none; color: var(--lv-text-2); font-family: inherit; font-size: 11px; line-height: 1.4; transition: border-color .15s, background .15s, color .15s; }
 .lieve-workspace .lieve-block-library [data-add-block][hidden] { display: none !important; }
 .lieve-workspace .lieve-block-library .lieve-element-tile-icon { display: grid; width: 26px; height: 26px; flex-shrink: 0; place-items: center; border-radius: 6px; background: var(--lv-surface-3); color: var(--lv-text-2); -webkit-text-fill-color: currentColor; transition: background .15s, color .15s; }
 .lieve-element-tile-icon svg { width: 19px; height: 19px; }
-.lieve-workspace .lieve-block-library .lieve-element-tile-label { max-width: 100%; background: none; -webkit-text-fill-color: currentColor; color: inherit; font-size: 12px; font-weight: 600; text-align: center; line-height: 1.45; overflow-wrap: anywhere; }
+.lieve-workspace .lieve-block-library .lieve-element-tile-label { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; width: 100%; min-width: 0; max-height: 36px; overflow: hidden; background: none; -webkit-text-fill-color: currentColor; color: inherit; font-size: 12px; font-weight: 600; text-align: center; line-height: 18px; overflow-wrap: anywhere; }
 .lieve-workspace .lieve-block-library [data-add-block]:is(:hover, :focus-visible):not(:disabled) { border-color: var(--lieve-accent-border); background: var(--lv-gradient-faint); box-shadow: none; color: var(--lv-accent-text); transform: none; }
 .lieve-workspace .lieve-block-library [data-add-block]:is(:hover, :focus-visible):not(:disabled) .lieve-element-tile-icon { background: var(--lv-gradient-soft); color: var(--lv-accent-text); }
 .lieve-workspace .lieve-block-library [data-add-block]:focus-visible { outline: 1px solid var(--lv-violet); outline-offset: 2px; }
 .lieve-workspace .lieve-block-library [data-add-block]:disabled { background: #f7f8fa; color: #787d88; opacity: 1; cursor: not-allowed; }
 .lieve-workspace .lieve-block-library [data-add-block]:disabled .lieve-element-tile-icon { background: #eceef3; color: #8a8f98; }
-.lieve-workspace .lieve-block-library .lieve-element-tile-dependency { max-width: 100%; color: var(--lv-muted); font-size: var(--lv-ui-meta-size); line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
+.lieve-workspace .lieve-block-library .lieve-element-tile-dependency { display: block; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lv-muted); font-size: var(--lv-ui-meta-size); line-height: 14px; text-align: center; }
 .lieve-workspace .lieve-block-library .lieve-element-pin { position: absolute; z-index: 1; top: 3px; right: 3px; display: grid; width: 25px; height: 25px; min-height: 0; padding: 0; place-items: center; border: 0; border-radius: 6px; background: transparent; box-shadow: none; color: var(--lv-muted); opacity: 0; transform: none; transition: opacity .15s, background .15s, color .15s; }
 .lieve-element-pin svg { width: 15px; height: 15px; }
 .lieve-workspace .lieve-element-tile:is(:hover, :focus-within) .lieve-element-pin, .lieve-workspace .lieve-block-library .lieve-element-pin[aria-pressed="true"] { opacity: 1; }

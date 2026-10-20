@@ -503,13 +503,14 @@ function lieve_render_editor_page() {
 							<section class="lieve-element-category" data-element-group="<?php echo esc_attr( $definition['group'] ); ?>" aria-labelledby="lieve-category-heading-<?php echo esc_attr( sanitize_title( $definition['group'] ) ); ?>"><div class="lieve-element-category-heading"><h3 class="lieve-element-category-name" id="lieve-category-heading-<?php echo esc_attr( sanitize_title( $definition['group'] ) ); ?>"><?php echo esc_html( $definition['group'] ); ?></h3><span class="lieve-element-category-count" aria-hidden="true"><?php echo esc_html( $group_counts[ $definition['group'] ] ); ?></span></div><div class="lieve-block-library">
 							<?php $previous_group = $definition['group']; ?>
 						<?php endif; ?>
-						<div class="lieve-element-tile" data-element-type="<?php echo esc_attr( $type ); ?>">
-						<button type="button" data-add-block="<?php echo esc_attr( $type ); ?>" data-element-search="<?php echo esc_attr( strtolower( $definition['label'] . ' ' . $definition['group'] . ' ' . $type ) ); ?>"<?php if ( ! empty( $definition['dependency'] ) ) { echo ' disabled title="' . esc_attr( $definition['dependency'] ) . '"'; } ?>>
+						<?php $tile_description = $definition['label'] . ( ! empty( $definition['dependency'] ) ? ' — ' . $definition['dependency'] : '' ); ?>
+						<div class="lieve-element-tile" data-element-type="<?php echo esc_attr( $type ); ?>" data-tooltip="<?php echo esc_attr( $tile_description ); ?>"<?php if ( ! empty( $definition['dependency'] ) ) { echo ' role="group" tabindex="0" aria-label="' . esc_attr( $tile_description ) . '"'; } ?>>
+						<button type="button" data-add-block="<?php echo esc_attr( $type ); ?>" data-element-search="<?php echo esc_attr( strtolower( $definition['label'] . ' ' . $definition['group'] . ' ' . $type ) ); ?>"<?php if ( ! empty( $definition['dependency'] ) ) { echo ' disabled'; } ?>>
 							<span class="lieve-element-tile-icon" aria-hidden="true"><?php echo lieve_element_icon( $definition['icon'] ); ?></span>
 							<span class="lieve-element-tile-label"><?php echo esc_html( $definition['label'] ); ?></span>
 							<?php if ( ! empty( $definition['dependency'] ) ) : ?><small class="lieve-element-tile-dependency"><?php echo esc_html( $definition['dependency'] ); ?></small><?php endif; ?>
 						</button>
-						<button type="button" class="lieve-element-pin" data-pin-element="<?php echo esc_attr( $type ); ?>" aria-pressed="false" aria-label="<?php echo esc_attr( sprintf( __( 'Pin %s', 'lieve-builder' ), $definition['label'] ) ); ?>" title="<?php echo esc_attr( sprintf( __( 'Pin %s', 'lieve-builder' ), $definition['label'] ) ); ?>"><?php echo lieve_workspace_icon( 'pin' ); ?></button>
+						<button type="button" class="lieve-element-pin" data-pin-element="<?php echo esc_attr( $type ); ?>" data-tooltip="" aria-pressed="false" aria-label="<?php echo esc_attr( sprintf( __( 'Pin %s', 'lieve-builder' ), $definition['label'] ) ); ?>" title="<?php echo esc_attr( sprintf( __( 'Pin %s', 'lieve-builder' ), $definition['label'] ) ); ?>"><?php echo lieve_workspace_icon( 'pin' ); ?></button>
 						</div>
 					<?php endforeach; echo '</div></section>'; ?>
 						<p class="lieve-element-search-empty" role="status" hidden><?php esc_html_e( 'No matching elements. Try a different search.', 'lieve-builder' ); ?></p>
