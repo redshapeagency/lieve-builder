@@ -13,28 +13,26 @@ function lieve_editor_preview_node( $node, $listing = false ) {
 
 /** The caller supplies a sanitized node. PHP runs only for an explicit code-administrator preview. */
 function lieve_render_editor_preview( $node, $post, $execute_custom_code = false ) {
-	$previous_post = $GLOBALS['post'] ?? null;
-	$had_preview = array_key_exists( 'lieve_element_preview', $GLOBALS );
-	$previous_preview = $GLOBALS['lieve_element_preview'] ?? false;
-	$previous_source = $GLOBALS['lieve_document_source_id'] ?? null;
-	$previous_code = $GLOBALS['lieve_custom_code_preview'] ?? null;
-	$previous_runtime = $GLOBALS['lieve_runtime_document'] ?? null;
-	$level = ob_get_level();
-	$GLOBALS['post'] = $post; $GLOBALS['lieve_element_preview'] = true;
-	$GLOBALS['lieve_document_source_id'] = (int) $post->ID;
-	$GLOBALS['lieve_runtime_document'] = array('children'=>array($node));
-	$GLOBALS['lieve_custom_code_preview'] = true === $execute_custom_code && function_exists( 'lieve_can_author_custom_code' ) && lieve_can_author_custom_code() && current_user_can( 'edit_post', $post->ID );
-	try {
-		setup_postdata( $post ); ob_start(); lieve_render_node( $node ); return ob_get_clean();
-	} finally {
-		while ( ob_get_level() > $level ) { ob_end_clean(); }
-		if ( $had_preview ) { $GLOBALS['lieve_element_preview'] = $previous_preview; } else { unset( $GLOBALS['lieve_element_preview'] ); }
-		if ( null === $previous_source ) { unset( $GLOBALS['lieve_document_source_id'] ); } else { $GLOBALS['lieve_document_source_id'] = $previous_source; }
-		if ( null === $previous_code ) { unset( $GLOBALS['lieve_custom_code_preview'] ); } else { $GLOBALS['lieve_custom_code_preview'] = $previous_code; }
-		if ( null === $previous_runtime ) { unset($GLOBALS['lieve_runtime_document']); } else { $GLOBALS['lieve_runtime_document']=$previous_runtime; }
-		$GLOBALS['post'] = $previous_post;
-		if ( $previous_post ) { setup_postdata( $previous_post ); } else { wp_reset_postdata(); }
-	}
+	// Setting only $post is insufficient: PHP loops call wp_reset_postdata(),
+	// which restores the main query's post. Use the same complete, isolated
+	// page context as inherited templates so that reset targets this document.
+	return lieve_with_editor_page_context( $post, static function() use ( $node, $post, $execute_custom_code ) {
+		$previous_source = $GLOBALS['lieve_document_source_id'] ?? null;
+		$previous_code = $GLOBALS['lieve_custom_code_preview'] ?? null;
+		$previous_runtime = $GLOBALS['lieve_runtime_document'] ?? null;
+		$level = ob_get_level();
+		$GLOBALS['lieve_document_source_id'] = (int) $post->ID;
+		$GLOBALS['lieve_runtime_document'] = array('children'=>array($node));
+		$GLOBALS['lieve_custom_code_preview'] = true === $execute_custom_code && function_exists( 'lieve_can_author_custom_code' ) && lieve_can_author_custom_code() && current_user_can( 'edit_post', $post->ID );
+		try {
+			ob_start(); lieve_render_node( $node ); return ob_get_clean();
+		} finally {
+			while ( ob_get_level() > $level ) { ob_end_clean(); }
+			if ( null === $previous_source ) { unset( $GLOBALS['lieve_document_source_id'] ); } else { $GLOBALS['lieve_document_source_id'] = $previous_source; }
+			if ( null === $previous_code ) { unset( $GLOBALS['lieve_custom_code_preview'] ); } else { $GLOBALS['lieve_custom_code_preview'] = $previous_code; }
+			if ( null === $previous_runtime ) { unset($GLOBALS['lieve_runtime_document']); } else { $GLOBALS['lieve_runtime_document']=$previous_runtime; }
+		}
+	} );
 }
 
 function lieve_editor_preview_has_php( $node ) {
