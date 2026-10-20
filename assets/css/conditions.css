@@ -1,0 +1,793 @@
+.lieve-conditions-builder,
+.lieve-conditions-builder * {
+	box-sizing: border-box;
+}
+
+.lieve-conditions-builder,
+.lieve-conditions-popup,
+.edit-php.post-type-lieve_template {
+	--lieve-condition-border: var(--lieve-border, var(--lv-border, #e6e8ec));
+	--lieve-condition-columns: 18px 118px 196px minmax(180px, 1fr) 28px;
+	--lieve-condition-soft: #f6f7f7;
+	--lieve-condition-text: #1d2327;
+	--lieve-condition-muted: #646970;
+	--lieve-condition-violet: var(--lieve-violet, var(--lv-violet, var(--lieve-accent-end,#8044e3)));
+	--lieve-condition-gradient: var(--lieve-gradient, var(--lv-gradient, linear-gradient(90deg, var(--lieve-accent-start,#16c6c0), var(--lieve-accent-end,#8044e3))));
+	--lieve-condition-gradient-soft: var(--lieve-gradient-soft, var(--lv-gradient-soft, linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),0.13), rgba(var(--lieve-accent-end-rgb,128,68,227),0.13))));
+}
+
+.lieve-conditions-popup[hidden] { display: none !important; }
+#lieve-conditions-modal #lieve-cancel-conditions[hidden] { display: none !important; }
+
+.lieve-conditions-popup {
+	position: fixed;
+	z-index: 100100;
+	inset: 0;
+	display: flex;
+	padding: 24px;
+	align-items: center;
+	justify-content: center;
+	overflow: auto;
+	color: var(--lieve-condition-text);
+	font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	overscroll-behavior: contain;
+}
+
+.lieve-conditions-popup * { box-sizing: border-box; }
+
+.lieve-conditions-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	background: rgba(16, 24, 40, 0.58);
+	-webkit-backdrop-filter: blur(4px);
+	backdrop-filter: blur(4px);
+	opacity: 0;
+	transition: opacity 0.18s ease;
+}
+
+.lieve-conditions-popup.is-visible .lieve-conditions-backdrop { opacity: 1; }
+
+.lieve-conditions-dialog {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	width: min(920px, 100%);
+	max-height: calc(100vh - 48px);
+	margin: auto;
+	flex-direction: column;
+	border: 1px solid rgba(16, 24, 40, 0.08);
+	border-radius: 16px;
+	background: #fff;
+	box-shadow: 0 24px 60px rgba(16, 24, 40, 0.28), 0 4px 12px rgba(16, 24, 40, 0.12);
+	overflow: hidden;
+	opacity: 0;
+	outline: none;
+	transform: translateY(10px);
+	transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease;
+}
+
+.lieve-conditions-popup.is-visible .lieve-conditions-dialog {
+	opacity: 1;
+	transform: none;
+}
+
+.lieve-conditions-header {
+	display: flex;
+	padding: 18px 24px 14px;
+	flex: 0 0 auto;
+	justify-content: space-between;
+	align-items: center;
+	gap: 18px;
+	border-bottom: 1px solid #eef0f3;
+}
+
+.lieve-conditions-heading {
+	min-width: 0;
+}
+
+.lieve-conditions-header h2 {
+	margin: 0;
+	color: var(--lieve-condition-text);
+	font-size: 16px;
+	font-weight: 600;
+	line-height: 1.35;
+}
+
+.lieve-conditions-header p {
+	margin: 4px 0 0;
+	color: var(--lieve-condition-muted);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.lieve-conditions-body {
+	min-height: 0;
+	padding: 20px 24px 24px;
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	background: #fff;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+.lieve-conditions-body::-webkit-scrollbar { width: 10px; }
+.lieve-conditions-body::-webkit-scrollbar-track { background: transparent; }
+.lieve-conditions-body::-webkit-scrollbar-thumb {
+	border: 3px solid transparent;
+	border-radius: 10px;
+	background: linear-gradient(180deg, var(--lieve-accent-start,#16c6c0) 0%, var(--lieve-accent-end,#8044e3) 100%) padding-box;
+}
+
+@supports (scrollbar-color: auto) {
+	.lieve-conditions-body { scrollbar-color: var(--lieve-accent-end,#8044e3) transparent; }
+}
+
+.lieve-conditions-footer {
+	display: flex;
+	padding: 16px 24px;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	border-top: 1px solid #eef0f3;
+	background: #fff;
+	color: var(--lieve-condition-muted);
+	font-size: 12px;
+}
+
+.lieve-conditions-status,
+#lieve-conditions-status { margin-right: auto; }
+
+.lieve-conditions-status.is-error,
+#lieve-conditions-status.is-error { color: #b32d2e; }
+
+/* Keep each save hint to the right of its button, including wrapped footers. */
+.lieve-conditions-footer .lieve-save-control,
+.lieve-responsive-footer .lieve-save-control,
+.lieve-ds-footer .lieve-save-control { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; flex: 0 0 auto; max-width: 100%; }
+.lieve-ds-footer:has([data-ds-cancel][hidden]) .lieve-save-control { margin-left: auto; }
+.lieve-save-shortcut { color: var(--lieve-condition-muted, #646970); font-size: 11px; line-height: 1.5; white-space: nowrap; }
+.lieve-save-shortcut kbd { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: inherit; font: inherit; }
+
+.lieve-conditions-popup button {
+	font: inherit;
+	transform: none !important;
+	cursor: pointer;
+}
+
+.lieve-conditions-popup .lieve-conditions-close {
+	display: inline-flex;
+	width: auto;
+	height: auto;
+	margin: 0;
+	padding: 0;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	border: 0 !important;
+	border-radius: 0 !important;
+	background: none !important;
+	box-shadow: none !important;
+	color: #787c82;
+	font-size: 20px;
+	font-weight: 400;
+	line-height: 1;
+	transition: color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.lieve-conditions-popup .lieve-conditions-close:hover {
+	background: none !important;
+	color: var(--lieve-condition-text);
+}
+
+.lieve-conditions-popup .lieve-conditions-close:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--lieve-condition-violet) !important;
+}
+
+.lieve-conditions-save {
+	display: inline-flex;
+	min-width: 112px;
+	min-height: 36px;
+	padding: 0 16px;
+	align-items: center;
+	justify-content: center;
+	border: 0 !important;
+	border-radius: 8px !important;
+	background: var(--lieve-condition-gradient) !important;
+	box-shadow: 0 2px 8px rgba(var(--lieve-accent-end-rgb,128,68,227),0.22) !important;
+	color: #fff !important;
+	font-weight: 600;
+	transition: opacity 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.lieve-conditions-cancel,
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-cancel,
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) :is(.lieve-create-secondary, .lieve-condition-add),
+.lieve-condition-picker-menu[id^="lieve-create-conditions-picker-"] .lieve-condition-more,
+.edit-php.post-type-lieve_template #posts-filter .tablenav .actions .button,
+.edit-php.post-type-lieve_template #posts-filter .search-box .button {
+	min-width: 112px;
+	min-height: 36px;
+	padding: 0 16px;
+	border: 1px solid #c3c4c7 !important;
+	border-radius: 8px !important;
+	background: #fff !important;
+	box-shadow: none !important;
+	color: #3c434a !important;
+	cursor: pointer;
+	transform: none;
+	transition: none !important;
+}
+
+/* Backend secondary actions share the Template list's Cancel-style control.
+ * Keep specificity above the admin-wide button reset and manager font shorthand. */
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-cancel,
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) :is(.lieve-create-secondary, .lieve-condition-add),
+.lieve-condition-picker-menu[id^="lieve-create-conditions-picker-"] .lieve-condition-more,
+.edit-php.post-type-lieve_template #posts-filter .tablenav .actions .button,
+.edit-php.post-type-lieve_template #posts-filter .search-box .button {
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	line-height: 30px !important;
+	outline: none !important;
+}
+
+.lieve-conditions-cancel:hover,
+.lieve-conditions-cancel:focus,
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-cancel:is(:hover, :focus, :active),
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) :is(.lieve-create-secondary, .lieve-condition-add):is(:hover, :focus),
+.lieve-condition-picker-menu[id^="lieve-create-conditions-picker-"] .lieve-condition-more:is(:hover, :focus),
+.edit-php.post-type-lieve_template .subsubsub a:not(.current):is(:hover, :focus-visible),
+.lieve-settings-page .lieve-settings-tabs a:not([aria-selected="true"]):is(:hover, :focus-visible),
+.edit-php.post-type-lieve_template #posts-filter .tablenav .actions .button:is(:hover, :focus),
+.edit-php.post-type-lieve_template #posts-filter .search-box .button:is(:hover, :focus) {
+	border-color: var(--lieve-condition-violet) !important;
+	background: var(--lieve-condition-gradient-soft) !important;
+	box-shadow: none !important;
+	color: var(--lieve-accent-ink,#7040c1) !important;
+}
+
+.lieve-conditions-cancel:focus-visible,
+.lieve-conditions-popup .lieve-conditions-cancel:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(var(--lieve-accent-end-rgb,128,68,227),0.16) !important;
+}
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-cancel:is(:focus, :focus-visible, :active),
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) :is(.lieve-create-secondary, .lieve-condition-add):is(:focus, :focus-visible, :active),
+.lieve-condition-picker-menu[id^="lieve-create-conditions-picker-"] .lieve-condition-more:is(:focus, :focus-visible, :active),
+.edit-php.post-type-lieve_template #posts-filter .tablenav .actions .button:is(:focus, :focus-visible, :active),
+.edit-php.post-type-lieve_template #posts-filter .search-box .button:is(:focus, :focus-visible, :active) {
+	outline: none !important;
+	box-shadow: none !important;
+}
+
+/* One quiet-action skin for Template list filters and template creation. */
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) :is(.lieve-create-secondary, .lieve-condition-add),
+.lieve-condition-picker-menu[id^="lieve-create-conditions-picker-"] .lieve-condition-more,
+.edit-php.post-type-lieve_template #posts-filter .tablenav .actions .button,
+.edit-php.post-type-lieve_template #posts-filter .search-box .button {
+	border-color: #e6e8ec !important;
+	background: transparent !important;
+	color: #50575e !important;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+
+/* The Conditions modal shares the library's primary/quiet action skins.
+ * Keep both footer actions 40px high; icon-only remove/close controls are untouched. */
+#lieve-conditions-modal :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more),
+#lieve-conditions-modal .lieve-conditions-save {
+	--towp-radius-sm: var(--lieve-radius-sm, 8px);
+	display: inline-flex;
+	min-height: 40px;
+	padding: 0 16px;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	box-sizing: border-box;
+	border-radius: var(--towp-radius-sm) !important;
+	box-shadow: none !important;
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	line-height: 38px !important;
+	text-decoration: none;
+	cursor: pointer;
+	transform: none !important;
+}
+#lieve-conditions-modal :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more) {
+	border: 1px solid #e6e8ec !important;
+	background: transparent !important;
+	color: #50575e !important;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+#lieve-conditions-modal :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more):is(:hover, :focus-visible) {
+	border-color: var(--lieve-condition-violet) !important;
+	background: var(--lieve-condition-gradient-soft) !important;
+	color: var(--lieve-accent-ink,#7040c1) !important;
+}
+#lieve-conditions-modal .lieve-condition-more[hidden] { display: none; }
+#lieve-conditions-modal .lieve-conditions-save {
+	border-top: 1px solid transparent !important;
+	border-bottom: 1px solid transparent !important;
+	border-left: 0 !important;
+	border-right: 0 !important;
+	background: linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),1) 0%, rgba(var(--lieve-accent-end-rgb,128,68,227),1) 100%) !important;
+	color: #fff !important;
+	transition: opacity .15s ease, box-shadow .15s ease !important;
+}
+#lieve-conditions-modal .lieve-conditions-save:not(:disabled) { opacity: 1; }
+#lieve-conditions-modal .lieve-conditions-save:not(:disabled):is(:hover, :focus-visible) { opacity: 0.85; }
+#lieve-conditions-modal :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more, .lieve-conditions-save):disabled { cursor: default; }
+#lieve-conditions-modal :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more, .lieve-conditions-save):focus-visible {
+	outline: 2px solid var(--lieve-condition-violet);
+	outline-offset: 2px;
+}
+.lieve-workspace[data-color-mode="dark"] #lieve-conditions-modal :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more) {
+	border-color: var(--lv-border) !important;
+	color: var(--lv-text-2) !important;
+}
+.lieve-workspace[data-color-mode="dark"] #lieve-conditions-modal :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more):is(:hover, :focus-visible) {
+	border-color: var(--lv-violet) !important;
+	color: var(--lv-accent-text) !important;
+}
+.lieve-conditions-save:not(:disabled):hover,
+.lieve-conditions-save:not(:disabled):focus {
+	background: var(--lieve-condition-gradient) !important;
+	box-shadow: 0 4px 12px rgba(var(--lieve-accent-end-rgb,128,68,227),0.28) !important;
+	color: #fff !important;
+	opacity: 0.9;
+}
+.lieve-conditions-save:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--lieve-condition-violet) !important;
+}
+.lieve-conditions-popup button:disabled { opacity: 0.45; cursor: default; }
+
+.lieve-conditions-builder {
+	--lieve-popup-text: var(--lv-text, #1d2327);
+	--lieve-popup-muted: var(--lv-muted, #50575e);
+	--lieve-popup-line: var(--ds-border, var(--lv-border, #e6e8ec));
+	--lieve-condition-columns: 18px 118px 196px minmax(180px, 1fr) 28px;
+}
+
+.lieve-popup-opening {
+	display: grid;
+	gap: 8px;
+	margin-bottom: 20px;
+	padding-bottom: 20px;
+	border-bottom: 1px solid var(--lieve-popup-line);
+	color: var(--lieve-popup-text);
+}
+.lieve-popup-opening > label { font-size: 13px; font-weight: 600; }
+.lieve-popup-opening > .lieve-popup-opening-control { display: block; min-height: 0; width: min(100%, 320px); background: transparent; }
+.lieve-popup-opening-control > select { width: 100%; }
+.lieve-popup-opening > p { margin: 0; max-width: 70ch; color: var(--lieve-popup-muted); font-size: 12px; line-height: 1.6; }
+.lieve-popup-select-layer.lieve-ds { position: relative; z-index: 100010; display: block; min-height: 0; background: transparent; }
+
+.lieve-condition-toolbar {
+	display: flex;
+	min-height: 36px;
+	margin-bottom: 16px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.lieve-condition-total { color: var(--lieve-condition-muted); font-size: 12px; font-weight: 500; }
+.lieve-conditions-builder .lieve-condition-add {
+	display: inline-flex;
+	min-height: 34px;
+	margin: 0;
+	padding: 0 12px;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	border: 1px solid var(--lieve-condition-border) !important;
+	border-radius: 8px !important;
+	background: #fff !important;
+	box-shadow: none !important;
+	color: #50575e !important;
+	font: 600 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	cursor: pointer;
+	transform: none !important;
+	transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease !important;
+}
+.lieve-conditions-builder .lieve-condition-add:hover {
+	border-color: rgba(var(--lieve-accent-end-rgb,128,68,227),0.4) !important;
+	background: var(--lieve-condition-gradient-soft) !important;
+	color: var(--lieve-condition-violet) !important;
+}
+
+.lieve-condition-columns,
+.lieve-condition-row-main {
+	display: grid;
+	grid-template-columns: var(--lieve-condition-columns);
+	align-items: center;
+	gap: 12px;
+}
+.lieve-condition-columns {
+	padding: 0 14px 10px;
+	color: #646970;
+	font-size: 11px;
+	font-weight: 600;
+}
+.lieve-condition-list {
+	border: 1px solid var(--lieve-condition-border);
+	border-radius: 10px;
+	background: #fff;
+}
+.lieve-condition-row {
+	position: relative;
+	border: 0;
+	border-bottom: 1px solid #eef0f3;
+	background: #fff;
+	color: var(--lieve-condition-text);
+	user-select: none;
+	transition: background 0.14s ease;
+}
+.lieve-condition-row:first-child { border-radius: 10px 10px 0 0; }
+.lieve-condition-row:last-child { border-bottom: 0; border-radius: 0 0 10px 10px; }
+.lieve-condition-row:only-child { border-radius: 10px; }
+.lieve-condition-row:hover { background: #fbfbfc; }
+.lieve-condition-row-main { min-height: 74px; padding: 16px 14px; }
+.lieve-condition-list.is-ready .lieve-condition-row { cursor: grab; }
+.lieve-condition-list.is-ready .lieve-condition-row:active { cursor: grabbing; }
+.lieve-condition-row:focus { outline: none; }
+.lieve-condition-row:focus-visible { box-shadow: inset 0 0 0 2px rgba(var(--lieve-accent-end-rgb,128,68,227),0.4); }
+.lieve-condition-row label,
+.lieve-condition-row button,
+.lieve-condition-row input,
+.lieve-condition-row select { user-select: auto; }
+
+.lieve-condition-drag {
+	display: inline-flex;
+	width: 18px;
+	align-items: center;
+	justify-content: center;
+	color: #a0a5af;
+	font-size: 16px;
+	letter-spacing: -2px;
+	line-height: 1;
+	cursor: inherit;
+}
+.lieve-condition-row:hover .lieve-condition-drag { color: var(--lieve-condition-violet); }
+.lieve-condition-row.ui-sortable-helper {
+	z-index: 100102;
+	border: 1px solid #9ca3af;
+	border-radius: 10px;
+	background: #fff;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.13);
+	cursor: grabbing;
+}
+.lieve-condition-row.ui-sortable-placeholder {
+	border: 1px dashed rgba(var(--lieve-accent-end-rgb,128,68,227),0.5) !important;
+	border-radius: 10px;
+	background: var(--lieve-condition-gradient-soft) !important;
+	visibility: visible !important;
+}
+
+.lieve-conditions-builder label.lieve-condition-field {
+	display: grid;
+	min-width: 0;
+	margin: 0 !important;
+	gap: 6px;
+	letter-spacing: 0;
+	text-transform: none;
+}
+.lieve-condition-row-main > .lieve-condition-field > span {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+.lieve-condition-field > span {
+	color: #646970;
+	font-size: 11px;
+	font-weight: 500;
+}
+.lieve-conditions-builder .lieve-condition-field select,
+.lieve-conditions-builder .lieve-condition-field input:not([type="checkbox"]) {
+	width: 100%;
+	max-width: none;
+	height: 38px;
+	min-height: 38px;
+	margin: 0;
+	padding: 0 10px;
+	border: 1px solid var(--lieve-condition-border);
+	border-radius: 8px;
+	background-color: #fff;
+	box-shadow: none;
+	color: #2c3338;
+	font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.lieve-conditions-builder .lieve-condition-field select { padding-right: 28px; }
+.lieve-conditions-builder .lieve-condition-select.lieve-ds { min-height: 0; width: 100%; background: transparent; }
+.lieve-conditions-builder .lieve-condition-select .lieve-ds-select-trigger { width: 100%; min-height: 38px; padding: 8px 10px; border-radius: 8px; font-size: 12px; }
+.lieve-conditions-builder .lieve-condition-field select:hover { border-color: #c3c4c7; }
+.lieve-conditions-builder .lieve-condition-field select:focus,
+.lieve-conditions-builder .lieve-condition-field input:not([type="checkbox"]):focus {
+	border-color: var(--lieve-condition-violet);
+	box-shadow: 0 0 0 3px rgba(var(--lieve-accent-end-rgb,128,68,227),0.16);
+	outline: none;
+}
+.lieve-condition-targets { display: grid; min-width: 0; gap: 8px; }
+.lieve-condition-scope { padding: 0 2px; color: #8a8f98; font-size: 12px; line-height: 1.5; }
+.lieve-condition-picker { min-width: 0; }
+.lieve-conditions-builder .lieve-condition-picker-trigger {
+	display: flex;
+	width: 100%;
+	min-height: 38px;
+	margin: 0;
+	padding: 5px 10px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	border: 1px solid var(--lieve-condition-border) !important;
+	border-radius: 8px !important;
+	background: #fff !important;
+	box-shadow: none !important;
+	color: #2c3338;
+	font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.lieve-conditions-builder .lieve-condition-picker-trigger:hover { border-color: #c3c4c7 !important; }
+.lieve-conditions-builder .lieve-condition-picker-trigger[aria-expanded="true"],
+.lieve-conditions-builder .lieve-condition-picker-trigger:focus-visible {
+	border-color: var(--lieve-condition-violet) !important;
+	box-shadow: 0 0 0 3px rgba(var(--lieve-accent-end-rgb,128,68,227),0.16) !important;
+	outline: none;
+}
+.lieve-condition-picker-summary { display: flex; min-width: 0; flex: 1; align-items: center; gap: 4px; }
+.lieve-condition-picker-placeholder { overflow: hidden; color: #8a8f98; text-overflow: ellipsis; white-space: nowrap; }
+.lieve-condition-picker-tag {
+	min-width: 0;
+	padding: 3px 7px;
+	border-radius: 5px;
+	background: var(--lieve-condition-gradient-soft);
+	color: var(--lieve-accent-ink,#6636a7);
+	font-size: 11px;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.lieve-condition-picker-count { flex-shrink: 0; color: #646970; font-size: 11px; }
+.lieve-condition-picker-arrow { display: flex; flex-shrink: 0; color: #8a8f98; }
+.lieve-condition-picker-menu {
+	position: fixed;
+	z-index: 100103;
+	display: flex;
+	padding: 8px;
+	flex-direction: column;
+	border: 1px solid #e6e8ec;
+	border-radius: 12px;
+	background: #fff;
+	box-shadow: 0 12px 32px rgba(16, 24, 40, 0.14), 0 2px 6px rgba(16, 24, 40, 0.06);
+	color: #2c3338;
+	font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.lieve-condition-picker-menu * { box-sizing: border-box; }
+.lieve-condition-picker-heading {
+	display: flex;
+	padding: 5px 6px 10px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.lieve-condition-picker-heading strong { font-size: 12px; font-weight: 600; }
+.lieve-condition-picker-heading > span { color: #8a8f98; font-size: 11px; }
+.lieve-condition-picker-menu input.lieve-condition-picker-search {
+	width: 100%;
+	height: 34px;
+	min-height: 34px;
+	margin: 0 0 8px;
+	padding: 0 10px;
+	border: 1px solid #e6e8ec;
+	border-radius: 8px;
+	background: #f7f8fa;
+	box-shadow: none;
+	color: #2c3338;
+	font: inherit;
+}
+.lieve-condition-picker-menu input.lieve-condition-picker-search:focus {
+	border-color: var(--lieve-accent-end,#8044e3);
+	box-shadow: 0 0 0 3px rgba(var(--lieve-accent-end-rgb,128,68,227),0.12);
+	outline: none;
+}
+.lieve-condition-picker-options { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.lieve-condition-picker-option {
+	position: relative;
+	display: flex;
+	min-height: 36px;
+	margin: 0;
+	padding: 8px;
+	align-items: center;
+	gap: 10px;
+	border-radius: 7px;
+	cursor: pointer;
+}
+.lieve-condition-picker-option:hover { background: #f7f8fa; }
+.lieve-condition-picker-option:has(input:checked) { background: linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),0.07), rgba(var(--lieve-accent-end-rgb,128,68,227),0.07)); }
+.lieve-condition-switch {
+	position: relative;
+	display: inline-block;
+	width: 40px;
+	height: 22px;
+	flex-shrink: 0;
+	cursor: pointer;
+}
+.lieve-condition-switch input[type="checkbox"] {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	opacity: 0;
+	cursor: inherit;
+}
+.lieve-condition-switch-slider {
+	position: absolute;
+	inset: 0;
+	border-radius: 999px;
+	background: #c3c4c7;
+	pointer-events: none;
+}
+/* Fade a separate gradient layer, as in TheOneWP, to retain rounded corners. */
+.lieve-condition-switch-slider::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: var(--lieve-condition-gradient, var(--lieve-gradient, linear-gradient(90deg, var(--lieve-accent-start,#16c6c0), var(--lieve-accent-end,#8044e3))));
+	opacity: 0;
+	transition: opacity 0.2s;
+}
+.lieve-condition-switch-slider::before {
+	content: "";
+	position: absolute;
+	z-index: 1;
+	top: 50%;
+	left: 3px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+	transform: translateY(-50%);
+	transition: left 0.2s;
+}
+.lieve-condition-switch input:checked + .lieve-condition-switch-slider::after { opacity: 1; }
+.lieve-condition-switch input:checked + .lieve-condition-switch-slider::before { left: calc(100% - 19px); }
+.lieve-condition-switch input:focus-visible + .lieve-condition-switch-slider {
+	outline: 2px solid var(--lieve-accent-end,#8044e3);
+	outline-offset: 2px;
+}
+.lieve-condition-switch input:disabled + .lieve-condition-switch-slider { opacity: 0.45; }
+.lieve-condition-switch:has(input:disabled) { cursor: default; }
+.lieve-condition-picker-option > span:last-child {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.lieve-condition-picker-empty { padding: 12px 8px; color: #8a8f98; }
+.lieve-condition-picker-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lieve-condition-picker-footer:has(small:empty):has(button[hidden]) { display: none; }
+.lieve-condition-picker-footer small { padding: 6px; color: #646970; font-size: 11px; }
+.lieve-condition-picker-menu .lieve-condition-more {
+	min-height: 28px;
+	margin: 6px 0 0;
+	padding: 0 8px;
+	border: 1px solid #e6e8ec;
+	border-radius: 6px;
+	background: #fff;
+	color: var(--lieve-accent-ink,#6636a7);
+	font: inherit;
+	cursor: pointer;
+}
+.lieve-condition-more[hidden] { display: none; }
+
+.lieve-condition-row-details {
+	display: flex;
+	padding: 0 54px 16px 44px;
+	align-items: end;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+.lieve-condition-row-details .is-wide { min-width: 200px; flex: 1; }
+.lieve-condition-row-details .is-priority { width: 112px; }
+.lieve-condition-hook-hint { width: 100%; margin: 0; color: #8a8f98; font-size: 11px; line-height: 1.55; }
+.lieve-conditions-builder label.lieve-condition-checkbox {
+	position: relative;
+	display: inline-flex !important;
+	min-height: 28px;
+	margin: 0 !important;
+	padding: 0;
+	align-items: center;
+	gap: 8px;
+	color: #646970;
+	font-size: 12px !important;
+	font-weight: 400 !important;
+	letter-spacing: 0 !important;
+	text-transform: none !important;
+	cursor: pointer;
+}
+.lieve-condition-checkbox.is-active { color: var(--lieve-accent-ink,#6636a7); }
+
+.lieve-conditions-builder .lieve-condition-remove {
+	display: inline-flex;
+	box-sizing: border-box;
+	width: 28px;
+	height: 28px;
+	min-height: 28px;
+	margin: 0;
+	padding: 0;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid transparent !important;
+	border-radius: 8px !important;
+	background: none !important;
+	box-shadow: none !important;
+	color: #8a8f98;
+	line-height: 0;
+	cursor: pointer;
+	text-decoration: none;
+	transition: color 0.12s, background 0.12s, border-color 0.12s !important;
+}
+.lieve-condition-remove svg { pointer-events: none; }
+.lieve-conditions-builder .lieve-condition-remove:hover,
+.lieve-conditions-builder .lieve-condition-remove:focus-visible {
+	border-color: rgba(214, 54, 56, 0.35) !important;
+	background: rgba(214, 54, 56, 0.08) !important;
+	color: #d63638;
+}
+.lieve-conditions-builder .lieve-condition-remove:focus { outline: none; }
+.lieve-conditions-builder .lieve-condition-remove:focus-visible { box-shadow: 0 0 0 3px rgba(var(--lieve-accent-end-rgb,128,68,227),0.16) !important; }
+.lieve-condition-empty { padding: 32px 24px; color: #8a8f98; font-size: 12px; line-height: 1.6; text-align: center; }
+
+@media (max-width: 760px) {
+	.lieve-conditions-popup { padding: 16px; }
+	.lieve-conditions-dialog { max-height: calc(100vh - 32px); }
+	.lieve-conditions-builder,
+	.lieve-conditions-popup { --lieve-condition-columns: 18px 110px minmax(0, 1fr) 28px; }
+	.lieve-condition-columns > span:nth-child(4) { display: none; }
+	.lieve-condition-row-main .lieve-condition-targets { grid-column: 2 / 4; grid-row: 2; }
+	.lieve-condition-row-main .lieve-condition-remove { grid-column: 4; grid-row: 1; }
+	.lieve-condition-row-details { padding-right: 14px; }
+}
+@media (max-width: 480px) {
+	.lieve-conditions-popup { padding: 10px; }
+	.lieve-conditions-dialog { max-height: calc(100vh - 20px); border-radius: 12px; }
+	.lieve-conditions-header,
+	.lieve-conditions-body,
+	.lieve-conditions-footer { padding-right: 16px; padding-left: 16px; }
+	.lieve-conditions-builder,
+	.lieve-conditions-popup { --lieve-condition-columns: 14px 88px minmax(0, 1fr) 28px; }
+	.lieve-condition-columns,
+	.lieve-condition-row-main { padding-right: 10px; padding-left: 10px; gap: 8px; }
+	.lieve-condition-row-details { padding-left: 32px; }
+	.lieve-conditions-footer { flex-wrap: wrap; }
+	#lieve-conditions-status { width: 100%; }
+	.lieve-conditions-cancel,
+	.lieve-conditions-save { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+	#lieve-conditions-modal :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more, .lieve-conditions-save),
+	.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) :is(.lieve-create-secondary, .lieve-condition-add),
+	.lieve-condition-picker-menu[id^="lieve-create-conditions-picker-"] .lieve-condition-more,
+	.edit-php.post-type-lieve_template #posts-filter .tablenav .actions .button,
+	.edit-php.post-type-lieve_template #posts-filter .search-box .button,
+	.lieve-conditions-backdrop,
+	.lieve-conditions-dialog,
+	.lieve-condition-switch-slider::before,
+	.lieve-condition-switch-slider::after { transition: none !important; }
+}
+#lieve-conditions-modal .lieve-condition-error,
+.lieve-conditions-builder .lieve-condition-error { margin: 0; padding: 8px 12px; color: #b32d2e; font-size: 12px; line-height: 1.5; }
+.lieve-conditions-builder .lieve-condition-error[hidden] { display: none; }
+.lieve-conditions-builder .lieve-condition-row.has-error { border-color: #dba3a3; }

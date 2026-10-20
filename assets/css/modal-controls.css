@@ -1,0 +1,124 @@
+/* Shared dialog chrome: Library, Template Conditions and token action sheets.
+ * Scope to actual dialogs, never backend page controls or authored canvas markup. */
+.lieve-modal-skin {
+	--lm-surface: var(--lv-surface, var(--ds-surface, #fff));
+	--lm-soft: var(--lv-surface-3, var(--ds-soft, #f7f8fa));
+	--lm-border: var(--lv-border, var(--ds-border, #e6e8ec));
+	--lm-border-soft: var(--lv-border-soft, #eef0f3);
+	--lm-text: var(--lv-text, var(--ds-text, #1d2327));
+	--lm-text-2: var(--lv-text-2, #50575e);
+	--lm-muted: var(--lv-muted, var(--ds-muted, #646970));
+	--lm-accent: var(--lv-violet, var(--lieve-accent-end, #8044e3));
+	--lm-accent-text: var(--lv-accent-text, var(--lieve-accent-ink, #7040c1));
+	--lm-gradient: var(--lv-gradient, var(--lieve-gradient, linear-gradient(90deg, var(--lieve-accent-start, #16c6c0), var(--lieve-accent-end, #8044e3))));
+	--lm-gradient-soft: var(--lv-gradient-soft, var(--lieve-gradient-soft, linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),.13), rgba(var(--lieve-accent-end-rgb,128,68,227),.13))));
+	--lm-ring: var(--lv-ring, 0 0 0 3px rgba(var(--lieve-accent-end-rgb,128,68,227),.16));
+	--lm-font: var(--lv-font-ui, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+	color: var(--lm-text); font: 13px/1.5 var(--lm-font);
+}
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] { min-height: 0; color: var(--lm-text); background: var(--lm-surface); }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-template-header, .lieve-conditions-header, form > header) { min-height: 80px; padding: 20px 24px; align-items: center; gap: 16px; border-color: var(--lm-border-soft); background: var(--lm-surface); }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-template-header h2, .lieve-conditions-heading h2, .lieve-ds-action-heading h3) { margin: 0; color: var(--lm-text); font: 600 16px/1.4 var(--lm-font); }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-template-header p, .lieve-conditions-heading p, .lieve-ds-action-heading p) { margin: 4px 0 0; color: var(--lm-muted); font: 12px/1.6 var(--lm-font); }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-template-create, .lieve-conditions-footer, form > footer) { min-height: 80px; padding: 18px 24px; align-items: center; gap: 10px; border-color: var(--lm-border-soft); background: var(--lm-surface); color: var(--lm-muted); }
+
+/* The same neutral base and permanent hover layer as the extended editor managers. */
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more, .lieve-template-apply, .lieve-template-filter) {
+	position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+	min-width: 0; height: 40px; min-height: 40px; margin: 0; padding: 0 16px; gap: 6px;
+	border: 1px solid var(--lm-border) !important; border-radius: 8px !important; background: transparent !important;
+	color: var(--lm-text-2) !important; box-shadow: none !important; font: 500 13px/38px var(--lm-font) !important;
+	text-decoration: none; transform: none !important; transition: border-color .15s, background .15s, color .15s !important;
+}
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-template-close, .lieve-conditions-close, .lieve-ds-icon) {
+	position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+	width: 36px; height: 36px; min-width: 36px; min-height: 36px; margin: 0; padding: 0; flex: 0 0 36px;
+	border: 1px solid var(--lm-border) !important; border-radius: 8px !important; background: transparent !important;
+	color: var(--lm-muted); box-shadow: none !important; transition: border-color .15s, background .15s, color .15s !important;
+}
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more, .lieve-template-apply, .lieve-template-filter, .lieve-template-close, .lieve-conditions-close, .lieve-ds-icon)::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--lm-gradient-soft); opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more, .lieve-template-apply, .lieve-template-filter, .lieve-template-close, .lieve-conditions-close, .lieve-ds-icon):not(:disabled):is(:hover, :focus-visible) { border-color: var(--lieve-accent-border, var(--lm-accent)) !important; background: transparent !important; color: var(--lm-accent-text) !important; box-shadow: none !important; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-conditions-cancel, .lieve-condition-add, .lieve-condition-more, .lieve-template-apply, .lieve-template-filter, .lieve-template-close, .lieve-conditions-close, .lieve-ds-icon):not(:disabled):is(:hover, :focus-visible)::before { opacity: 1; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-conditions-save, .lieve-button-primary) {
+	display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 40px; min-height: 40px; padding: 0 16px; gap: 6px;
+	border-top: 1px solid transparent !important; border-bottom: 1px solid transparent !important; border-left: 0 !important; border-right: 0 !important;
+	border-radius: 8px !important; background: var(--lm-gradient) !important; color: #fff !important; box-shadow: none !important;
+	font: 500 13px/38px var(--lm-font) !important; text-decoration: none; transition: opacity .15s ease, box-shadow .15s ease !important;
+}
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-conditions-save, .lieve-button-primary):not(:disabled) { opacity: 1; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-conditions-save, .lieve-button-primary):not(:disabled):is(:hover, :focus-visible) { opacity: .85; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(button, a):focus:not(:focus-visible) { outline: none !important; box-shadow: none !important; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(button, a):focus-visible { outline: 2px solid var(--lm-accent) !important; outline-offset: 3px; box-shadow: none !important; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] button:disabled { opacity: .45; cursor: default; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(button, a) > svg { width: 16px; height: 16px; flex: 0 0 auto; pointer-events: none; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] footer .lieve-conditions-cancel { min-width: 112px; }
+
+/* Fields keep their existing select behavior, including searchable multiple targets. */
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-ds-field input:not([type="checkbox"]), .lieve-ds-field textarea, .lieve-ds-select-trigger, .lieve-condition-field select, .lieve-condition-field input:not([type="checkbox"]), .lieve-condition-picker-trigger) {
+	min-height: 40px; border: 1px solid var(--lm-border) !important; border-radius: 8px !important;
+	background-color: var(--lm-surface) !important; color: var(--lm-text); box-shadow: none; caret-color: var(--lm-accent);
+	font: 400 13px/1.5 var(--lm-font); transition: border-color .15s, box-shadow .15s !important;
+}
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-ds-field input:not([type="checkbox"]), .lieve-ds-field textarea) { padding: 9px 12px; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-ds-field input:not([type="checkbox"]), .lieve-ds-field textarea, .lieve-condition-field input:not([type="checkbox"])):focus,
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-ds-select-trigger, .lieve-condition-field select, .lieve-condition-picker-trigger):is(:focus-visible, [aria-expanded="true"]) { outline: none !important; border-color: var(--lm-accent) !important; box-shadow: var(--lm-ring) !important; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] input[aria-invalid="true"] { border-color: var(--lv-danger, #d63638) !important; }
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(input, textarea)::placeholder { color: var(--lm-muted); opacity: 1; }
+
+/* Template library layout retains the existing filters, assignments and application flow. */
+#lieve-template-modal.lieve-modal-skin { padding: 24px; }
+#lieve-template-modal.lieve-modal-skin .lieve-template-dialog { max-height: min(900px, calc(100dvh - 48px)); grid-template-rows: auto auto minmax(0, 1fr) auto; }
+#lieve-template-modal.lieve-modal-skin .lieve-template-assignments { padding: 16px 24px; gap: 10px; border-color: var(--lm-border-soft); background: var(--lm-soft); }
+#lieve-template-modal.lieve-modal-skin .lieve-template-assignment { min-height: 40px; padding: 8px 12px; background: var(--lm-surface); font-size: 12px; }
+#lieve-template-modal.lieve-modal-skin .lieve-template-categories { padding: 24px 12px; background: var(--lm-soft); }
+#lieve-template-modal.lieve-modal-skin .lieve-template-label { padding: 0 10px 16px; color: var(--lm-text); font: 600 12px/1.5 var(--lm-font); letter-spacing: 0; text-transform: none; }
+#lieve-template-modal.lieve-modal-skin #lieve-template-filters { gap: 8px; }
+#lieve-template-modal.lieve-modal-skin .lieve-modal-dialog[role="dialog"] .lieve-template-filter { justify-content: space-between; padding-inline: 12px; }
+#lieve-template-modal.lieve-modal-skin .lieve-modal-dialog[role="dialog"] .lieve-template-filter.is-active { padding-inline: 13px; border-top: 1px solid transparent !important; border-bottom: 1px solid transparent !important; border-left: 0 !important; border-right: 0 !important; color: #fff !important; background: var(--lm-gradient) !important; transition: opacity .15s ease, box-shadow .15s ease !important; }
+#lieve-template-modal.lieve-modal-skin .lieve-modal-dialog[role="dialog"] .lieve-template-filter.is-active::before { content: none; }
+#lieve-template-modal.lieve-modal-skin .lieve-modal-dialog[role="dialog"] .lieve-template-filter.is-active:hover { opacity: .85; }
+#lieve-template-modal.lieve-modal-skin .lieve-template-main { padding: 24px; background: var(--lm-surface); }
+#lieve-template-modal.lieve-modal-skin .lieve-template-card { padding: 20px; gap: 20px; }
+#lieve-template-modal.lieve-modal-skin .lieve-template-type-badge { color: var(--lm-accent-text); letter-spacing: 0; text-transform: none; font: 500 11px/1.5 var(--lm-font); }
+#lieve-template-modal.lieve-modal-skin .lieve-template-create > div { gap: 4px; }
+#lieve-template-modal.lieve-modal-skin .lieve-template-create span { color: var(--lm-muted); font-size: 12px; line-height: 1.6; }
+#lieve-template-modal.lieve-modal-skin :is(.lieve-template-main, .lieve-template-categories) { scrollbar-width: thin; scrollbar-color: var(--lm-border) transparent; overscroll-behavior: contain; }
+
+/* Conditions' picker is portaled beside the dialog so it remains outside the scroller. */
+#lieve-conditions-modal.lieve-modal-skin { --lieve-condition-border: var(--lm-border); --lieve-condition-text: var(--lm-text); --lieve-condition-muted: var(--lm-muted); --lieve-condition-soft: var(--lm-soft); }
+#lieve-conditions-modal.lieve-modal-skin .lieve-conditions-body { padding: 24px; background: var(--lm-surface); }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu { color: var(--lm-text); background: var(--lm-surface); font-family: var(--lm-font); }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu input.lieve-condition-picker-search { height: 40px; border-color: var(--lm-border); border-radius: 8px; background: var(--lm-surface); color: var(--lm-text); font: 13px/1.5 var(--lm-font); caret-color: var(--lm-accent); }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu input.lieve-condition-picker-search:focus { border-color: var(--lm-accent); outline: none; box-shadow: var(--lm-ring); }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-row-main { align-items: center; }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-remove { transition: background .15s, color .15s !important; }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu .lieve-condition-more { border-color: var(--lm-border) !important; background: transparent !important; color: var(--lm-text-2) !important; transition: border-color .15s, background .15s, color .15s !important; }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu .lieve-condition-more { position: relative; isolation: isolate; border-radius: 8px; }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu .lieve-condition-more::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--lm-gradient-soft); opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu .lieve-condition-more:not(:disabled):is(:hover, :focus-visible) { border-color: var(--lm-accent) !important; color: var(--lm-accent-text) !important; }
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu .lieve-condition-more:not(:disabled):is(:hover, :focus-visible)::before { opacity: 1; }
+
+/* Explicit hidden states must beat the inline-flex button skin. */
+:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] [hidden],
+#lieve-conditions-modal.lieve-modal-skin .lieve-condition-picker-menu .lieve-condition-more[hidden] { display: none !important; }
+
+@media (max-width: 680px) {
+	:is(#lieve-template-modal, #lieve-conditions-modal).lieve-modal-skin { padding: 12px; }
+	:is(#lieve-template-modal, #lieve-conditions-modal).lieve-modal-skin .lieve-modal-dialog { max-height: calc(100dvh - 24px); }
+	:is(#lieve-template-modal, #lieve-conditions-modal, .lieve-full-preview-modal, .lieve-code-editor-modal, [data-ds-action-layer]).lieve-modal-skin .lieve-modal-dialog[role="dialog"] :is(.lieve-template-header, .lieve-conditions-header, .lieve-template-create, .lieve-conditions-footer, form > header, form > footer) { padding: 16px; }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-assignments { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-content { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-categories { padding: 16px; border-right: 0; border-bottom: 1px solid var(--lm-border); overflow: hidden; }
+	#lieve-template-modal.lieve-modal-skin #lieve-template-filters { display: flex; overflow-x: auto; gap: 8px; }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-filter { flex: 0 0 auto; width: auto; white-space: nowrap; }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-label { padding: 0 0 12px; }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-main { padding: 16px; }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-grid { grid-template-columns: minmax(0, 1fr); }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-create { grid-template-columns: minmax(0, 1fr); }
+	#lieve-template-modal.lieve-modal-skin .lieve-template-create > a { justify-self: end; }
+	#lieve-conditions-modal.lieve-modal-skin .lieve-conditions-body { padding: 16px; }
+	#lieve-conditions-modal.lieve-modal-skin .lieve-conditions-footer { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.lieve-modal-skin *, .lieve-modal-skin *::before { transition: none !important; }
+}

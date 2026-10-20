@@ -1,0 +1,12 @@
+/* Inherited template content has the same clean baseline as the published site. */
+#lieve-canvas .lieve-inherited-template { position: relative; }
+#lieve-canvas .lieve-inherited-template-content { display: contents; }
+.lieve-workspace #lieve-canvas:has(> .lieve-inherited-template) .lieve-canvas-empty { min-height: max(300px, calc(100vh - 208px - var(--lv-inherited-height, 0px))); }
+#lieve-canvas .lieve-template-preview-tools { position: absolute; z-index: 5; top: 6px; right: 6px; display: flex; max-width: calc(100% - 12px); padding: 6px 8px; align-items: center; gap: 8px; border-radius: 7px; background: var(--lv-surface, #fff); color: var(--lv-text-2, #50575e); box-shadow: 0 2px 10px rgba(16,24,40,.14); font: 10px/1.5 var(--lv-font-ui); opacity: 0; pointer-events: none; }
+#lieve-canvas .lieve-template-preview-tools span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#lieve-canvas .lieve-template-preview-tools a { flex-shrink: 0; padding: 3px 6px; border-radius: 5px; background: var(--lv-gradient-soft); color: var(--lv-violet); font: inherit; text-decoration: none; }
+#lieve-canvas .lieve-template-preview-tools a:focus-visible { outline: 1px solid var(--lv-violet); outline-offset: 2px; }
+#lieve-canvas .lieve-inherited-template:is(:hover, :focus-within) > .lieve-template-preview-tools { opacity: 1; pointer-events: auto; }
+.lieve-workspace[data-color-mode="dark"] #lieve-canvas .lieve-template-preview-tools a { color: var(--lv-accent-text); }
+.lieve-workspace .lieve-template-assignment small { color: var(--lv-muted); font-size: 9px; line-height: 1.4; white-space: nowrap; }
+@media (hover: none) { #lieve-canvas .lieve-template-preview-tools { opacity: 1; pointer-events: auto; } }

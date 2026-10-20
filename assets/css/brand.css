@@ -1,0 +1,51 @@
+/* One accent source drives the interface; semantic status colors stay independent. */
+:root {
+	--lieve-accent-start: #16c6c0;
+	--lieve-accent-end: #8044e3;
+	--lieve-accent-start-rgb: 22,198,192;
+	--lieve-accent-end-rgb: 128,68,227;
+	--lieve-accent-start-ink: color-mix(in srgb,var(--lieve-accent-start) 80%,black);
+	--lieve-accent-ink: color-mix(in srgb,var(--lieve-accent-end) 85%,black);
+	--lieve-accent-ink-strong: color-mix(in srgb,var(--lieve-accent-end) 70%,black);
+	--lieve-accent-tint: color-mix(in srgb,var(--lieve-accent-end) 45%,white);
+	--lieve-accent-border: color-mix(in srgb,var(--lieve-accent-end) 55%,white);
+	--lieve-accent-surface: color-mix(in srgb,var(--lieve-accent-end) 8%,white);
+}
+
+/* The original brand asset is scaled without masking, cropping, or extra effects. */
+.lieve-brand-logo {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+#toplevel_page_lieve-dashboard .wp-menu-image img {
+	width: 20px;
+	height: 20px;
+	padding: 7px 0 0;
+	object-fit: contain;
+	opacity: 1;
+}
+
+/* Template status has one appearance in the library and editor. */
+.lieve-template-state { display: inline-flex; align-items: center; min-height: 28px; padding: 0 9px; border-radius: var(--lieve-radius-sm,8px); background: #f0f1f3; color: #50575e; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; font-size: 12px; font-weight: 500; line-height: 1.625; white-space: nowrap; }
+.lieve-template-state[data-template-state="active"] { background: #e8f5ef; color: #216b4b; }
+.lieve-template-state[data-template-state="manual"] { background-color: #fff; background-image: var(--lieve-gradient-soft,linear-gradient(90deg,rgba(var(--lieve-accent-start-rgb,22,198,192),.13) 0%,rgba(var(--lieve-accent-end-rgb,128,68,227),.13) 100%)); }
+
+/* Search clear buttons share the neutral/soft-accent chrome in every Lieve manager. */
+.lieve-search-field { position: relative; display: inline-flex; box-sizing: border-box; flex: 1 1 auto; min-width: 0; width: 100%; max-width: 100%; vertical-align: middle; }
+.lieve-search-field > input.lieve-search-input { flex: 1 1 auto; min-width: 0; width: 100%; padding-right: 36px !important; }
+.lieve-search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+.lieve-search-field > button.lieve-search-clear { position: absolute; isolation: isolate; display: grid; box-sizing: border-box; top: 50%; right: 4px; width: 28px; min-width: 28px; height: 28px; min-height: 28px; margin: 0; padding: 5px; transform: translateY(-50%); place-items: center; border: 0; border-radius: var(--lv-radius-sm,var(--lieve-radius-sm,6px)); background: transparent; box-shadow: none; color: var(--lv-muted,var(--ds-muted,#646970)); cursor: pointer; transition: background .15s, color .15s !important; }
+.lieve-search-field > button.lieve-search-clear::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--lv-gradient-soft,var(--lieve-gradient-soft,linear-gradient(90deg,rgba(var(--lieve-accent-start-rgb,22,198,192),.13),rgba(var(--lieve-accent-end-rgb,128,68,227),.13)))); opacity: 0; pointer-events: none; transition: opacity .15s; }
+.lieve-search-field > button.lieve-search-clear:is(:hover, :focus-visible) { background: transparent; color: var(--lv-accent-text,var(--lieve-accent-ink,#7040c1)); box-shadow: none; }
+.lieve-search-field > button.lieve-search-clear:is(:hover, :focus-visible)::before { opacity: 1; }
+.lieve-search-field > button.lieve-search-clear:focus:not(:focus-visible) { outline: none; }
+.lieve-search-field > button.lieve-search-clear:focus-visible { outline: 2px solid var(--lv-violet,var(--lieve-accent-end,#8044e3)); outline-offset: -2px; }
+.lieve-search-field > button.lieve-search-clear svg { display: block; width: 16px; height: 16px; pointer-events: none; }
+.lieve-search-field > button.lieve-search-clear[hidden] { display: none !important; }
+.post-type-lieve_template #posts-filter .search-box > .lieve-search-field { flex: 1 1 0%; width: auto; }
+.lieve-condition-picker-menu > .lieve-search-field { flex: 0 0 auto; margin-bottom: 8px; }
+.lieve-condition-picker-menu .lieve-search-field > input.lieve-condition-picker-search { margin-bottom: 0; }
+@media (prefers-reduced-motion: reduce) { .lieve-search-field > button.lieve-search-clear, .lieve-search-field > button.lieve-search-clear::before { transition: none !important; } }

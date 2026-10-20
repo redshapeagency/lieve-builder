@@ -1,0 +1,22 @@
+/* The sixth inspector tab extends the established Lieve control system. */
+.lieve-workspace .lieve-inspector-tabs:not(.lieve-popup-tabs) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lieve-element-conditions .lieve-interact-intro { margin-bottom: var(--lv-inspector-section-gap); }
+.lieve-element-conditions .lieve-interact-intro > p { margin-top: 10px; color: var(--lv-text-2); }
+.lieve-ec-groups { display: grid; gap: 16px; }
+.lieve-element-conditions .lieve-interact-row-heading { min-height: 58px; padding-inline: 12px; }
+.lieve-ec-tools, .lieve-ec-rule-heading { display: flex; gap: 4px; align-items: center; margin-bottom: 16px; }
+.lieve-ec-tools > span, .lieve-ec-rule-heading > strong { flex: 1; min-width: 0; }
+.lieve-ec-rule-heading > strong { font-size: 12px; font-weight: 600; }
+.lieve-ec-result { color: var(--lv-text-2); font-size: 10px; overflow-wrap: anywhere; }
+.lieve-ec-rule { padding-top: 16px; margin-top: 20px; border-top: 1px solid var(--lv-border-soft); }
+.lieve-element-conditions .lieve-ec-rule > .lieve-control { display: grid; gap: var(--lv-inspector-label-gap); }
+.lieve-ec-operand { display: flex; min-width: 0; gap: 6px; align-items: center; }
+.lieve-ec-operand > input { flex: 1; min-width: 0; height: var(--lv-inspector-control-height); }
+.lieve-element-conditions .lieve-ec-operand > button { flex-shrink: 0; width: 36px; height: 36px; }
+.lieve-element-conditions .lieve-ec-add-group { margin-top: 16px; }
+.lieve-ec-check { display: grid; justify-items: start; gap: 12px; margin-top: var(--lv-inspector-section-gap); padding-top: var(--lv-inspector-section-gap); border-top: 1px solid var(--lv-border-soft); }
+.lieve-ec-check-result { width: 100%; box-sizing: border-box; padding: 12px; background: var(--lv-surface-2); border-radius: var(--lv-radius-sm); color: var(--lv-text); overflow-wrap: anywhere; }
+.lieve-element-conditions .lieve-interact-error:not([hidden]) { margin-top: 8px; }
+.lieve-element-conditions .lieve-interact-empty { margin-top: 16px; }
+.lieve-element-conditions :is(button,input,select):disabled { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .lieve-element-conditions *, .lieve-element-conditions *::before, .lieve-element-conditions *::after { transition: none !important; } }

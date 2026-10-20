@@ -1,0 +1,319 @@
+/* New Template only. Load after the shared admin and conditions layers. */
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) {
+	margin-top: 32px;
+	--lieve-condition-gradient-soft: var(--lieve-gradient-soft);
+}
+
+.lieve-template-create-page .lieve-create-form {
+	display: grid;
+	min-width: 0;
+	margin: 28px 0 0;
+	gap: 12px;
+}
+
+.lieve-template-create-page .lieve-form-card {
+	min-width: 0;
+	padding: 24px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius);
+	background: var(--lieve-surface);
+	box-shadow: var(--lieve-shadow);
+}
+
+.lieve-template-create-page .lieve-form-card-heading { margin: 0 0 20px; }
+.lieve-template-create-page .lieve-form-card-heading h2 {
+	margin: 0 0 6px;
+	color: var(--lieve-text);
+	font-size: 18px;
+	font-weight: 600;
+	line-height: 1.35;
+}
+.lieve-template-create-page .lieve-form-card-heading p {
+	margin: 0;
+	color: var(--lieve-text-2);
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+.lieve-template-create-page .lieve-template-details-card {
+	display: grid;
+	grid-template-columns: minmax(220px, .7fr) minmax(320px, 1.3fr);
+	align-items: center;
+	gap: 34px;
+}
+.lieve-template-create-page .lieve-template-details-card .lieve-form-card-heading { margin: 0; }
+.lieve-template-create-page .lieve-template-name-field { display: grid; min-width: 0; gap: 8px; }
+.lieve-template-create-page .lieve-template-name-field label {
+	margin: 0;
+	color: var(--lieve-text-2);
+	font-size: 12px;
+	font-weight: 500;
+}
+.lieve-template-create-page .lieve-required-mark { color: var(--lieve-violet); }
+.lieve-template-create-page input.lieve-title-input {
+	width: 100%;
+	max-width: none;
+	min-height: 42px;
+	margin: 0;
+	padding: 8px 12px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-sm);
+	background: #fff;
+	box-shadow: none;
+	color: var(--lieve-text);
+	font-size: 14px;
+	line-height: 24px;
+	transition: border-color .15s, box-shadow .15s;
+}
+.lieve-template-create-page input.lieve-title-input::placeholder { color: var(--lieve-muted); opacity: 1; }
+.lieve-template-create-page input.lieve-title-input:hover { border-color: #c3c4c7; }
+.lieve-template-create-page input.lieve-title-input:focus {
+	border-color: var(--lieve-violet);
+	box-shadow: var(--lieve-ring);
+	outline: 0;
+}
+.lieve-template-create-page .lieve-template-name-field p {
+	margin: 0;
+	color: #646970;
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+.lieve-template-create-page .lieve-type-grid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 10px;
+}
+.lieve-template-create-page .lieve-type-card { position: relative; min-width: 0; cursor: pointer; }
+.lieve-template-create-page .lieve-type-card input[type="radio"] {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	box-shadow: none;
+	outline: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+}
+.lieve-template-create-page .lieve-type-card input[type="radio"]::before { content: none; }
+.lieve-template-create-page .lieve-type-card-body {
+	position: relative;
+	display: grid;
+	height: 100%;
+	min-height: 106px;
+	padding: 17px;
+	grid-template-columns: 24px minmax(0, 1fr) 22px;
+	align-content: start;
+	align-items: start;
+	gap: 12px;
+	border: 0;
+	border-radius: var(--lieve-radius-sm);
+	background: #fff;
+	box-shadow: none;
+	transform: none !important;
+	transition: background .15s, color .15s !important;
+}
+/* A permanent border layer avoids animating from a removed border/currentColor
+ * when a checked card becomes unchecked. Geometry stays identical in both states. */
+.lieve-template-create-page .lieve-type-card-body::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border: 1px solid var(--lieve-border);
+	border-radius: inherit;
+	pointer-events: none;
+	opacity: 1;
+	transition: opacity .15s, border-color .15s;
+}
+.lieve-template-create-page .lieve-type-icon { display: flex; color: #747b87; transition: color .15s; }
+.lieve-template-create-page .lieve-type-icon svg { display: block; width: 24px; height: 24px; }
+.lieve-template-create-page .lieve-type-copy { display: grid; min-width: 0; gap: 5px; }
+.lieve-template-create-page .lieve-type-copy strong { color: var(--lieve-text); font-size: 13px; font-weight: 600; line-height: 24px; }
+.lieve-template-create-page .lieve-type-copy small { color: #646970; font-size: 12px; line-height: 1.5; }
+.lieve-template-create-page .lieve-type-check {
+	position: relative;
+	display: block;
+	width: 22px;
+	height: 22px;
+	margin-top: 1px;
+	border: 0;
+	border-radius: 50%;
+	color: var(--lieve-muted);
+	box-shadow: none;
+	pointer-events: none;
+	transition: color .15s ease;
+}
+.lieve-template-create-page .lieve-type-check::before,
+.lieve-template-create-page .lieve-type-check::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	transition: opacity .15s ease;
+}
+.lieve-template-create-page .lieve-type-check::before { border: 1.5px solid currentColor; opacity: 1; }
+.lieve-template-create-page .lieve-type-check::after { background: var(--lieve-gradient); opacity: 0; }
+.lieve-template-create-page .lieve-type-point {
+	position: absolute;
+	z-index: 1;
+	inset: 0;
+	width: 8px;
+	height: 8px;
+	margin: auto;
+	border: 0;
+	border-radius: 50%;
+	background: #fff;
+	opacity: 0;
+	transition: opacity .15s ease;
+}
+.lieve-template-create-page .lieve-type-card:hover input:not(:disabled):not(:checked) + .lieve-type-card-body { background: var(--lieve-surface-2); }
+.lieve-template-create-page .lieve-type-card:hover input:not(:disabled):not(:checked) + .lieve-type-card-body::before { border-color: #c3c4c7; }
+.lieve-template-create-page .lieve-type-card:hover input:not(:disabled) + .lieve-type-card-body .lieve-type-check { color: var(--lieve-violet); }
+.lieve-template-create-page .lieve-type-card input:checked + .lieve-type-card-body { background: var(--lieve-gradient-soft); }
+.lieve-template-create-page .lieve-type-card input:checked + .lieve-type-card-body::before { opacity: 0; }
+.lieve-template-create-page .lieve-type-card input:checked + .lieve-type-card-body .lieve-type-icon { color: var(--lieve-violet); }
+.lieve-template-create-page .lieve-type-card input:checked + .lieve-type-card-body .lieve-type-check { border: 0; color: var(--lieve-violet); }
+.lieve-template-create-page .lieve-type-card input:checked + .lieve-type-card-body .lieve-type-check::before { opacity: 0; }
+.lieve-template-create-page .lieve-type-card input:checked + .lieve-type-card-body .lieve-type-check::after,
+.lieve-template-create-page .lieve-type-card input:checked + .lieve-type-card-body .lieve-type-point { opacity: 1; }
+.lieve-template-create-page .lieve-type-card input:focus-visible + .lieve-type-card-body { outline: 2px solid var(--lieve-violet); outline-offset: 3px; }
+.lieve-template-create-page .lieve-type-card input:disabled + .lieve-type-card-body { cursor: default; opacity: .45; }
+
+/* Keep the shared rule engine, sortable rows, pickers and gradient toggles. */
+.lieve-template-create-page .lieve-condition-card > .description { margin: 12px 0 0; color: #646970; font-size: 11px; line-height: 1.6; }
+.lieve-template-create-page .lieve-condition-toolbar { margin-bottom: 12px; }
+.lieve-template-create-page .lieve-condition-empty { padding: 22px 16px; border-radius: 9px; background: var(--lieve-surface-2); color: #646970; }
+.lieve-template-create-page .lieve-condition-field :is(select, input:not([type="checkbox"])) { transition: border-color .15s, box-shadow .15s; }
+.lieve-admin-page.lieve-template-create-page .lieve-condition-picker-trigger {
+	border: 1px solid var(--lieve-border) !important;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+.lieve-admin-page.lieve-template-create-page .lieve-condition-picker-trigger:hover { border-color: #c3c4c7 !important; }
+.lieve-admin-page.lieve-template-create-page .lieve-condition-picker-trigger:is(:focus, :active, [aria-expanded="true"]) { box-shadow: none !important; }
+.lieve-admin-page.lieve-template-create-page .lieve-condition-picker-trigger:is(:focus-visible, [aria-expanded="true"]) { border-color: var(--lieve-violet) !important; }
+.lieve-admin-page.lieve-template-create-page .lieve-condition-picker-trigger:focus-visible { outline: 2px solid var(--lieve-violet); outline-offset: 2px; }
+.lieve-admin-page.lieve-template-create-page .lieve-condition-remove { transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-admin-page.lieve-template-create-page .lieve-condition-remove:focus-visible { box-shadow: none !important; outline: 2px solid var(--lieve-violet); outline-offset: 2px; }
+
+.lieve-template-create-page .lieve-create-submit {
+	display: flex;
+	min-width: 0;
+	padding-top: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+.lieve-template-create-page .lieve-create-status { display: flex; min-width: 0; flex: 1 1 260px; align-items: center; gap: 8px; }
+.lieve-template-create-page .lieve-create-status svg { width: 18px; height: 18px; flex-shrink: 0; color: #747b87; }
+.lieve-template-create-page [data-create-status] { color: var(--lieve-text-2); font-size: 12px; line-height: 1.5; }
+.lieve-template-create-page .lieve-save-control { display: inline-flex; align-items: center; gap: 10px; }
+.lieve-template-create-page .lieve-save-shortcut { flex-shrink: 0; color: #747b87; font-size: 11px; line-height: 1.5; white-space: nowrap; }
+
+/* Exact primary skin used by Create a New Template in the library. */
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) .lieve-admin-button-primary {
+	--towp-radius-sm: var(--lieve-radius-sm, 8px);
+	display: inline-flex;
+	min-height: 40px;
+	padding: 0 15px;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	box-sizing: border-box;
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	line-height: 38px !important;
+	color: #fff !important;
+	background: linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),1) 0%, rgba(var(--lieve-accent-end-rgb,128,68,227),1) 100%) !important;
+	border-top: 1px solid transparent !important;
+	border-bottom: 1px solid transparent !important;
+	border-left: 0 !important;
+	border-right: 0 !important;
+	border-radius: var(--towp-radius-sm) !important;
+	box-shadow: none !important;
+	text-decoration: none;
+	cursor: pointer;
+	transform: none !important;
+	transition: opacity .15s ease, box-shadow .15s ease !important;
+}
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) .lieve-admin-button-primary:not(:disabled):hover { opacity: .85; }
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) .lieve-admin-button-primary:disabled { opacity: .45; cursor: wait; }
+
+/* Portals sit outside the page wrapper; this file is only loaded on New Template. */
+.lieve-condition-picker-menu {
+	--lieve-condition-gradient-soft: linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),.13), rgba(var(--lieve-accent-end-rgb,128,68,227),.13));
+	--lieve-condition-violet: var(--lieve-accent-end,#8044e3);
+}
+.lieve-condition-picker-menu .lieve-condition-picker-search { transition: border-color .15s, box-shadow .15s; }
+
+/* Only layout here: the actual skin and every state come from conditions.css,
+ * in the very same rules as the Template list's Apply/Filter/Search buttons. */
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) :is(.lieve-create-secondary, .lieve-condition-add),
+.lieve-condition-picker-menu .lieve-condition-more {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	box-sizing: border-box;
+	font-family: inherit;
+	text-decoration: none;
+}
+.lieve-condition-picker-menu .lieve-condition-more { margin-top: 8px; }
+.lieve-condition-picker-menu .lieve-condition-more[hidden] { display: none; }
+.lieve-admin-page.lieve-template-create-page .lieve-condition-add:disabled { opacity: .45; cursor: not-allowed; }
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) .lieve-admin-button-primary:is(:focus, :active) { box-shadow: none !important; }
+.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) .lieve-admin-button-primary:focus-visible { outline: 2px solid var(--lieve-violet); outline-offset: 3px; }
+
+/* The completion screen remains in the same management-page frame. */
+.lieve-admin-page.lieve-template-complete-page { display: block; min-height: 0; }
+.lieve-template-complete-page .lieve-template-complete {
+	display: flex;
+	min-width: 0;
+	margin-top: 28px;
+	padding: 32px;
+	align-items: flex-start;
+	gap: 20px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius);
+	background: #fff;
+	box-shadow: var(--lieve-shadow);
+}
+.lieve-template-complete-page .lieve-complete-icon { display: grid; width: 44px; height: 44px; flex-shrink: 0; place-items: center; border-radius: var(--lieve-radius); background: var(--lieve-gradient-soft); color: var(--lieve-accent-ink,#6636a7); }
+.lieve-template-complete-page .lieve-complete-copy { min-width: 0; }
+.lieve-template-complete-page .lieve-complete-label { margin: 0 0 6px; color: var(--lieve-accent-ink,#6636a7); font-size: 12px; font-weight: 500; }
+.lieve-template-complete-page h2 { margin: 0; color: var(--lieve-text); font-size: 24px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.lieve-template-complete-page .lieve-complete-copy > p:not(.lieve-complete-label) { max-width: 650px; margin: 10px 0 0; color: var(--lieve-text-2); font-size: 13px; line-height: 1.65; }
+.lieve-template-complete-page .lieve-complete-meta { display: flex; margin: 24px 0; flex-wrap: wrap; gap: 20px 40px; }
+.lieve-template-complete-page .lieve-complete-meta div { min-width: 0; }
+.lieve-template-complete-page .lieve-complete-meta dt { margin-bottom: 4px; color: #747b87; font-size: 11px; }
+.lieve-template-complete-page .lieve-complete-meta dd { margin: 0; color: var(--lieve-text); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+
+@media (max-width: 1200px) {
+	.lieve-template-create-page .lieve-type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 782px) {
+	.lieve-template-create-page .lieve-template-details-card { grid-template-columns: 1fr; gap: 20px; }
+	.lieve-template-create-page .lieve-form-card { padding: 20px; }
+	.lieve-template-create-page input.lieve-title-input { font-size: 16px; }
+	.lieve-template-create-page .lieve-create-status { flex-basis: 100%; margin-bottom: 4px; }
+	.lieve-template-create-page .lieve-create-submit { justify-content: flex-end; }
+}
+@media (max-width: 560px) {
+	.lieve-template-create-page .lieve-type-grid { grid-template-columns: 1fr; gap: 8px; }
+	.lieve-template-create-page .lieve-type-card-body { min-height: 82px; padding: 15px; }
+	.lieve-template-create-page .lieve-save-control { flex: 1; }
+	.lieve-template-create-page .lieve-save-control .lieve-admin-button-primary { flex: 1; }
+	.lieve-template-complete-page .lieve-template-complete { padding: 20px; flex-direction: column; gap: 16px; }
+	.lieve-template-complete-page .lieve-admin-actions { align-items: stretch; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) *,
+	.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) *::before,
+	.lieve-admin-page:is(.lieve-template-create-page, .lieve-template-complete-page) *::after,
+	.lieve-condition-picker-menu *,
+	.lieve-condition-picker-menu *::before { transition: none !important; }
+}

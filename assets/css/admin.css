@@ -1,0 +1,1009 @@
+.lieve-admin-page,
+.post-type-lieve_template {
+	--lieve-teal: var(--lieve-accent-start,#16c6c0);
+	--lieve-violet: var(--lieve-accent-end,#8044e3);
+	--lieve-gradient: linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),1) 0%, rgba(var(--lieve-accent-end-rgb,128,68,227),1) 100%);
+	--lieve-gradient-soft: linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),0.13) 0%, rgba(var(--lieve-accent-end-rgb,128,68,227),0.13) 100%);
+	--lieve-gradient-faint: linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),0.045) 0%, rgba(var(--lieve-accent-end-rgb,128,68,227),0.045) 100%);
+	--lieve-surface: #fff;
+	--lieve-surface-2: #fbfbfc;
+	--lieve-surface-3: #f7f8fa;
+	--lieve-border: #e6e8ec;
+	--lieve-border-soft: #eef0f3;
+	--lieve-text: #1d2327;
+	--lieve-text-2: #50575e;
+	--lieve-muted: #8c8f94;
+	--lieve-radius: 12px;
+	--lieve-radius-lg: 16px;
+	--lieve-radius-sm: 8px;
+	--lieve-ring: 0 0 0 3px rgba(var(--lieve-accent-end-rgb,128,68,227),0.16);
+	--lieve-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 6px rgba(16, 24, 40, 0.05);
+	--lieve-shadow-md: 0 6px 18px rgba(16, 24, 40, 0.08);
+}
+
+.lieve-admin-page {
+	width: auto;
+	min-width: 0;
+	max-width: none;
+	margin: 0 20px 60px 0;
+	color: var(--lieve-text);
+}
+
+.post-type-lieve_template #wpbody-content > .wrap {
+	width: auto;
+	min-width: 0;
+	max-width: none;
+}
+
+.lieve-admin-page,
+.lieve-admin-page * {
+	box-sizing: border-box;
+}
+
+.lieve-admin-page button:focus:not(:focus-visible),
+.lieve-admin-page a:focus:not(:focus-visible),
+.lieve-admin-page select:focus:not(:focus-visible),
+.lieve-admin-page input:focus:not(:focus-visible) {
+	outline: none;
+	box-shadow: none;
+}
+
+/* Product header: same visual hierarchy used throughout TheOneWP. */
+.lieve-admin-header {
+	display: flex;
+	min-height: 132px;
+	padding: 16px 0 18px;
+	align-items: center;
+	clear: both;
+}
+
+.lieve-admin-logo {
+	display: block;
+	width: 86px;
+	height: 86px;
+	margin-right: 16px;
+	flex: 0 0 auto;
+}
+
+.lieve-admin-title-wrap {
+	display: flex;
+	min-width: 0;
+	padding: 9px 0 9px 16px;
+	flex: 1;
+	flex-direction: column;
+	gap: 2px;
+	border-left: 1px solid #dcdcde;
+}
+
+.lieve-admin-title-wrap h1 {
+	margin: 0;
+	padding: 0;
+	color: var(--lieve-text);
+	font-size: 34px;
+	font-weight: 900;
+	line-height: 1.08;
+	letter-spacing: -0.035em;
+}
+
+.lieve-admin-title-wrap h1 span {
+	color: var(--lieve-accent-end,#8044e3);
+	background: var(--lieve-gradient);
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+.lieve-admin-title-wrap p {
+	margin: 0;
+	color: var(--lieve-muted);
+	font-size: 15px;
+	font-style: italic;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	line-height: 1.35;
+}
+
+.lieve-admin-header-compact {
+	min-height: 106px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.lieve-admin-header-compact .lieve-admin-logo {
+	width: 62px;
+	height: 62px;
+	margin-right: 12px;
+}
+
+.lieve-admin-header-compact .lieve-admin-title-wrap h1 {
+	font-size: 26px;
+}
+
+.lieve-admin-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.lieve-admin-header > .lieve-admin-actions {
+	margin-left: 24px;
+}
+
+.lieve-admin-button {
+	display: inline-flex;
+	min-height: 36px;
+	padding: 0 15px;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid #c3c4c7;
+	border-radius: var(--lieve-radius-sm);
+	background: transparent;
+	box-shadow: none;
+	color: var(--lieve-text-2);
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1;
+	text-decoration: none;
+	cursor: pointer;
+	transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+}
+
+.lieve-admin-button:hover,
+.lieve-admin-button:focus-visible {
+	border-color: var(--lieve-accent-end,#8044e3);
+	background: var(--lieve-gradient-soft);
+	box-shadow: none;
+	color: var(--lieve-accent-ink,#7040c1);
+}
+
+/* Shared default primary style for template and global management actions.
+ * These pages reuse modal controls; outrank that layer without changing editor dialogs. */
+.lieve-admin-button-primary,
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-save {
+	display: inline-flex;
+	min-width: 0;
+	min-height: 36px;
+	padding: 0 15px;
+	align-items: center;
+	justify-content: center;
+	border: 0 !important;
+	border-image: none !important;
+	border-radius: var(--lieve-radius-sm, 8px) !important;
+	background: var(--lieve-gradient) !important;
+	box-shadow: none !important;
+	color: #fff !important;
+	font-size: 13px !important;
+	font-weight: 600 !important;
+	line-height: 1 !important;
+	opacity: 1;
+	cursor: pointer;
+	transform: none !important;
+	transition: none !important;
+}
+
+.lieve-admin-button-primary:not(:disabled):hover,
+.lieve-admin-button-primary:not(:disabled):focus-visible,
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-save:not(:disabled):hover,
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-save:not(:disabled):focus-visible {
+	background: var(--lieve-gradient) !important;
+	box-shadow: none !important;
+	color: #fff !important;
+	opacity: 0.85;
+}
+
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-save:focus {
+	outline: none;
+}
+
+.lieve-admin-page:is(.lieve-responsive-page, .lieve-design-page) .lieve-conditions-save:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+/* Dashboard. */
+.lieve-admin-hero {
+	position: relative;
+	display: grid;
+	min-height: 192px;
+	padding: 30px 34px;
+	align-items: center;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 36px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-lg);
+	background: var(--lieve-surface);
+	box-shadow: var(--lieve-shadow);
+	overflow: hidden;
+}
+
+.lieve-admin-hero::before {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 4px;
+	background: var(--lieve-gradient);
+	content: "";
+}
+
+.lieve-admin-eyebrow {
+	display: inline-flex;
+	min-height: 24px;
+	margin-bottom: 12px;
+	padding: 0 10px;
+	align-items: center;
+	border: 1px solid rgba(var(--lieve-accent-end-rgb,128,68,227),0.22);
+	border-radius: 999px;
+	background: var(--lieve-gradient-soft);
+	color: var(--lieve-accent-ink-strong,#5b26a8);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+/* The Overview label follows the compact 6px pill shape used by TheOneWP. */
+.lieve-admin-hero .lieve-admin-eyebrow {
+	border-radius: 6px;
+}
+
+.lieve-admin-hero h2 {
+	margin: 0;
+	color: var(--lieve-text);
+	font-size: 27px;
+	font-weight: 800;
+	line-height: 1.15;
+	letter-spacing: -0.025em;
+}
+
+.lieve-admin-hero p {
+	max-width: 720px;
+	margin: 10px 0 0;
+	color: var(--lieve-text-2);
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.lieve-admin-hero-mark {
+	display: block;
+	width: 112px;
+	height: 112px;
+}
+
+.lieve-admin-feature-grid {
+	display: grid;
+	margin-top: 16px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.lieve-admin-feature-grid article {
+	padding: 22px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius);
+	background: var(--lieve-surface);
+	box-shadow: var(--lieve-shadow);
+	transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+
+.lieve-admin-feature-grid article:hover {
+	border-color: var(--lieve-accent-border,#d0c0ed);
+	background: var(--lieve-accent-surface,#edecf1);
+	box-shadow: var(--lieve-shadow);
+	transform: translateY(-1px);
+}
+
+.lieve-admin-feature-grid article > span {
+	display: grid;
+	width: 30px;
+	height: 30px;
+	place-items: center;
+	border: 1px solid rgba(var(--lieve-accent-end-rgb,128,68,227),0.22);
+	border-radius: var(--lieve-radius-sm);
+	background: var(--lieve-gradient-soft);
+	color: var(--lieve-accent-ink-strong,#5b26a8);
+	font-size: 10px;
+	font-weight: 700;
+}
+
+.lieve-admin-feature-grid h2 {
+	margin: 16px 0 6px;
+	color: var(--lieve-text);
+	font-size: 17px;
+}
+
+.lieve-admin-feature-grid p {
+	margin: 0;
+	color: var(--lieve-text-2);
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+
+/* Shared server-rendered header; keep WordPress' list controls below it. */
+.edit-php.post-type-lieve_template #wpbody-content > .wrap.lieve-template-library-heading {
+	margin: 28px 20px 0 0;
+}
+
+.edit-php.post-type-lieve_template #wpbody-content > .wrap:not(.lieve-template-library-heading) {
+	margin: 28px 20px 60px 0;
+}
+
+/* Shared starting position for management pages using the compact product header. */
+.lieve-template-create-page,
+.lieve-settings-page,
+.lieve-responsive-page {
+	margin-top: 32px;
+}
+
+.edit-php.post-type-lieve_template #wpbody-content > .wrap > h1.wp-heading-inline,
+.edit-php.post-type-lieve_template #wpbody-content > .wrap > .page-title-action {
+	display: none;
+}
+
+.edit-php.post-type-lieve_template .tablenav.top {
+	height: auto;
+	min-height: 36px;
+	margin: 12px 0 8px;
+	padding-top: 0;
+}
+
+.edit-php.post-type-lieve_template .tablenav .actions select,
+.edit-php.post-type-lieve_template .tablenav .actions .button {
+	min-height: 36px;
+}
+
+.post-type-lieve_template .page-title-action,
+.post-type-lieve_template .page-title-action:focus {
+	min-height: 32px;
+	padding: 0 13px;
+	border: 0;
+	border-radius: 8px;
+	background: var(--lieve-gradient);
+	box-shadow: 0 2px 8px rgba(var(--lieve-accent-end-rgb,128,68,227),0.22);
+	color: #fff;
+	font-weight: 600;
+	line-height: 32px;
+}
+
+.post-type-lieve_template .page-title-action:hover {
+	background: var(--lieve-gradient);
+	color: #fff;
+	opacity: 0.85;
+}
+
+.post-type-lieve_template .search-box input[type="search"],
+.post-type-lieve_template .tablenav select {
+	border-color: var(--lieve-border);
+	border-radius: 8px;
+	box-shadow: none;
+}
+
+.post-type-lieve_template .search-box input[type="search"]:focus,
+.post-type-lieve_template .tablenav select:focus,
+.lieve-responsive-page .lieve-responsive-manager input[data-breakpoint-name]:focus,
+.lieve-responsive-page .lieve-responsive-manager input[data-breakpoint-width]:focus {
+	border-color: var(--lieve-accent-end,#8044e3);
+	box-shadow: var(--lieve-ring);
+	outline: none;
+}
+
+.post-type-lieve_template .wp-list-table {
+	border-color: var(--lieve-border);
+	border-radius: var(--lieve-radius);
+	box-shadow: var(--lieve-shadow);
+	overflow: hidden;
+}
+
+.post-type-lieve_template .wp-list-table thead,
+.post-type-lieve_template .wp-list-table tfoot {
+	background: var(--lieve-surface-2);
+}
+
+.post-type-lieve_template .wp-list-table tbody tr:hover {
+	background: var(--lieve-accent-surface,#edecf1);
+}
+
+.post-type-lieve_template .wp-list-table .no-items:hover {
+	background: #fff;
+}
+
+.lieve-list-empty {
+	display: flex;
+	min-height: 280px;
+	padding: 40px 20px;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	background: linear-gradient(180deg, #fff 0%, #fbfbfc 100%);
+	text-align: center;
+}
+
+.lieve-list-empty,
+.lieve-list-empty * {
+	box-sizing: border-box;
+}
+
+.lieve-list-empty-icon {
+	display: grid;
+	width: 52px;
+	height: 52px;
+	margin-bottom: 15px;
+	place-items: center;
+	border: 1px solid rgba(var(--lieve-accent-end-rgb,128,68,227),0.22);
+	border-radius: 14px;
+	background: var(--lieve-gradient-soft);
+	color: var(--lieve-accent-ink,#7040c1);
+	font-size: 26px;
+	font-weight: 300;
+}
+
+.lieve-list-empty strong {
+	color: var(--lieve-text);
+	font-size: 17px;
+	font-weight: 650;
+}
+
+.lieve-list-empty p {
+	max-width: 440px;
+	margin: 6px 0 18px;
+	color: var(--lieve-text-2);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.post-type-lieve_template .column-lieve_template_active { width: 56px; text-align: center; }
+.post-type-lieve_template td.column-lieve_template_active { padding-top: 12px; }
+.post-type-lieve_template .lieve-template-toggle {
+	position: relative;
+	display: inline-flex;
+	width: 40px;
+	height: 24px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	box-shadow: none;
+	outline: none;
+	vertical-align: middle;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+.lieve-template-toggle-track { position: absolute; inset: 1px 0; border-radius: inherit; background: #c3c4c7; pointer-events: none; }
+.lieve-template-toggle-track::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--lieve-gradient); opacity: 0; transition: opacity .15s ease; }
+.lieve-template-toggle-track::before { content: ""; position: absolute; z-index: 1; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transform: translateX(0); transition: transform .15s ease; }
+.lieve-template-toggle[aria-checked="true"] .lieve-template-toggle-track::after,
+.lieve-settings-popup-switch input:checked + .lieve-template-toggle-track::after { opacity: 1; }
+.lieve-template-toggle[aria-checked="true"] .lieve-template-toggle-track::before,
+.lieve-settings-popup-switch input:checked + .lieve-template-toggle-track::before { transform: translateX(18px); }
+.post-type-lieve_template .lieve-template-toggle:is(:hover, :active) { border: 0; background: transparent; box-shadow: none; }
+.post-type-lieve_template .lieve-template-toggle:focus-visible { outline: 2px solid var(--lieve-violet); outline-offset: 3px; }
+.lieve-template-toggle:disabled { opacity: .45; cursor: default; }
+.lieve-template-toggle[aria-busy="true"] { cursor: wait; }
+@media (prefers-reduced-motion: reduce) { .lieve-template-toggle-track::before, .lieve-template-toggle-track::after { transition: none; } }
+
+/* One status-tab skin for Template views and Settings sections. */
+.edit-php.post-type-lieve_template .subsubsub a,
+.lieve-settings-page .lieve-settings-tabs a {
+	box-sizing: border-box;
+	display: inline-flex;
+	min-height: 40px;
+	padding: 0 16px;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid #e6e8ec;
+	border-image: none;
+	border-radius: var(--lieve-radius-sm);
+	background: transparent;
+	box-shadow: none;
+	color: #50575e;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 38px;
+	text-decoration: none;
+	cursor: pointer;
+	transform: none;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+/* Selected tabs keep zero-width side borders, reserving their two pixels in
+ * padding so width, text alignment and neighboring tabs never shift. */
+.edit-php.post-type-lieve_template .subsubsub a.current,
+.lieve-settings-page .lieve-settings-tabs a[aria-selected="true"] {
+	padding: 0 17px;
+	border-top: 1px solid transparent;
+	border-bottom: 1px solid transparent;
+	border-left: 0;
+	border-right: 0;
+	background: var(--lieve-gradient);
+	color: #fff;
+	transition: opacity .15s ease, box-shadow .15s ease !important;
+}
+.edit-php.post-type-lieve_template .subsubsub a.current:hover,
+.lieve-settings-page .lieve-settings-tabs a[aria-selected="true"]:hover { opacity: .85; }
+@media (prefers-reduced-motion: reduce) {
+	.lieve-settings-page .lieve-settings-tabs a,
+	.lieve-settings-page .lieve-settings-tabs a[aria-selected="true"] { transition: none !important; }
+}
+@media (max-width: 782px) {
+	.post-type-lieve_template .wp-list-table td.column-lieve_template_active { display: table-cell !important; width: 48px; padding: 12px 8px; }
+	.post-type-lieve_template .wp-list-table th.column-lieve_template_active { width: 48px; padding-right: 8px; padding-left: 8px; }
+	.post-type-lieve_template .wp-list-table td.column-lieve_template_active::before { display: none; }
+	.post-type-lieve_template .wp-list-table tr:not(.is-expanded) .row-actions { display: none; }
+}
+.post-type-lieve_template .column-lieve_template_type { width: 105px; }
+.post-type-lieve_template .column-lieve_template_state { width: 95px; }
+.post-type-lieve_template .column-lieve_template_condition { width: 26%; }
+
+/* One quiet disclosure per template, with its details inside the same surface. */
+.lieve-template-display {
+	min-width: 0;
+	color: var(--lieve-text-2);
+	font-size: 12px;
+	line-height: 1.5;
+}
+.lieve-template-display * { box-sizing: border-box; }
+.lieve-display-card {
+	max-width: 380px;
+	min-width: 0;
+	margin: 0;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-sm);
+	background: var(--lieve-surface);
+	overflow: hidden;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+.lieve-display-card > .lieve-display-overview {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr) 12px;
+	min-height: 58px;
+	margin: 0;
+	padding: 10px 12px;
+	align-items: center;
+	gap: 10px;
+	border: 0;
+	border-radius: var(--lieve-radius-sm);
+	background: transparent;
+	color: var(--lieve-text-2);
+	font: inherit;
+	list-style: none;
+	cursor: pointer;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+.lieve-display-card.is-manual > .lieve-display-overview { grid-template-columns: 18px minmax(0, 1fr); cursor: default; }
+.lieve-display-card.is-manual .lieve-display-icon { color: #787e85; }
+.lieve-display-icon { display: grid; place-items: center; color: var(--lieve-accent-ink,#7043b1); }
+.lieve-display-svg { display: block; flex: 0 0 auto; width: 16px; height: 16px; }
+.lieve-display-icon .lieve-display-svg { width: 18px; height: 18px; }
+.lieve-display-overview > .lieve-display-svg { width: 12px; height: 12px; color: #8c8f94; }
+.lieve-display-copy { display: grid; min-width: 0; gap: 2px; }
+.lieve-display-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--lieve-text); font-size: 13px; font-weight: 600; line-height: 1.45; overflow: hidden; overflow-wrap: anywhere; }
+.lieve-display-caption { display: block; color: #6b7178; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.lieve-display-overlap-hint { color: #805b11; }
+.lieve-display-rule { display: grid; grid-template-columns: 48px minmax(0, 1fr); min-width: 0; align-items: baseline; gap: 10px; }
+.lieve-display-rule-copy { min-width: 0; }
+.lieve-display-action {
+	color: #16736e;
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1.6;
+	letter-spacing: .025em;
+	text-transform: uppercase;
+}
+.lieve-display-action[data-rule-action="exclude"] { color: #963b3b; }
+.lieve-display-scope { color: var(--lieve-text); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.post-type-lieve_template .wp-list-table .lieve-display-target { margin: 4px 0 0; color: var(--lieve-text-2); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.lieve-template-display summary::-webkit-details-marker { display: none; }
+.lieve-template-display summary::marker { content: ''; }
+.lieve-template-display summary:focus { box-shadow: none; }
+.lieve-template-display summary:focus-visible { outline: 2px solid var(--lieve-violet); outline-offset: -2px; }
+.lieve-template-rule-details[open] > .lieve-display-overview > .lieve-display-svg { transform: rotate(90deg); }
+.lieve-display-card[open] { border-color: #d9cbe8; }
+.lieve-display-card[open] > .lieve-display-overview { border-radius: var(--lieve-radius-sm) var(--lieve-radius-sm) 0 0; background: var(--lieve-gradient-faint); }
+.lieve-display-panel { min-width: 0; padding: 12px; border-top: 1px solid var(--lieve-border-soft); }
+.post-type-lieve_template .wp-list-table .lieve-display-note { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--lieve-border-soft); color: var(--lieve-text-2); font-size: 11px; line-height: 1.6; }
+.lieve-template-display .lieve-display-rules, .lieve-template-display .lieve-display-peers { margin: 0; padding: 0; list-style: none; }
+.lieve-display-rules > li { margin: 0; padding: 10px 0; }
+.lieve-display-rules > li:first-child { padding-top: 0; }
+.lieve-display-rules > li:last-child { padding-bottom: 0; }
+.lieve-display-rules > li + li { border-top: 1px solid var(--lieve-border-soft); }
+.lieve-template-competition { min-width: 0; margin: 10px 0 0; overflow-wrap: anywhere; }
+.lieve-template-competition > summary {
+	display: inline-flex;
+	max-width: 100%;
+	min-height: 28px;
+	padding: 4px 6px;
+	align-items: center;
+	gap: 6px;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: #805b11;
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 1.4;
+	list-style: none;
+	cursor: pointer;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+.lieve-template-competition > summary .lieve-display-svg { width: 12px; height: 12px; }
+.lieve-template-competition[open] > summary > .lieve-display-svg:last-child { transform: rotate(90deg); }
+.lieve-display-count { font-size: 10px; font-variant-numeric: tabular-nums; }
+.lieve-template-competition > .lieve-display-panel { padding: 6px 0 0; border: 0; }
+.post-type-lieve_template .lieve-template-competition .lieve-display-note { margin: 0 0 10px; padding: 0; border: 0; }
+.lieve-display-peers > li { margin: 5px 0 0; padding: 7px 9px; border: 1px solid var(--lieve-border-soft); border-radius: var(--lieve-radius-sm); background: var(--lieve-surface-2); }
+.lieve-display-peers a { color: var(--lieve-accent-ink,#6536a9); font-size: 12px; text-decoration: none; overflow-wrap: anywhere; transition: color .15s !important; }
+.lieve-display-peers a:hover { color: var(--lieve-accent-ink-strong,#4c2486); text-decoration: underline; }
+.lieve-display-peers a:focus-visible { outline: 2px solid var(--lieve-violet); outline-offset: 2px; box-shadow: none; }
+@media (hover: hover) and (pointer: fine) {
+	.lieve-display-card:not(.is-manual):hover { border-color: var(--lieve-accent-border,#d2bee9); }
+	.lieve-display-card > summary:hover { background: var(--lieve-gradient-faint); }
+	.lieve-template-competition > summary:hover { background: #fcf8ee; color: #79540c; }
+}
+@media screen and (max-width: 782px) {
+	.lieve-display-card { max-width: none; }
+	.lieve-display-card > .lieve-display-overview { padding: 10px; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.lieve-display-card, .lieve-template-display summary, .lieve-display-peers a { transition: none !important; }
+}
+.post-type-lieve_template .row-actions .lieve-row-template-action { text-decoration: none; box-shadow: none; }
+.post-type-lieve_template .row-actions .lieve-row-template-action:disabled { opacity: .5; cursor: wait; }
+.lieve-template-list-status { box-sizing: border-box; margin: 12px 20px 0 0; padding: 12px 16px; border-radius: var(--lieve-radius-sm, 8px); background: #e8f5ef; color: #216b4b; }
+.lieve-template-list-status.is-error { background: #fff1f1; color: #922b2b; }
+.lieve-template-list-status[hidden] { display: none !important; }
+@media (max-width: 782px) { .post-type-lieve_template .column-lieve_template_condition { width: auto; } }
+
+.post-type-lieve_template #lieve-template-type .inside select {
+	width: 100% !important;
+	min-height: 36px;
+	border-color: var(--lieve-border);
+	border-radius: 8px;
+}
+
+@media (max-width: 960px) {
+	.lieve-admin-header {
+		align-items: flex-start;
+		flex-wrap: wrap;
+	}
+
+	.lieve-admin-header > .lieve-admin-actions {
+		width: 100%;
+		margin: 14px 0 0 104px;
+	}
+
+	.lieve-admin-feature-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 782px) {
+	.lieve-admin-page {
+		margin-right: 10px;
+	}
+
+	.lieve-admin-header {
+		min-height: auto;
+		padding-top: 12px;
+	}
+
+	.lieve-admin-logo {
+		width: 62px;
+		height: 62px;
+		margin-right: 10px;
+	}
+
+	.lieve-admin-title-wrap h1 {
+		font-size: 27px;
+	}
+
+	.lieve-admin-header > .lieve-admin-actions {
+		margin-left: 72px;
+	}
+
+	.lieve-admin-hero {
+		padding: 26px;
+		grid-template-columns: 1fr;
+	}
+
+	.lieve-admin-hero-mark {
+		display: none;
+	}
+}
+
+@media (max-width: 620px) {
+	.lieve-admin-title-wrap p {
+		font-size: 13px;
+	}
+
+	.lieve-admin-header > .lieve-admin-actions {
+		margin-left: 0;
+	}
+
+	.lieve-admin-feature-grid {
+		grid-template-columns: 1fr;
+	}
+
+}
+
+/* Theme settings. */
+.lieve-settings-form {
+	display: grid;
+	width: 100%;
+	min-width: 0;
+	max-width: none;
+	margin: 28px 0 0;
+	gap: 12px;
+}
+
+.lieve-settings-card {
+	display: grid;
+	padding: 24px;
+	grid-template-columns: minmax(220px, 0.7fr) minmax(320px, 1.3fr);
+	gap: 34px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius);
+	background: #fff;
+	box-shadow: var(--lieve-shadow);
+}
+
+.lieve-settings-card-heading .lieve-admin-eyebrow {
+	margin-bottom: 9px;
+}
+
+.lieve-settings-card-heading h2 {
+	margin: 0;
+	font-size: 18px;
+	line-height: 1.25;
+}
+
+.lieve-settings-card-heading p {
+	margin: 7px 0 0;
+	color: var(--lieve-text-2);
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+.lieve-settings-grid {
+	display: grid;
+	align-content: start;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px;
+}
+
+.lieve-settings-grid-three {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lieve-settings-grid > label {
+	display: grid;
+	gap: 7px;
+	color: var(--lieve-text-2);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.lieve-settings-grid input[type="color"] {
+	width: 100%;
+	height: 46px;
+	padding: 4px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-sm);
+	background: #fff;
+	cursor: pointer;
+}
+
+.lieve-number-field {
+	display: flex;
+	height: 42px;
+	align-items: center;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-sm);
+	background: #fff;
+	overflow: hidden;
+}
+
+.lieve-number-field input {
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0 10px;
+	border: 0;
+	box-shadow: none;
+}
+
+.lieve-number-field small {
+	padding: 0 10px;
+	color: var(--lieve-muted);
+	font-size: 11px;
+	text-transform: none;
+}
+
+.lieve-settings-toggle-card {
+	align-items: center;
+}
+
+.lieve-settings-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	cursor: pointer;
+}
+
+.lieve-settings-switch input {
+	position: absolute;
+	opacity: 0;
+}
+
+.lieve-settings-switch > span {
+	position: relative;
+	width: 42px;
+	height: 24px;
+	border-radius: 999px;
+	background: #c3c4c7;
+}
+
+.lieve-settings-switch > span::after {
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 3px rgba(16, 24, 40, 0.22);
+	content: "";
+}
+
+.lieve-settings-switch input:checked + span {
+	background: var(--lieve-gradient);
+}
+
+.lieve-settings-switch input:checked + span::after {
+	left: 21px;
+}
+
+.lieve-settings-switch input:focus-visible + span {
+	outline: 3px solid rgba(var(--lieve-accent-end-rgb,128,68,227),0.16);
+	outline-offset: 2px;
+}
+
+.lieve-settings-switch strong {
+	font-size: 13px;
+}
+
+.lieve-settings-submit {
+	display: flex;
+	padding-top: 4px;
+	justify-content: flex-end;
+}
+
+/* Borderless, immediate button states across the Lieve backend. */
+.lieve-admin-page button:not(:where(.lieve-responsive-base-toggle, .lieve-responsive-remove)),
+.lieve-admin-page .lieve-admin-button,
+.post-type-lieve_template .lieve-admin-button,
+.post-type-lieve_template .button,
+.post-type-lieve_template .page-title-action {
+	border: 0 !important;
+	border-image: none !important;
+	border-radius: var(--lieve-radius-sm) !important;
+	box-shadow: none !important;
+	transition: none !important;
+}
+
+.lieve-admin-page button:not(:where(.lieve-responsive-base-toggle, .lieve-responsive-remove)):hover,
+.lieve-admin-page button:not(:where(.lieve-responsive-base-toggle, .lieve-responsive-remove)):focus-visible,
+.lieve-admin-page button:not(:where(.lieve-responsive-base-toggle, .lieve-responsive-remove)):active,
+.lieve-admin-page .lieve-admin-button:hover,
+.lieve-admin-page .lieve-admin-button:focus-visible,
+.lieve-admin-page .lieve-admin-button:active,
+.post-type-lieve_template .lieve-admin-button:hover,
+.post-type-lieve_template .lieve-admin-button:focus-visible,
+.post-type-lieve_template .lieve-admin-button:active,
+.post-type-lieve_template .page-title-action:hover,
+.post-type-lieve_template .page-title-action:focus-visible,
+.post-type-lieve_template .page-title-action:active {
+	border: 0 !important;
+	border-image: none !important;
+	border-radius: var(--lieve-radius-sm) !important;
+	box-shadow: none !important;
+	transform: none !important;
+	transition: none !important;
+}
+
+.post-type-lieve_template .button:hover,
+.post-type-lieve_template .button:active,
+.post-type-lieve_template .button:focus {
+	border: 0 !important;
+	border-radius: var(--lieve-radius-sm) !important;
+	box-shadow: none;
+	transition: none !important;
+	transform: none !important;
+}
+
+.post-type-lieve_template .button:not(.button-primary) { background: #ececf1; color: #50575e; }
+.post-type-lieve_template .button-primary { background: var(--lieve-gradient); }
+.post-type-lieve_template .button-primary:not(:disabled):hover,
+.post-type-lieve_template .button-primary:not(:disabled):focus-visible {
+	background: var(--lieve-gradient);
+	color: #fff;
+	opacity: 0.85;
+}
+
+.lieve-admin-feature-grid article { transition: none !important; }
+.lieve-admin-feature-grid article:hover { transform: none !important; }
+
+.lieve-admin-button:not(.lieve-admin-button-primary) {
+	background: #f1f2f4;
+}
+
+/* TheOneWP Cancel/ghost: transparent at rest, soft gradient on interaction. */
+.lieve-admin-page .lieve-admin-button.lieve-admin-button-ghost,
+.lieve-admin-page .lieve-admin-button.lieve-admin-button-ghost:link,
+.lieve-admin-page .lieve-admin-button.lieve-admin-button-ghost:visited,
+.lieve-admin-page .lieve-admin-button.lieve-admin-button-ghost:active {
+	border: 1px solid #c3c4c7 !important;
+	background: transparent;
+	color: #50575e;
+}
+
+.lieve-admin-page .lieve-admin-button.lieve-admin-button-ghost:hover,
+.lieve-admin-page .lieve-admin-button.lieve-admin-button-ghost:focus-visible {
+	border-color: var(--lieve-violet) !important;
+	background: var(--lieve-gradient-soft);
+	background: linear-gradient(90deg, color-mix(in srgb, var(--lieve-teal) 13%, transparent) 0%, color-mix(in srgb, var(--lieve-violet) 13%, transparent) 100%);
+	color: var(--lieve-violet);
+}
+
+.lieve-admin-page .lieve-admin-button.lieve-admin-button-ghost:focus-visible {
+	outline: 2px solid var(--lieve-violet);
+	outline-offset: 3px;
+}
+
+/* Responsive, Variables and Colors reuse the library's exact TheOneWP primary skin. */
+.edit-php.post-type-lieve_template .lieve-template-library-heading .lieve-admin-actions .lieve-admin-button-primary,
+.lieve-admin-page.lieve-responsive-page .lieve-conditions-save,
+.lieve-admin-page.lieve-token-page .lieve-conditions-save {
+	--towp-radius-sm: var(--lieve-radius-sm, 8px);
+	display: inline-flex;
+	min-height: 40px;
+	align-items: center;
+	gap: 6px;
+	box-sizing: border-box;
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	line-height: 38px !important;
+	color: #fff !important;
+	background: linear-gradient(90deg, rgba(var(--lieve-accent-start-rgb,22,198,192),1) 0%, rgba(var(--lieve-accent-end-rgb,128,68,227),1) 100%) !important;
+	border-top: 1px solid transparent !important;
+	border-bottom: 1px solid transparent !important;
+	border-left: 0 !important;
+	border-right: 0 !important;
+	border-radius: var(--towp-radius-sm) !important;
+	text-decoration: none;
+	cursor: pointer;
+	transition: opacity .15s ease, box-shadow .15s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.edit-php.post-type-lieve_template .lieve-template-library-heading .lieve-admin-actions .lieve-admin-button-primary,
+	.lieve-admin-page.lieve-responsive-page .lieve-conditions-save,
+	.lieve-admin-page.lieve-token-page .lieve-conditions-save {
+		transition: none !important;
+	}
+}
+
+@media (max-width: 782px) {
+	.lieve-settings-card {
+		grid-template-columns: 1fr;
+		gap: 20px;
+	}
+
+	.lieve-settings-grid,
+	.lieve-settings-grid-three {
+		grid-template-columns: 1fr;
+	}
+}

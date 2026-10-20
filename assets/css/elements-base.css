@@ -1,0 +1,72 @@
+/* One presentation baseline for builder output and the editor canvas.
+ * No default element spacing or decoration. Explicit IDs, responsive styles
+ * and inline HTML styles outrank this reset. Editor chrome and native
+ * WordPress content (including classless paragraphs) are out of scope.
+ */
+:is(.lieve-builder-content,[data-lieve-scope="builder"]), #lieve-canvas { font: initial; color: initial; text-align: initial; text-transform: none; letter-spacing: normal; list-style: none; }
+
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(:not([data-lieve-popup-close], [data-lieve-ui^="popup"], svg, svg *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)),
+#lieve-canvas :where(.lieve-editor-node, .lieve-editor-node *):where(:not(svg, svg *, [data-editor-ui], [data-editor-ui] *, [data-editor-code], [data-editor-code] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)),
+:where(#lieve-canvas [data-editor-code], #lieve-canvas [data-editor-code] *):where(:not(svg, svg *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)) {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	font-style: inherit;
+	font-weight: inherit;
+	line-height: inherit;
+	text-align: inherit;
+	text-decoration: none;
+	text-transform: inherit;
+	letter-spacing: inherit;
+	list-style: inherit;
+	border-spacing: 0;
+}
+
+/* Custom Code has a zero-specificity baseline so authored CSS wins without priority flags.
+ * Other widgets keep the existing ID-scoped baseline below their generated styles. */
+/* Keep the familiar H1-H6 size hierarchy, without default bold or spacing. */
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(h1):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), #lieve-canvas :where(h1.lieve-editor-node, .lieve-editor-node h1):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas [data-editor-code]) :where(h1):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas h1[data-editor-code]) { font-size: 2em; }
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(h2):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), #lieve-canvas :where(h2.lieve-editor-node, .lieve-editor-node h2):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas [data-editor-code]) :where(h2):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas h2[data-editor-code]) { font-size: 1.5em; }
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(h3):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), #lieve-canvas :where(h3.lieve-editor-node, .lieve-editor-node h3):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas [data-editor-code]) :where(h3):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas h3[data-editor-code]) { font-size: 1.17em; }
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(h4):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), #lieve-canvas :where(h4.lieve-editor-node, .lieve-editor-node h4):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas [data-editor-code]) :where(h4):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas h4[data-editor-code]) { font-size: 1em; }
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(h5):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), #lieve-canvas :where(h5.lieve-editor-node, .lieve-editor-node h5):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas [data-editor-code]) :where(h5):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas h5[data-editor-code]) { font-size: .83em; }
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(h6):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), #lieve-canvas :where(h6.lieve-editor-node, .lieve-editor-node h6):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas [data-editor-code]) :where(h6):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas h6[data-editor-code]) { font-size: .67em; }
+
+/* Formatting explicitly authored in rich text/HTML keeps its meaning. */
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(strong, b):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), #lieve-canvas :where(.lieve-editor-node strong, .lieve-editor-node b):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas [data-editor-code] :is(strong, b), #lieve-canvas :is(strong, b)[data-editor-code]):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)) { font-weight: bolder; }
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(em, i):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), #lieve-canvas :where(.lieve-editor-node em, .lieve-editor-node i):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)), :where(#lieve-canvas [data-editor-code] :is(em, i), #lieve-canvas :is(em, i)[data-editor-code]):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)) { font-style: italic; }
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) :where(button:not([data-lieve-popup-close]), input[type="button"], input[type="submit"], input[type="reset"]):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)),
+#lieve-canvas :where(.lieve-editor-node button, .lieve-editor-node input[type="button"], .lieve-editor-node input[type="submit"], .lieve-editor-node input[type="reset"]):where(:not([data-editor-code], [data-editor-code] *, [data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)),
+:where(#lieve-canvas [data-editor-code] :is(button, input[type="button"], input[type="submit"], input[type="reset"]), #lieve-canvas :is(button, input[type="button"], input[type="submit"], input[type="reset"])[data-editor-code]):where(:not([data-editor-ui], [data-editor-ui] *, [data-lieve-native-content] *, [class*="wp-block-"], [class*="wp-block-"] *)) { appearance: none; }
+
+/* Functional listing layout only; model elements receive no decorative defaults.
+ * Match the canvas reset, but stay below authored ID + target selectors. */
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing]) { min-width: 0; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing] > [data-lieve-listing-track]) { display: grid; grid-template-columns: repeat(var(--lieve-listing-columns, 3), minmax(0, 1fr)); grid-auto-rows: var(--lieve-listing-height, 1fr); column-gap: var(--lieve-listing-gap-x, 24px); row-gap: var(--lieve-listing-gap-y, 24px); align-items: var(--lieve-listing-align, stretch); min-width: 0; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing-track] > [data-lieve-listing-item]) { min-width: 0; padding: var(--lieve-listing-padding, 0px); align-self: var(--lieve-listing-item-align, auto); overflow-wrap: anywhere; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-listing-mode="slider"] > [data-lieve-listing-track]) { display: flex; width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-listing-mode="slider"] > [data-lieve-listing-track])::-webkit-scrollbar { display: none; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-listing-scrollbar="true"] > [data-lieve-listing-track]) { scrollbar-width: thin; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-listing-scrollbar="true"] > [data-lieve-listing-track])::-webkit-scrollbar { display: block; height: 8px; }
+:is(.lieve-builder-content,[data-lieve-scope="builder"]) [data-listing-drag="true"] > [data-lieve-listing-track] { cursor: grab; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing-track].is-listing-dragging) { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-listing-mode="slider"] > [data-lieve-listing-track] > [data-lieve-listing-item]) { flex: 0 0 calc((100% - (var(--lieve-listing-columns, 3) - 1) * var(--lieve-listing-gap-x, 24px)) / var(--lieve-listing-columns, 3)); scroll-snap-align: start; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing] > [data-lieve-listing-controls]) { display: flex; flex-wrap: wrap; align-items: center; justify-content: var(--lieve-listing-controls-align, center); gap: var(--lieve-listing-controls-gap, 8px); margin-top: var(--lieve-listing-controls-offset, 12px); }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) [data-lieve-listing] > [data-lieve-listing-controls][hidden] { display: none; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing-controls] button) { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: 4px; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; box-shadow: none; transition: opacity .15s; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing-controls] button:hover) { opacity: .7; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing-controls] button:disabled) { opacity: .35; cursor: default; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing-controls] > :is([data-listing-prev],[data-listing-next]) > svg) { width: var(--lieve-listing-arrow-size, 20px); height: var(--lieve-listing-arrow-size, 20px); flex-shrink: 0; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-listing-dots]) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lieve-listing-dot-gap, 2px); }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-listing-dots] button)::before { content: ""; width: var(--lieve-listing-dot-size, 6px); height: var(--lieve-listing-dot-size, 6px); flex-shrink: 0; border-radius: 50%; background: currentColor; opacity: .3; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-listing-dots] button[aria-current="true"])::before { opacity: 1; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where(:is([data-lieve-listing-track],[data-lieve-listing-controls] button):focus-visible) { outline: 2px solid currentColor; outline-offset: 2px; }
+:is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing-pagination]) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lieve-listing-controls-gap, 8px); margin-top: var(--lieve-listing-controls-offset, 12px); }
+@media (prefers-reduced-motion: reduce) { :is(#lieve-canvas,.lieve-builder-content,[data-lieve-scope="builder"]) :where([data-lieve-listing-controls] button) { transition: none; } }

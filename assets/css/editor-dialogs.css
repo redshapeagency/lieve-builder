@@ -1,0 +1,207 @@
+/* Global managers inside the editor only. Keep backend pages and authored CSS isolated.
+ * Load after the shared managers: one skin for both themes and nested action sheets. */
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal {
+	--lieve-condition-border: var(--lv-border);
+	--lieve-condition-soft: var(--lv-surface-3);
+	--lieve-condition-text: var(--lv-text);
+	--lieve-condition-muted: var(--lv-muted);
+	--lieve-condition-violet: var(--lv-violet);
+	--lieve-condition-gradient: var(--lv-gradient);
+	--lieve-condition-gradient-soft: var(--lv-gradient-soft);
+	color: var(--lv-text);
+	font: 13px/1.5 var(--lv-font-ui);
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds {
+	--ds-border: var(--lv-border);
+	--ds-soft: var(--lv-surface-3);
+	--ds-text: var(--lv-text);
+	--ds-muted: var(--lv-muted);
+	--ds-surface: var(--lv-surface);
+	--ds-focus: var(--lv-violet);
+	font-family: var(--lv-font-ui);
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-dialog, .lieve-conditions-header, .lieve-conditions-body, .lieve-conditions-footer, .lieve-ds-footer) { background: var(--lv-surface); color: var(--lv-text); border-color: var(--lv-border-soft); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-dialog { min-height: 0; max-height: calc(100dvh - 48px); outline: none; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-header { min-height: 80px; padding: 20px 24px; gap: 24px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-heading { min-width: 0; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-heading h2 { color: var(--lv-text); font: 600 16px/1.4 var(--lv-font-ui); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-heading p { margin: 4px 0 0; color: var(--lv-muted); font: 12px/1.6 var(--lv-font-ui); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-footer, .lieve-ds-footer) { min-height: 80px; padding: 18px 24px; gap: 10px; flex-shrink: 0; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-status, [data-ds-status]) { color: var(--lv-muted); font-size: 12px; line-height: 1.6; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-status, [data-ds-status]).is-error { color: var(--lv-danger); }
+
+/* Neutral controls: the approved Cancel base, with a permanent fading hover layer.
+ * The layer cannot intercept clicks or change the control's measured dimensions. */
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-cancel, .lieve-ds-quiet, .lieve-ds-action-buttons button, .lieve-condition-add, .lieve-condition-more) {
+	position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center;
+	box-sizing: border-box; min-width: 0; min-height: 40px; margin: 0; padding: 0 16px; gap: 6px;
+	border: 1px solid var(--lv-border) !important; border-radius: var(--lv-radius-sm) !important;
+	background: transparent !important; color: var(--lv-text-2) !important; box-shadow: none !important;
+	font: 500 13px/38px var(--lv-font-ui) !important; text-decoration: none; transform: none !important;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-close, .lieve-ds-icon, .lieve-responsive-icon-trigger, .lieve-responsive-remove) {
+	position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center;
+	width: 32px; height: 32px; min-width: 32px; min-height: 32px; margin: 0; padding: 0; flex: 0 0 32px;
+	border: 1px solid var(--lv-border) !important; border-radius: var(--lv-radius-sm) !important;
+	background: transparent !important; color: var(--lv-muted); box-shadow: none !important;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-close { width: 36px; height: 36px; flex-basis: 36px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-cancel, .lieve-ds-quiet, .lieve-ds-action-buttons button, .lieve-condition-add, .lieve-condition-more, .lieve-conditions-close, .lieve-ds-icon, .lieve-responsive-icon-trigger)::before {
+	content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit;
+	background: var(--lv-gradient-soft); opacity: 0; pointer-events: none; transition: opacity .15s ease;
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-cancel, .lieve-ds-quiet, .lieve-ds-action-buttons button, .lieve-condition-add, .lieve-condition-more, .lieve-conditions-close, .lieve-ds-icon:not(.is-danger), .lieve-responsive-icon-trigger):not(:disabled):is(:hover, :focus-visible) {
+	border-color: var(--lieve-accent-border, var(--lv-violet)) !important; background: transparent !important; color: var(--lv-accent-text) !important; box-shadow: none !important;
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-cancel, .lieve-ds-quiet, .lieve-ds-action-buttons button, .lieve-condition-add, .lieve-condition-more, .lieve-conditions-close, .lieve-ds-icon:not(.is-danger), .lieve-responsive-icon-trigger):not(:disabled):is(:hover, :focus-visible)::before { opacity: 1; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-ds-icon.is-danger, .lieve-responsive-remove):not(:disabled):is(:hover, :focus-visible) { color: var(--lv-danger); background: color-mix(in srgb, var(--lv-danger) 10%, transparent) !important; border-color: color-mix(in srgb, var(--lv-danger) 30%, var(--lv-border)) !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-icon.is-danger::before { content: none; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-footer, .lieve-ds-footer, .lieve-ds-action-dialog footer) .lieve-conditions-cancel { min-width: 112px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-history button { width: 40px; min-width: 40px; padding: 0; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-bulk .lieve-ds-quiet { min-height: 32px; padding: 0 10px; font-size: 12px !important; line-height: 30px !important; }
+
+/* Full-gradient actions never acquire a mouse-focus shadow or lateral borders. */
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-save {
+	display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 16px;
+	border-top: 1px solid transparent !important; border-bottom: 1px solid transparent !important; border-left: 0 !important; border-right: 0 !important;
+	border-radius: var(--lv-radius-sm) !important; background: var(--lv-gradient) !important; color: #fff !important; box-shadow: none !important;
+	font: 500 13px/38px var(--lv-font-ui) !important; transition: opacity .15s ease, box-shadow .15s ease !important;
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-save:not(:disabled) { opacity: 1; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-save:not(:disabled):is(:hover, :focus-visible) { opacity: .85; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal button:disabled { opacity: .45; cursor: default; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal button:focus:not(:focus-visible) { outline: none !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal button:focus-visible { outline: 2px solid var(--lv-violet) !important; outline-offset: 3px; box-shadow: none !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal button > svg { width: 16px; height: 16px; flex: 0 0 auto; pointer-events: none; }
+
+/* Inspector navigation is distinct from the shared Light/Dark preview segment. */
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs { display: flex; gap: 8px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs { margin: 0 0 24px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs button {
+	position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 12px; flex: 1; gap: 6px;
+	border: 1px solid var(--lv-border) !important; border-radius: var(--lv-radius-sm); color: var(--lv-text-2) !important; background: transparent !important; box-shadow: none !important;
+	font: 500 13px/36px var(--lv-font-ui); transition: border-color .15s, background .15s, color .15s !important;
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs button::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--lv-gradient-soft); opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs button:is(:hover, :focus-visible)::before { opacity: 1; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs button:is([aria-selected="true"], [aria-pressed="true"]) {
+	padding-inline: 13px; border-top: 1px solid transparent !important; border-bottom: 1px solid transparent !important; border-left: 0 !important; border-right: 0 !important;
+	background: var(--lv-gradient) !important; color: #fff !important; transition: opacity .15s ease, box-shadow .15s ease !important;
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs button:is([aria-selected="true"], [aria-pressed="true"]):hover { opacity: .85; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs button::after,
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-tabs button:is([aria-selected="true"], [aria-pressed="true"])::before { content: none; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-mode { min-height: 40px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-mode button { height: 32px; min-height: 32px; font: 500 12px/20px var(--lv-font-ui); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-mode button[aria-pressed="true"] { color: var(--lv-accent-text); }
+
+/* Inputs and custom selects share the search control's size and branded focus. */
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-ds-field input:not([type="checkbox"]), .lieve-ds-field textarea, .lieve-ds-select-trigger, .lieve-ds-select-menu input, input[data-breakpoint-name], input[data-breakpoint-width]) {
+	min-height: 40px; padding: 9px 12px; border: 1px solid var(--lv-border) !important; border-radius: var(--lv-radius-sm) !important;
+	background-color: var(--lv-surface); color: var(--lv-text); box-shadow: none; font-size: 13px; caret-color: var(--lv-violet);
+	transition: border-color .15s, box-shadow .15s !important;
+}
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal input[data-breakpoint-width] { padding-right: 31px; font-variant-numeric: tabular-nums; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-ds-field input:not([type="checkbox"]), .lieve-ds-field textarea, .lieve-ds-select-menu input, input[data-breakpoint-name], input[data-breakpoint-width]):focus,
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-select-trigger:is(:focus-visible, [aria-expanded="true"]) { border-color: var(--lv-violet) !important; outline: none !important; box-shadow: var(--lv-ring) !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal input[aria-invalid="true"] { border-color: var(--lv-danger) !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(input, textarea)::placeholder { color: var(--lv-muted); opacity: 1; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-search { height: 40px; border-color: var(--lv-border); background: var(--lv-surface); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-search:focus-within { border-color: var(--lv-violet); box-shadow: var(--lv-ring); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-search input { height: 38px; outline: none !important; box-shadow: none !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-field > span { color: var(--lv-text-2); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-select-option::before { pointer-events: none; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-select-option.is-chosen { color: #fff !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-copy-ref { color: var(--lv-muted); transition: color .15s !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-copy-ref:hover { color: var(--lv-accent-text); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-action-dialog .lieve-conditions-cancel { color: var(--lv-text-2) !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-action-dialog .lieve-conditions-cancel:not(:disabled):is(:hover, :focus-visible) { color: var(--lv-accent-text) !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-action-layer { position: fixed; z-index: 100110; inset: 0; }
+
+/* Extended managers: consistent rhythm without changing sorting or draft semantics. */
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-toolbar { min-height: 88px; padding: 24px; gap: 10px; flex-shrink: 0; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-workspace { grid-template-columns: 192px minmax(240px, 1fr) minmax(460px, 42%); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-sidebar { padding: 24px 12px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-section-title { min-height: 32px; margin-bottom: 16px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-sidebar nav button { min-height: 40px; font-weight: 500; transition: background .15s, color .15s; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-sidebar nav button.is-active { color: var(--lv-accent-text); background: var(--lv-gradient-soft); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-library-head { min-height: 80px; padding: 20px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-details { padding: 24px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-item:hover { border-color: var(--lieve-accent-border, var(--lv-violet)); background: var(--lv-gradient-faint); box-shadow: none; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-item:is(.is-active, .is-selected) { background: var(--lv-gradient-soft); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-ds-toggle, .lieve-responsive-base-toggle) { transition: background .15s !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-toggle span { transition: transform .15s; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-base-toggle > span { transition: left .15s; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-ds-list, .lieve-ds-details, .lieve-ds-workspace, .lieve-ds-action-body, .lieve-conditions-body) { scrollbar-width: thin; scrollbar-color: var(--lv-border) transparent; overscroll-behavior: contain; }
+
+/* Breakpoint rows follow the dedicated page's table rhythm and neutral surfaces. */
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-manager { font: 13px/1.5 var(--lv-font-ui); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-table { border: 1px solid var(--lv-border); border-radius: var(--lv-radius); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-columns { min-height: 42px; padding: 10px 16px; border-bottom: 1px solid var(--lv-border); font-size: 12px; letter-spacing: normal; text-transform: none; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-list { gap: 0; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-row { min-height: 68px; padding: 14px 16px; border-radius: 0; background: transparent; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-row + .lieve-responsive-row { border-top: 1px solid var(--lv-border-soft); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-row:nth-child(even) { background: var(--lv-surface-3); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-row.is-base { background: var(--lv-gradient-faint); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-row:last-child { border-radius: 0 0 var(--lv-radius) var(--lv-radius); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-icon-picker { flex-basis: 32px; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-icon-option { transition: background .15s, color .15s !important; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-icon-option[aria-pressed="true"] { border-color: transparent !important; color: #fff; background: var(--lv-gradient); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-archive > summary { display: flex; align-items: center; gap: 8px; list-style: none; min-height: 46px; font-weight: 500; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-archive > summary::-webkit-details-marker { display: none; }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-archive > summary::after { content: ''; width: 6px; height: 6px; margin-left: auto; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
+#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-archive[open] > summary::after { transform: rotate(225deg); }
+
+@media (max-width: 1180px) {
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-workspace { grid-template-columns: 160px minmax(200px, 1fr) minmax(400px, 44%); }
+}
+@media (max-width: 1040px) {
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-workspace { grid-template-columns: 160px minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; }
+}
+@media (max-width: 680px) {
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal { padding: 12px; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-conditions-dialog { max-height: calc(100dvh - 24px); }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-header, .lieve-conditions-body, .lieve-conditions-footer, .lieve-ds-toolbar, .lieve-ds-footer, .lieve-ds-details) { padding: 16px; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-toolbar { gap: 8px; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-search { flex: 1 1 100%; width: 100%; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-footer, .lieve-ds-footer) { flex-wrap: wrap; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-footer { justify-content: flex-end; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal :is(.lieve-conditions-status, [data-ds-status]) { flex: 1 1 100%; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-workspace { grid-template-columns: minmax(0, 1fr); }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-sidebar { max-height: none; border-right: 0; border-bottom: 1px solid var(--lv-border); padding: 16px; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-sidebar nav { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; max-height: 180px; overflow: auto; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-sidebar nav button { width: auto; flex: 0 0 auto; white-space: nowrap; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-category-row { width: 100%; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-sidebar-note { display: none; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-library { max-height: 300px; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-columns { display: none; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-responsive-actions { flex-wrap: wrap; gap: 8px; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal .lieve-ds-action-layer { padding: 12px; }
+}
+/* A short/stacked manager scrolls as one surface instead of squeezing its list
+ * between an expanding toolbar and footer. Wide desktop keeps three scroll panes. */
+@media (max-width: 1040px), (max-height: 680px) {
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal > .lieve-conditions-dialog > .lieve-ds {
+		display: block;
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scroll-padding-block: 16px;
+	}
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal .lieve-ds-workspace { flex: none; min-height: 320px; overflow: visible; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal :is(.lieve-ds-sidebar, .lieve-ds-library) { max-height: 360px; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal .lieve-ds-details { overflow: visible; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal .lieve-ds-footer { position: static; }
+}
+@media (max-width: 680px) {
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal .lieve-ds-sidebar { max-height: none; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal .lieve-ds-sidebar nav { flex-wrap: nowrap; max-height: none; overflow-x: auto; padding-block: 4px; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal .lieve-ds.is-editing-categories .lieve-ds-sidebar nav { flex-direction: column; overflow-x: visible; }
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal.lieve-ds-modal .lieve-ds-library { min-height: 240px; max-height: 360px; }
+}
+@media (prefers-reduced-motion: reduce) {
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal *,
+	#lieve-builder-app[data-color-mode] .lieve-editor-manager-modal *::before { transition: none !important; }
+}

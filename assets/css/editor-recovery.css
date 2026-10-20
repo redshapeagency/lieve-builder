@@ -1,0 +1,44 @@
+/* Recovery is in the workspace flow; it never covers authored content or controls. */
+.lieve-workspace .lieve-stage-wrap { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.lieve-workspace .lieve-stage-wrap > .lieve-recovery-notice { grid-row: 1; }
+.lieve-workspace .lieve-stage-wrap > .lieve-device-bar { grid-row: 2; }
+.lieve-workspace .lieve-stage-wrap > .lieve-stage-scroll { grid-row: 3; }
+.lieve-workspace .lieve-stage-wrap > .lieve-motion-shelf { grid-row: 4; }
+.lieve-workspace .lieve-recovery-notice {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	min-width: 0;
+	padding: 8px 16px;
+	border-bottom: 1px solid var(--lv-border);
+	background: var(--lv-surface-2);
+	color: var(--lv-text-2);
+	font: 12px/1.5 var(--lv-font-ui);
+}
+.lieve-recovery-notice > span { flex: 1; min-width: 0; }
+.lieve-recovery-notice > button { flex-shrink: 0; min-height: 32px; padding: 0 10px; font-size: 12px; }
+.lieve-recovery-notice .lieve-recovery-dismiss { width: 32px; padding: 0; }
+.lieve-recovery-dismiss > svg { display: block; width: 16px; height: 16px; }
+.lieve-workspace .lieve-recovery-modal .lieve-conditions-dialog { width: min(520px, 100%); }
+.lieve-workspace .lieve-recovery.lieve-ds {
+	display: block;
+	min-height: 0;
+	padding: 24px;
+	background: var(--lv-surface);
+	color: var(--lv-text);
+	font: 13px/1.5 var(--lv-font-ui);
+	box-sizing: border-box;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.lieve-recovery.lieve-ds p { margin: 0 0 20px; color: var(--lv-text-2); }
+.lieve-recovery > label { display: block; margin-bottom: 8px; color: var(--lv-text-2); font-weight: 500; }
+.lieve-recovery select, .lieve-recovery .lieve-ds-select-trigger { width: 100%; }
+.lieve-recovery-modal .lieve-conditions-footer { flex-wrap: wrap; }
+.lieve-recovery-modal .lieve-conditions-footer > :first-child { margin-right: auto; }
+@media (max-width: 680px) {
+	.lieve-workspace .lieve-recovery.lieve-ds { padding: 16px; }
+	.lieve-workspace .lieve-recovery-modal .lieve-conditions-footer > button { min-width: 0; }
+	.lieve-workspace .lieve-recovery-notice { padding: 8px 12px; gap: 8px; }
+}

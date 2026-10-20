@@ -1,0 +1,87 @@
+/* Fonts extends the approved Variables/Colors workspace. No font applies to UI chrome. */
+.lieve-fonts { min-height: 650px; }
+.lieve-fonts svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.lieve-fonts .lieve-ds-toolbar .lieve-ds-search { width: min(360px, 32%); }
+.lieve-font-toolbar-note { margin-right: auto; color: var(--ds-muted); font-size: 12px; }
+.lieve-fonts [data-font-sort] { width: 44px; min-width: 44px; white-space: nowrap; }
+.lieve-fonts .lieve-font-workspace { grid-template-columns: 170px minmax(250px, 30%) minmax(0, 1fr); }
+.lieve-fonts .lieve-ds-sidebar nav button { min-height: 40px; gap: 9px; }
+.lieve-font-family { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 10px; border-radius: 8px; background: transparent; color: var(--ds-text); text-align: left; transition: background .15s, color .15s; }
+.lieve-font-family > span:nth-child(2) { flex: 1; min-width: 0; }
+.lieve-font-family strong, .lieve-font-family small { display: block; overflow-wrap: anywhere; }
+.lieve-font-family strong { font-size: 13px; font-weight: 600; }
+.lieve-font-family small { margin-top: 3px; color: var(--ds-muted); font-size: 11px; }
+.lieve-font-family:hover { background: var(--ds-soft); }
+.lieve-font-family[aria-pressed="true"] { background: var(--lieve-gradient-soft); }
+.lieve-font-glyph { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 8px; background: var(--ds-soft); color: var(--ds-muted); }
+.lieve-font-family[aria-pressed="true"] .lieve-font-glyph { background: var(--ds-surface); color: var(--ds-focus); }
+.lieve-font-state { font-size: 10px; color: var(--ds-muted); white-space: nowrap; }
+.lieve-font-empty { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; min-height: 390px; max-width: 470px; margin: auto; padding: 25px 12px; }
+.lieve-font-empty h2 { margin: 20px 0 10px; font-size: 23px; line-height: 1.3; letter-spacing: -.02em; color: var(--ds-text); }
+.lieve-font-empty p { margin: 0 0 24px; color: var(--ds-muted); font-size: 13px; line-height: 1.7; }
+.lieve-font-empty > div { display: flex; gap: 10px; flex-wrap: wrap; }
+.lieve-font-empty-glyph { color: var(--ds-focus); }
+.lieve-font-empty-glyph svg { width: 48px; height: 48px; }
+.lieve-font-list-empty { padding: 28px 10px; color: var(--ds-muted); line-height: 1.7; }
+.lieve-font-list-empty p { margin: 8px 0 0; }
+.lieve-font-heading { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 22px; }
+.lieve-font-heading > div:first-child { flex: 1; min-width: 0; }
+.lieve-font-heading h2 { margin: 0 0 6px; color: var(--ds-text); font-size: 21px; line-height: 1.35; overflow-wrap: anywhere; }
+.lieve-font-heading p { margin: 0; color: var(--ds-muted); font-size: 12px; }
+.lieve-font-heading .lieve-ds-detail-actions { gap: 5px; }
+.lieve-font-specimen { min-height: 150px; max-height: 300px; margin: 12px 0 16px; padding: 24px 0; overflow: auto; color: var(--ds-text); line-height: 1.25; overflow-wrap: anywhere; white-space: pre-wrap; }
+.lieve-font-preview-controls { display: grid; grid-template-columns: minmax(120px,1fr) 90px; align-items: end; gap: 12px; }
+.lieve-font-preview-controls input[type="number"] { padding-right: 4px; }
+.lieve-font-preview-controls > .is-wide { grid-column: 1 / -1; }
+.lieve-font-preview-note { color: var(--ds-muted); font-size: 11px; }
+.lieve-font-section { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--ds-border); }
+.lieve-font-section > h3 { margin-bottom: 16px; }
+.lieve-font-fields { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+.lieve-font-fields > .is-wide { grid-column: 1/-1; }
+.lieve-font-file { display: grid; grid-template-columns: minmax(0,1fr) 110px 100px auto; gap: 12px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--lieve-border-soft); }
+.lieve-font-file:last-child { border: 0; }
+.lieve-font-file > div:first-child { min-width: 0; }
+.lieve-font-file strong { display: block; font-size: 12px; overflow-wrap: anywhere; }
+.lieve-font-file small { display: block; margin-top: 4px; color: var(--ds-muted); font-size: 11px; overflow-wrap: anywhere; }
+.lieve-font-file .lieve-ds-field input { min-height: 34px; padding: 6px 8px; }
+.lieve-font-preload { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ds-muted); }
+.lieve-font-preload .lieve-ds-toggle { transform: scale(.85); transform-origin: right; }
+.lieve-font-select { position: relative; min-width: 0; }
+.lieve-fonts .lieve-font-select > button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--ds-border) !important; border-radius: 8px; background: var(--ds-surface); color: var(--ds-text); text-align: left; transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-font-select > button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lieve-fonts .lieve-font-select > button:is(:hover, [aria-expanded="true"]) { border-color: var(--ds-focus) !important; }
+.lieve-font-select [role="listbox"] { position: absolute; z-index: 30; display: flex; flex-direction: column; gap: 4px; top: calc(100% + 5px); left: 0; right: 0; max-height: 250px; padding: 5px; overflow: auto; border: 1px solid var(--ds-border); border-radius: 8px; background: var(--ds-surface); box-shadow: var(--lieve-shadow-md); }
+.lieve-font-select [role="option"] { display: block; flex: 0 0 auto; width: 100%; padding: 9px 10px; color: var(--ds-text); background: transparent; border-radius: 5px; text-align: left; }
+.lieve-font-select [role="option"]:is(:hover, [aria-selected="true"]) { background: var(--lieve-gradient-soft); color: var(--ds-focus); }
+.lieve-fonts .lieve-ds-action-layer[data-ds-action="fonts"] .lieve-ds-action-dialog { display: flex; flex-direction: column; width: min(100%,1080px); max-width: 1080px; }
+.lieve-fonts .lieve-ds-action-dialog > header { display: flex; align-items: flex-start; gap: 20px; }
+.lieve-fonts .lieve-ds-action-dialog > header > div { flex: 1; }
+.lieve-fonts .lieve-ds-action-dialog header h3 { margin: 0; }
+.lieve-fonts .lieve-ds-action-dialog header p { margin: 6px 0 0; font-size: 12px; color: var(--ds-muted); }
+.lieve-font-dialog-body { padding: 24px; overflow: auto; min-height: 0; }
+.lieve-font-dialog-error { margin: 0 24px 16px; color: #b32d2e; font-size: 12px; line-height: 1.6; }
+.lieve-font-catalog-tools { display: grid; grid-template-columns: 1fr 190px; gap: 12px; margin-bottom: 18px; }
+.lieve-font-catalog { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(260px,1fr); min-height: 320px; gap: 24px; }
+.lieve-font-catalog-list { max-height: 350px; overflow: auto; padding-right: 12px; border-right: 1px solid var(--ds-border); }
+.lieve-font-catalog-list .lieve-font-family { padding: 10px; }
+.lieve-font-catalog-detail h3 { margin-bottom: 8px; font-size: 18px; }
+.lieve-font-catalog-detail p { color: var(--ds-muted); font-size: 12px; line-height: 1.65; }
+.lieve-font-variant { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--lieve-border-soft); }
+.lieve-font-variant small { display: block; color: var(--ds-muted); font-size: 11px; }
+.lieve-font-variants { max-height: 275px; overflow: auto; }
+.lieve-fonts .lieve-font-upload { display: block; padding: 28px; margin: 18px 0; border: 1px dashed #c4c8d0; border-radius: 10px; background: var(--ds-soft); text-align: center; }
+.lieve-font-upload > svg { display: block; width: 28px; height: 28px; margin: 0 auto 10px; color: var(--ds-focus); }
+.lieve-font-upload strong { display: block; font-size: 14px; margin-bottom: 6px; }
+.lieve-font-upload p { color: var(--ds-muted); font-size: 12px; }
+.lieve-font-upload input { max-width: 100%; }
+.lieve-font-upload input::file-selector-button { min-height: 40px; margin-right: 10px; padding: 0 14px; border: 1px solid #e6e8ec; border-radius: 8px; background: transparent; color: #50575e; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-font-upload input::file-selector-button:hover { border-color: var(--ds-focus); background: var(--lieve-gradient-soft); color: var(--ds-focus); }
+.lieve-font-upload input:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 4px; border-radius: 8px; }
+.lieve-font-upload-row { display: grid; grid-template-columns: minmax(0,1fr) 130px 120px; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--ds-border); }
+.lieve-font-upload-row > span { overflow-wrap: anywhere; font-size: 12px; }
+.lieve-font-dialog-progress { margin-right: auto; color: var(--ds-muted); font-size: 12px; align-self: center; }
+.lieve-fonts .lieve-ds-footer [data-font-status].is-error { color: #b32d2e; }
+@media (max-width: 1280px) { .lieve-fonts .lieve-font-workspace { grid-template-columns: 150px minmax(220px, 30%) minmax(0,1fr); } .lieve-font-file { grid-template-columns: minmax(0,1fr) auto; } .lieve-font-file > .lieve-ds-field { grid-row: 2; } .lieve-font-toolbar-note { display: none; } .lieve-fonts .lieve-ds-toolbar .lieve-ds-search { margin-right: auto; } }
+@media (max-width: 1040px) { .lieve-fonts .lieve-font-workspace { grid-template-columns: 150px minmax(0,1fr); } .lieve-fonts .lieve-ds-details { grid-column: 1/-1; } .lieve-font-empty { min-height: 250px; } }
+@media (max-width: 600px) { .lieve-fonts .lieve-ds-toolbar .lieve-ds-search { width: 100%; min-width: 0; flex-basis: 100%; } .lieve-fonts .lieve-font-workspace { grid-template-columns: minmax(0,1fr); } .lieve-fonts .lieve-ds-sidebar { padding: 12px 16px; border-right: 0; border-bottom: 1px solid var(--ds-border); } .lieve-fonts .lieve-ds-sidebar nav { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; } .lieve-fonts .lieve-ds-sidebar nav button { width: auto; padding: 8px; font-size: 11px; } .lieve-fonts .lieve-ds-sidebar .lieve-ds-section-title, .lieve-fonts .lieve-ds-sidebar-note, .lieve-font-state { display: none; } .lieve-fonts .lieve-ds-details { padding: 20px 16px; } .lieve-font-catalog, .lieve-font-catalog-tools, .lieve-font-fields { grid-template-columns: minmax(0,1fr); } .lieve-font-catalog-list { max-height: 200px; border-right: 0; border-bottom: 1px solid var(--ds-border); } .lieve-font-dialog-body { padding: 16px; } .lieve-font-upload-row { grid-template-columns: repeat(2,minmax(0,1fr)); } .lieve-font-upload-row > span { grid-column: 1/-1; } .lieve-fonts .lieve-ds-footer { gap: 10px; } .lieve-fonts .lieve-ds-toolbar > button { padding: 0 12px; } }
+@media (prefers-reduced-motion: reduce) { .lieve-fonts *, .lieve-fonts *::before { transition: none !important; } }

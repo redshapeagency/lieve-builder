@@ -1,0 +1,251 @@
+/* Template library: the Variables/Colors visual language on WordPress' native list.
+ * Keep the shared product header, native form, IDs, row expansion and Screen Options.
+ * This file is enqueued only on edit.php for lieve_template, before the first paint. */
+.edit-php.post-type-lieve_template #wpbody-content > .wrap:not(.lieve-template-library-heading) {
+	display: flow-root;
+	padding: 0;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-lg);
+	background: var(--lieve-surface);
+	box-shadow: var(--lieve-shadow);
+	overflow: clip;
+}
+.edit-php.post-type-lieve_template #wpbody-content > .wrap > .wp-header-end { display: none; }
+.edit-php.post-type-lieve_template #wpbody-content > .wrap > :is(.notice, .updated, .error) { margin: 20px 24px 0; }
+.edit-php.post-type-lieve_template #wpbody-content > .wrap > .subtitle { display: block; margin: 20px 24px 0; padding: 0; color: var(--lieve-text-2); }
+
+/* Status views and search share the first toolbar row; floats wrap naturally.
+ * No DOM moves or display:contents on the native search/bulk-action form. */
+.edit-php.post-type-lieve_template .subsubsub {
+	display: flex;
+	max-width: calc(100% - 48px);
+	margin: 24px 0 0 24px;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+}
+.edit-php.post-type-lieve_template .subsubsub li { margin: 0; font-size: 0; }
+/* Base/selected status skins are shared with Settings in admin.css. */
+.edit-php.post-type-lieve_template .subsubsub a .count { color: inherit; font-size: inherit; font-weight: inherit; font-variant-numeric: tabular-nums; }
+.edit-php.post-type-lieve_template #posts-filter { margin: 0; }
+.edit-php.post-type-lieve_template #posts-filter,
+.edit-php.post-type-lieve_template #posts-filter * { box-sizing: border-box; }
+.edit-php.post-type-lieve_template #posts-filter .search-box {
+	position: static;
+	display: flex;
+	float: right;
+	width: min(460px, calc(100% - 48px));
+	max-width: none;
+	height: auto;
+	margin: 24px 24px 0;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: nowrap;
+}
+.edit-php.post-type-lieve_template #posts-filter .search-box input[type="search"] {
+	float: none;
+	flex: 1 1 0%;
+	width: auto;
+	min-width: 0;
+	min-height: 40px;
+	height: 40px;
+	margin: 0;
+	padding: 0 12px 0 38px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-sm);
+	background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23646970' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='m15.5 15.5 5 5'/%3E%3C/svg%3E") no-repeat 12px center / 16px 16px;
+	color: var(--lieve-text);
+	font-size: 13px;
+	transition: border-color .15s, box-shadow .15s;
+}
+.edit-php.post-type-lieve_template #posts-filter .search-box input[type="search"]:focus { border-color: var(--lieve-violet); box-shadow: var(--lieve-ring); outline: none; }
+.edit-php.post-type-lieve_template #posts-filter :is(.search-box, .tablenav .actions) .button {
+	float: none;
+	flex-shrink: 0;
+	min-width: 0;
+	min-height: 40px;
+	height: auto;
+	margin: 0;
+	padding: 0 16px;
+	line-height: 38px !important;
+}
+.edit-php.post-type-lieve_template #posts-filter .tablenav {
+	display: flex;
+	clear: both;
+	width: 100%;
+	box-sizing: border-box;
+	height: auto;
+	min-height: 0;
+	margin: 0;
+	padding: 20px 24px;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+.edit-php.post-type-lieve_template #posts-filter .tablenav.top { padding-top: 18px; border-bottom: 1px solid var(--lieve-border-soft); }
+.edit-php.post-type-lieve_template #posts-filter .tablenav.bottom { background: var(--lieve-surface-2); }
+.edit-php.post-type-lieve_template #posts-filter .tablenav .actions { display: flex; float: none; max-width: 100%; padding: 0; align-items: center; gap: 10px; flex-wrap: wrap; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav .actions.hidden { display: none; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav .actions select {
+	float: none;
+	width: auto;
+	max-width: 100%;
+	min-height: 40px;
+	margin: 0;
+	padding: 0 30px 0 12px;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-sm);
+	background-color: var(--lieve-surface);
+	color: var(--lieve-text-2);
+	font-size: 13px;
+	line-height: 38px;
+	transition: border-color .15s, box-shadow .15s;
+}
+.edit-php.post-type-lieve_template #posts-filter .tablenav .tablenav-pages { float: none; margin: 0 0 0 auto; color: var(--lieve-text-2); font-size: 12px; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav > .clear { display: none; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav .displaying-num { margin-right: 12px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages .pagination-links { display: inline-flex; align-items: center; gap: 5px; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages.one-page .pagination-links { display: none; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages :is(a, .tablenav-pages-navspan, .current-page) {
+	box-sizing: border-box;
+	min-width: 32px;
+	min-height: 32px;
+	margin: 0;
+	border: 1px solid var(--lieve-border);
+	border-radius: var(--lieve-radius-sm);
+	background: transparent;
+	box-shadow: none;
+	color: var(--lieve-text-2);
+	line-height: 30px;
+	text-decoration: none;
+	transition: border-color .15s, background .15s, color .15s !important;
+}
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages .current-page { padding: 0 6px; font-size: 12px; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages a.button { border: 1px solid var(--lieve-border) !important; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages a.button:hover { border-color: var(--lieve-violet) !important; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages .paging-input { font-size: 12px; font-variant-numeric: tabular-nums; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages a:hover { border-color: var(--lieve-violet); background: var(--lieve-gradient-soft); color: var(--lieve-accent-ink,#7040c1); }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages .tablenav-pages-navspan { opacity: .45; }
+
+/* Flat, legible rows: no WordPress striping or purple block on hover. */
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table { border: 0; border-radius: 0; box-shadow: none; }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(thead, tfoot) { background: var(--lieve-surface-2); }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(thead, tfoot) tr { align-items: center; }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(thead, tfoot) :is(th, td) { height: 44px; padding: 12px 14px; border-color: var(--lieve-border-soft); color: var(--lieve-text-2); font-size: 12px; font-weight: 500; line-height: 1.4; vertical-align: middle; }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(thead, tfoot) a { display: inline-flex; padding: 0; align-items: center; gap: 4px; color: inherit; font-size: inherit; line-height: inherit; }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(thead, tfoot) .sorting-indicators { color: var(--lieve-text-2); }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table tbody > tr { background: var(--lieve-surface); }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table tbody > tr:hover { background: var(--lieve-surface-2); }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table tbody > tr.selected,
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table tbody > tr:has(> .check-column input:checked) { background: var(--lieve-gradient-faint); }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table tbody > tr > :is(th, td) { padding: 18px 14px; border-bottom: 1px solid var(--lieve-border-soft); color: var(--lieve-text-2); vertical-align: top; }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table .row-title { color: var(--lieve-text); font-size: 13px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table .row-title:hover { color: var(--lieve-violet); }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table .post-state { color: var(--lieve-text-2); font-size: 11px; font-weight: 400; }
+.edit-php.post-type-lieve_template #posts-filter .column-lieve_template_active { width: 64px; text-align: center; }
+.edit-php.post-type-lieve_template #posts-filter .column-lieve_template_type { width: 150px; }
+.edit-php.post-type-lieve_template #posts-filter .column-lieve_template_state { width: 106px; }
+.edit-php.post-type-lieve_template #posts-filter .column-lieve_template_condition { width: 28%; }
+.edit-php.post-type-lieve_template #posts-filter .column-date { width: 160px; font-size: 12px; }
+.edit-php.post-type-lieve_template #posts-filter .lieve-list-badge { display: inline-flex; max-width: 100%; min-height: 28px; padding: 4px 8px; box-sizing: border-box; align-items: center; gap: 7px; border-radius: var(--lieve-radius-sm); background: var(--lieve-surface-3); color: var(--lieve-text-2); font-size: 12px; font-weight: 500; line-height: 1.5; }
+.edit-php.post-type-lieve_template #posts-filter .lieve-list-badge svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.edit-php.post-type-lieve_template #posts-filter .lieve-list-badge > span { min-width: 0; overflow-wrap: anywhere; }
+.edit-php.post-type-lieve_template #posts-filter .lieve-display-card { max-width: none; }
+.edit-php.post-type-lieve_template #posts-filter .lieve-display-overview { min-height: 54px; }
+.edit-php.post-type-lieve_template #posts-filter .row-actions { margin-top: 8px; padding: 0; color: var(--lieve-text-2); font-size: 0; }
+.edit-php.post-type-lieve_template #posts-filter .row-actions > span { display: inline-block; margin: 0 10px 4px 0; font-size: 0; }
+.edit-php.post-type-lieve_template #posts-filter .row-actions :is(a, button) { padding: 0; border: 0; border-radius: 3px; background: transparent; box-shadow: none; color: var(--lieve-text-2); font-size: 12px; line-height: 1.6; text-decoration: none; transition: border-color .15s, background .15s, color .15s !important; }
+.edit-php.post-type-lieve_template #posts-filter .row-actions :is(a, button):hover { color: var(--lieve-violet); }
+.edit-php.post-type-lieve_template #posts-filter .row-actions :is(.trash, .delete) a { color: #b32d2e; }
+.edit-php.post-type-lieve_template #posts-filter .row-actions :is(.trash, .delete) a:hover { color: #8a2424; }
+.edit-php.post-type-lieve_template #posts-filter tr:focus-within .row-actions { position: static; }
+/* Native empty rows need their own breathing room; no JS replacement or flash. */
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table .no-items:hover { background: var(--lieve-surface); }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table .no-items td {
+	padding: 48px 24px;
+	border: 0;
+	color: var(--lieve-text-2);
+	font-size: 13px;
+	line-height: 1.6;
+	text-align: center;
+	vertical-align: middle;
+	overflow-wrap: anywhere;
+}
+
+/* Retain native checkbox names/IDs and full-cell labels for bulk/Shift selection. */
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table .check-column { width: 34px; padding: 20px 4px; text-align: center; }
+.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(thead, tfoot) .check-column { padding: 13px 4px; }
+.edit-php.post-type-lieve_template #posts-filter .check-column input[type="checkbox"] { appearance: none; position: relative; width: 16px; height: 16px; margin: 0; border: 1px solid #c4c8d0; border-radius: 4px; background: #fff; box-shadow: none; cursor: pointer; }
+.edit-php.post-type-lieve_template #posts-filter .check-column input:checked,
+.edit-php.post-type-lieve_template #posts-filter .check-column input:indeterminate { border: 0; background: var(--lieve-gradient); }
+.edit-php.post-type-lieve_template #posts-filter .check-column input:checked::before { content: ''; position: absolute; display: block; float: none; top: 50%; left: 50%; width: 4px; height: 8px; margin: 0; border: solid white; border-width: 0 2px 2px 0; transform: translate(-50%, -60%) rotate(45deg); }
+.edit-php.post-type-lieve_template #posts-filter .check-column input:indeterminate::before { content: ''; position: absolute; display: block; float: none; top: 50%; left: 50%; width: 8px; height: 2px; margin: 0; border: 0; background: #fff; transform: translate(-50%, -50%); }
+.edit-php.post-type-lieve_template #posts-filter .check-column .label-covers-full-cell:hover + input:not(:disabled) { box-shadow: none; }
+.edit-php.post-type-lieve_template #posts-filter .check-column .label-covers-full-cell:hover + input:not(:disabled):not(:checked):not(:indeterminate) { border-color: var(--lieve-violet); }
+.edit-php.post-type-lieve_template #posts-filter .check-column input:disabled { opacity: .45; cursor: default; }
+.edit-php.post-type-lieve_template #posts-filter .check-column label:hover { background: transparent; }
+.edit-php.post-type-lieve_template #posts-filter input { caret-color: var(--lieve-violet); }
+.edit-php.post-type-lieve_template #posts-filter ::selection { background: #e9def8; color: var(--lieve-text); }
+.edit-php.post-type-lieve_template .subsubsub a:focus-visible,
+.edit-php.post-type-lieve_template #posts-filter :is(a, button, input[type="checkbox"], .button):focus-visible { outline: 2px solid var(--lieve-violet) !important; outline-offset: 3px; box-shadow: none; }
+.edit-php.post-type-lieve_template #posts-filter .tablenav-pages .current-page:focus { border-color: var(--lieve-violet); outline: none; box-shadow: var(--lieve-ring); }
+
+@media (min-width: 783px) and (max-width: 1200px) {
+	.edit-php.post-type-lieve_template #posts-filter .column-lieve_template_type { width: 120px; }
+	.edit-php.post-type-lieve_template #posts-filter .column-date { width: 140px; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table tbody > tr > :is(th, td) { padding-right: 10px; padding-left: 10px; }
+}
+/* Switch the table to WordPress' expandable-row model before fixed columns
+ * can squeeze the title away beside the admin sidebar. Hidden columns stay hidden. */
+@media (max-width: 1100px) {
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table tr { display: flex; flex-wrap: wrap; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .inline-edit-row > td { flex: 1 1 100%; width: 100%; box-sizing: border-box; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(thead, tfoot) .column-primary ~ :is(th, td),
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table tr:not(.inline-edit-row):not(.no-items) .column-primary ~ td:not(.check-column) { display: none; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .is-expanded > :is(th, td):not(.hidden) { display: block !important; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(th, td).column-lieve_template_active { flex: 0 0 56px; width: 56px; padding: 18px 8px; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .check-column { flex: 0 0 28px; width: 28px; padding: 20px 4px; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(thead, tfoot) :is(.column-lieve_template_active, .check-column) { padding-top: 13px; padding-bottom: 13px; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table :is(td, th).column-primary { position: relative; flex: 1 1 0; min-width: 0; padding: 18px 44px 14px 10px; }
+	/* WordPress 7 uses th[scope=row] for the title; older versions used td.
+	 * Match the primary class, not its tag, for both collapse and label spacing. */
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table tr:not(.inline-edit-row):not(.no-items) .column-primary ~ td:not(.check-column) { position: relative; flex: 1 1 100%; width: auto; padding: 10px 16px 10px clamp(120px, 35%, 180px); }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table tr:not(.inline-edit-row):not(.no-items) .column-primary ~ td::before { position: absolute; left: 16px; display: block; width: clamp(88px, 28%, 144px); color: var(--lieve-text-2); font-size: 12px; font-weight: 500; content: attr(data-colname); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .column-primary::before { display: none; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table tr:not(.inline-edit-row):not(.no-items) .column-primary ~ td.column-lieve_template_condition { padding: 12px 16px 14px; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table tr:not(.inline-edit-row):not(.no-items) .column-primary ~ td.column-lieve_template_condition::before { position: static; width: auto; margin-bottom: 8px; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table td.column-lieve_template_active::before { display: none; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .toggle-row { position: absolute; display: block; top: 14px; right: 8px; width: 32px; height: 32px; border-radius: var(--lieve-radius-sm); color: var(--lieve-text-2); }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .toggle-row:hover { background: var(--lieve-gradient-soft); }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .toggle-row::before { top: 2px; left: 2px; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table tr:not(.is-expanded) .row-actions { display: none; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .is-expanded .row-actions { position: static; display: flex; flex-wrap: wrap; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .row-actions > span { padding: 0; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .no-items td { flex: 1 1 100%; }
+}
+@media (max-width: 782px) {
+	.edit-php.post-type-lieve_template .subsubsub { float: none; max-width: none; margin: 16px 16px 0; }
+	.edit-php.post-type-lieve_template #posts-filter .search-box { float: none; width: auto; margin: 16px 16px 0; }
+	.edit-php.post-type-lieve_template #posts-filter .tablenav { padding: 16px; gap: 10px; }
+	.edit-php.post-type-lieve_template #posts-filter .tablenav .tablenav-pages { width: auto; max-width: 100%; height: auto; margin-left: auto; }
+	.edit-php.post-type-lieve_template #posts-filter .tablenav .pagination-links { flex-wrap: wrap; }
+	.edit-php.post-type-lieve_template #posts-filter .tablenav .actions:not(.hidden) { display: flex; }
+	.edit-php.post-type-lieve_template #posts-filter .tablenav.bottom .displaying-num { position: static; font-size: 12px; }
+	.edit-php.post-type-lieve_template #posts-filter .wp-list-table .no-items td { padding: 32px 16px; }
+	.edit-php.post-type-lieve_template #wpbody-content > .wrap > :is(.notice, .updated, .error, .subtitle) { margin-right: 16px; margin-left: 16px; }
+}
+@media (max-width: 480px) {
+	.edit-php.post-type-lieve_template #posts-filter .tablenav .actions { width: 100%; }
+	.edit-php.post-type-lieve_template #posts-filter .tablenav .actions select { flex: 1 1 140px; min-width: 0; }
+	.edit-php.post-type-lieve_template #posts-filter .tablenav .tablenav-pages { width: 100%; text-align: left; }
+	.edit-php.post-type-lieve_template #posts-filter .tablenav .displaying-num { display: inline; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.edit-php.post-type-lieve_template .subsubsub a,
+	.edit-php.post-type-lieve_template .subsubsub a.current,
+	.edit-php.post-type-lieve_template #posts-filter :is(.row-actions a, .row-actions button, input, select, .tablenav-pages a, .tablenav-pages-navspan) { transition: none !important; }
+}
+@media (forced-colors: active) {
+	.edit-php.post-type-lieve_template #posts-filter .check-column input[type="checkbox"] { appearance: auto; }
+	.edit-php.post-type-lieve_template #posts-filter .check-column input[type="checkbox"]::before { display: none; }
+}

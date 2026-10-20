@@ -1,0 +1,58 @@
+/* An expanded workspace, using the shared modal header, controls and focus trap. */
+#lieve-builder-app .lieve-code-editor-modal { position: fixed; inset: 0; z-index: 100020; display: grid; place-items: center; padding: 16px; }
+#lieve-builder-app .lieve-code-editor-modal .lieve-modal-dialog[role="dialog"] { display: flex; flex-direction: column; box-sizing: border-box; width: calc(100vw - 32px); height: calc(100dvh - 32px); min-width: 0; min-height: min(400px, calc(100dvh - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); resize: none; overflow: hidden; }
+.lieve-code-editor-modal .lieve-template-header, .lieve-code-editor-modal .lieve-template-create { flex: 0 0 auto; }
+.lieve-code-editor-toolbar { display: flex; align-items: center; flex: 0 0 auto; flex-wrap: wrap; gap: 8px; padding: 12px 24px; border-bottom: 1px solid var(--lm-border-soft); }
+.lieve-code-editor-toolbar-space { flex: 1; }
+.lieve-code-search { flex: 0 0 auto; padding: 12px 24px; border-bottom: 1px solid var(--lm-border-soft); background: var(--lm-soft); }
+.lieve-code-search[hidden], .lieve-code-search-row[hidden] { display: none; }
+.lieve-code-search-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.lieve-code-search-row + .lieve-code-search-row { margin-top: 12px; }
+.lieve-code-search-row > label:not(.lieve-code-match-case) { display: flex; flex: 1 1 240px; flex-direction: column; min-width: 0; gap: 6px; color: var(--lm-text-2); font: 500 12px/1.5 var(--lm-font); }
+.lieve-workspace .lieve-code-search-row input:not([type="checkbox"]) { width: 100%; min-width: 0; height: 40px; margin: 0; padding: 8px 12px; border: 1px solid var(--lm-border); border-radius: 8px; background: var(--lm-surface); color: var(--lm-text); box-shadow: none; font: 400 13px/1.5 var(--lm-font); transition: border-color .15s, box-shadow .15s; }
+.lieve-workspace .lieve-code-search-row input:not([type="checkbox"]):focus { border-color: var(--lm-accent); outline: none; box-shadow: var(--lm-ring); }
+.lieve-code-search-row .lieve-code-match-case { display: inline-flex; align-items: center; min-height: 40px; gap: 6px; margin: 0 8px 0 0; color: var(--lm-text-2); font: 400 12px/1.5 var(--lm-font); cursor: pointer; }
+.lieve-code-match-case input { accent-color: var(--lm-accent); }
+.lieve-code-search [data-code-search-status] { min-height: 18px; margin: 8px 0 0; color: var(--lm-muted); font: 400 12px/1.5 var(--lm-font); }
+.lieve-code-editor-body { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 20px 24px; gap: 10px; }
+.lieve-code-editor-body label { color: var(--lm-text-2); font-size: 12px; font-weight: 600; }
+.lieve-workspace .lieve-code-editor-body > textarea { display: block; width: 100%; min-height: 0; flex: 1; margin: 0; padding: 16px; border: 1px solid var(--lm-border); border-radius: 8px; color: var(--lm-text); background: var(--lm-soft); caret-color: var(--lm-accent); font: 13px/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 2; resize: none; overflow: auto; }
+.lieve-code-editor-body > textarea:focus-visible { border-color: var(--lm-accent); outline: 2px solid var(--lm-accent); outline-offset: 2px; box-shadow: none; }
+/* CodeMirror is WordPress' bundled editor, scoped to this workspace only. */
+.lieve-custom-code-block { --lm-surface: var(--lv-surface); --lm-soft: var(--lv-surface-3); --lm-border: var(--lv-border); --lm-text: var(--lv-text); --lm-muted: var(--lv-muted); --lm-accent: var(--lv-violet); --lm-accent-text: var(--lv-accent-text); --lm-gradient-soft: var(--lv-gradient-soft); }
+.lieve-workspace .lieve-custom-code-block .lieve-code-inline.CodeMirror { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; height: 164px; min-height: 164px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: var(--lv-surface-2); color: var(--lv-text); font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; overflow: hidden; transition: border-color .15s, box-shadow .15s; }
+.lieve-workspace .lieve-custom-code-block .lieve-code-inline.CodeMirror-focused { border-color: var(--lv-violet); box-shadow: var(--lv-ring); }
+.lieve-custom-code-block .CodeMirror-placeholder { color: var(--lv-muted); }
+.lieve-code-inline .CodeMirror-scroll { scrollbar-width: thin; scrollbar-color: var(--lv-border) transparent; }
+.lieve-code-editor-body .CodeMirror { flex: 1 1 0; width: 100%; min-height: 0; height: 100%; border: 1px solid var(--lm-border); border-radius: 8px; background: var(--lm-soft); color: var(--lm-text); font: 13px/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 2; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror-focused { border-color: var(--lm-accent); }
+.lieve-workspace :is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror textarea { min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; outline: none; font: inherit; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror-lines { padding: 14px 0; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror pre.CodeMirror-line, :is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror pre.CodeMirror-line-like { padding: 0 16px; font: inherit; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror-gutters { border-right: 1px solid var(--lm-border); background: var(--lm-surface); }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror-linenumber { padding: 0 10px 0 14px; color: var(--lm-muted); }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror-cursor { border-left-color: var(--lm-text); }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror-selected { background: color-mix(in srgb, var(--lm-accent) 15%, var(--lm-soft)); }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror-focused .CodeMirror-selected { background: color-mix(in srgb, var(--lm-accent) 24%, var(--lm-soft)); }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .cm-comment { color: var(--lm-muted); font-style: italic; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-keyword,.cm-atom,.cm-meta) { color: var(--lm-accent-text); }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-string,.cm-string-2) { color: #13724b; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-number,.cm-variable-3,.cm-type) { color: #a04416; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-tag,.cm-builtin) { color: #126b8d; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-attribute,.cm-def,.cm-property) { color: #7d3aa5; }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-variable,.cm-variable-2,.cm-operator,.cm-qualifier) { color: var(--lm-text); }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) .CodeMirror-matchingbracket { color: var(--lm-accent-text) !important; background: var(--lm-gradient-soft); outline: 1px solid var(--lm-border); }
+:is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-error,.CodeMirror-nonmatchingbracket) { color: var(--lv-danger,#b32d2e) !important; text-decoration: underline wavy; }
+[data-color-mode="dark"] :is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-string,.cm-string-2) { color: #82d9b0; }
+[data-color-mode="dark"] :is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-number,.cm-variable-3,.cm-type) { color: #f3b78d; }
+[data-color-mode="dark"] :is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-tag,.cm-builtin) { color: #84cce5; }
+[data-color-mode="dark"] :is(.lieve-code-editor-body, .lieve-custom-code-block) :is(.cm-attribute,.cm-def,.cm-property) { color: #d9abef; }
+.lieve-code-editor-modal .lieve-template-create { display: flex; justify-content: flex-start; }
+#lieve-builder-app .lieve-code-editor-modal .lieve-modal-dialog[role="dialog"] .lieve-template-create { min-height: 48px; padding: 12px 24px; }
+.lieve-code-editor-modal .lieve-template-create > span { font-size: 12px; line-height: 1.6; }
+.lieve-code-editor-modal :is(textarea,button) { scroll-margin: 12px; }
+.lieve-code-editor-modal textarea { scrollbar-width: thin; scrollbar-color: var(--lm-border) transparent; }
+.lieve-code-editor-modal textarea::selection { background: color-mix(in srgb, var(--lm-accent) 20%, transparent); color: var(--lm-text); }
+@media (max-width: 600px) { .lieve-code-editor-body { padding: 16px; } .lieve-code-editor-toolbar, .lieve-code-search { padding: 12px 16px; } .lieve-code-editor-toolbar-space { display: none; } }
+@media (max-height: 700px) { #lieve-builder-app .lieve-code-editor-modal .lieve-modal-dialog[role="dialog"] { overflow: auto; } .lieve-code-editor-body { flex: 1 0 280px; min-height: 280px; } }
+@media (prefers-reduced-motion: reduce) { .lieve-code-search input, .lieve-workspace .lieve-custom-code-block .lieve-code-inline.CodeMirror { transition: none !important; } }

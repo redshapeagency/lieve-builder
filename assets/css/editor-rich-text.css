@@ -1,0 +1,71 @@
+/* Rich-text and multiline property controls. Scoped to the Lieve editor only. */
+.lieve-workspace :is(.lieve-field-heading, .lieve-rich-tools) > .lieve-dynamic-button { position: relative; isolation: isolate; display: grid; width: 34px; min-width: 34px; height: 34px; min-height: 34px; flex: 0 0 34px; box-sizing: border-box; margin: 0; padding: 0; place-items: center; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: transparent; box-shadow: none; color: var(--lv-muted); cursor: pointer; transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-workspace :is(.lieve-field-heading, .lieve-rich-tools) > .lieve-dynamic-button::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--lv-gradient-soft); opacity: 0; transition: opacity .15s ease; pointer-events: none; }
+.lieve-workspace :is(.lieve-field-heading, .lieve-rich-tools) > .lieve-dynamic-button svg { width: 18px; height: 18px; pointer-events: none; }
+.lieve-workspace .lieve-field-heading > .lieve-dynamic-button { width: 24px; min-width: 24px; height: 24px; min-height: 24px; flex-basis: 24px; }
+.lieve-workspace .lieve-field-heading > .lieve-dynamic-button svg { width: 16px; height: 16px; }
+.lieve-workspace :is(.lieve-field-heading, .lieve-rich-tools) > .lieve-dynamic-button:is(:hover, :focus-visible, [aria-pressed="true"]) { color: var(--lv-accent-text); border-color: var(--lieve-accent-border); }
+.lieve-workspace :is(.lieve-field-heading, .lieve-rich-tools) > .lieve-dynamic-button:is(:hover, :focus-visible, [aria-pressed="true"])::before { opacity: 1; }
+.lieve-workspace :is(.lieve-field-heading, .lieve-rich-tools) > .lieve-dynamic-button:is(:focus, :active) { box-shadow: none; outline: none; }
+.lieve-workspace :is(.lieve-field-heading, .lieve-rich-tools) > .lieve-dynamic-button:focus-visible { outline: 2px solid var(--lv-violet); outline-offset: 2px; }
+.lieve-workspace .lieve-field-heading + textarea { width: 100%; box-sizing: border-box; }
+.lieve-workspace .lieve-rich-text { min-width: 0; }
+.lieve-rich-text [hidden] { display: none !important; }
+.lieve-workspace .lieve-rich-text .wp-editor-wrap { display: block; min-width: 0; width: 100%; }
+.lieve-workspace .lieve-rich-text [data-rich-body]:not(:has(.wp-editor-wrap)) { border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); overflow: hidden; }
+.lieve-workspace .lieve-rich-tools { display: flex; min-width: 0; min-height: 34px; margin-bottom: 2px; align-items: center; justify-content: flex-end; gap: 6px; }
+.lieve-workspace .lieve-rich-tools > [data-rich-tabs] { display: flex; min-width: 0; }
+.lieve-workspace .lieve-rich-text .wp-editor-tabs { display: flex; gap: 6px; float: none; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor { position: relative; isolation: isolate; top: 0; float: none; display: inline-flex; height: 34px; min-height: 34px; min-width: 64px; margin: 0; padding: 0 10px; align-items: center; justify-content: center; box-sizing: border-box; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: transparent; box-shadow: none; color: var(--lv-text-2); font: 500 12px/1.5 var(--lv-font-ui); cursor: pointer; transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--lv-gradient-soft); opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor:not(:disabled):is(:hover, :focus-visible) { color: var(--lv-accent-text); border-color: var(--lieve-accent-border); }
+.lieve-workspace .lieve-rich-text .wp-switch-editor:not(:disabled):is(:hover, :focus-visible)::before { opacity: 1; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor[aria-pressed="true"] { border: 0; background: var(--lv-gradient); color: #fff; transition: opacity .15s ease, box-shadow .15s ease !important; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor[aria-pressed="true"]::before { content: none; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor[aria-pressed="true"]:not(:disabled):hover { color: #fff; opacity: .85; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor:disabled { opacity: .45; cursor: default; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor:is(:active, :focus) { box-shadow: none; }
+.lieve-workspace .lieve-rich-text .wp-switch-editor:focus-visible { outline: 2px solid var(--lv-violet); outline-offset: 2px; }
+.lieve-workspace .lieve-rich-text .wp-editor-container { display: block; width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: var(--lv-surface); overflow: hidden; }
+.lieve-workspace .lieve-rich-text :is(.mce-panel, .mce-toolbar-grp, .mce-statusbar) { border-color: var(--lv-border) !important; background: var(--lv-surface); box-shadow: none; }
+.lieve-workspace .lieve-rich-text .mce-toolbar-grp { padding: 6px; box-sizing: border-box; }
+.lieve-workspace .lieve-rich-text .mce-toolbar-grp > .mce-container-body { display: flex; width: 100%; flex-wrap: wrap; align-items: stretch; gap: 4px; }
+.lieve-workspace .lieve-rich-text :is(.mce-toolbar, .mce-toolbar > .mce-container-body, .mce-btn-group, .mce-btn-group > div) { display: contents; }
+.lieve-workspace .lieve-rich-text .mce-btn { position: relative; isolation: isolate; display: inline-flex; flex: 1 1 34px; min-width: 34px; margin: 0 !important; box-sizing: border-box; border: 0; border-radius: 5px; background: transparent !important; box-shadow: none !important; color: var(--lv-text-2); transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-workspace .lieve-rich-text .mce-btn::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--lv-gradient-soft); opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.lieve-workspace .lieve-rich-text .mce-btn button { display: inline-flex; width: 100%; min-width: 30px; height: 32px; min-height: 32px; margin: 0; padding: 4px; align-items: center; justify-content: center; border: 0; border-radius: inherit; background: transparent; box-shadow: none !important; color: inherit; font: 12px/1.5 var(--lv-font-ui); }
+.lieve-workspace .lieve-rich-text :is(.mce-ico, .mce-caret) { color: inherit; border-top-color: currentColor; }
+.lieve-workspace .lieve-rich-text .mce-listbox button { min-width: 94px; padding: 4px 20px 4px 8px; justify-content: flex-start; }
+.lieve-workspace .lieve-rich-text .mce-toolbar .mce-btn.mce-listbox { flex: 2 1 112px; min-width: 112px; border: 1px solid var(--lv-border); border-radius: 5px; }
+.lieve-workspace .lieve-rich-text .mce-btn.mce-splitbtn { flex: 2 1 60px; min-width: 60px; }
+.lieve-workspace .lieve-rich-text .mce-splitbtn button { width: auto; flex: 1 1 auto; }
+.lieve-workspace .lieve-rich-text .mce-splitbtn .mce-open { min-width: 24px; flex: 0 0 24px; }
+.lieve-workspace .lieve-rich-text .mce-btn:not(.mce-disabled):is(:hover, :focus-within), .lieve-workspace .lieve-rich-text .mce-btn.mce-active { color: var(--lv-accent-text); }
+.lieve-workspace .lieve-rich-text .mce-btn:not(.mce-disabled):is(:hover, :focus-within)::before, .lieve-workspace .lieve-rich-text .mce-btn.mce-active::before { opacity: 1; }
+.lieve-workspace .lieve-rich-text .mce-btn.mce-disabled { opacity: .45; }
+.lieve-workspace .lieve-rich-text :is(.mce-btn, .mce-btn button):focus-visible { outline: 2px solid var(--lv-violet); outline-offset: -2px; }
+.lieve-workspace .lieve-rich-text .mce-edit-area { border-top: 1px solid var(--lv-border) !important; background: var(--lv-surface); }
+.lieve-workspace .lieve-rich-text iframe { display: block; width: 100%; background: var(--lv-surface); }
+.lieve-workspace .lieve-rich-text .mce-statusbar { border-top: 1px solid var(--lv-border) !important; }
+.lieve-workspace .lieve-rich-text .mce-resizehandle { color: var(--lv-muted); }
+.lieve-workspace .lieve-rich-text textarea[data-prop="content"] { width: 100%; min-height: 180px; margin: 0; padding: 12px; box-sizing: border-box; border: 0; border-radius: 0; resize: vertical; background: var(--lv-surface); color: var(--lv-text); font: 12px/1.7 var(--lv-font-ui); }
+.lieve-workspace .lieve-rich-text .quicktags-toolbar { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border-bottom: 1px solid var(--lv-border); background: var(--lv-surface); }
+.lieve-workspace .lieve-rich-text .tmce-active .quicktags-toolbar { display: none; }
+.lieve-workspace .lieve-rich-text .quicktags-toolbar input.ed_button { height: 28px; min-height: 28px; flex: 1 1 auto; margin: 0; padding: 0 7px; border: 1px solid var(--lv-border); border-radius: 5px; background: transparent; box-shadow: none; color: var(--lv-text-2); font: 500 11px/1.5 var(--lv-font-ui); transition: border-color .15s, background .15s, color .15s !important; }
+.lieve-workspace .lieve-rich-text .quicktags-toolbar input.ed_button:hover { border-color: var(--lieve-accent-border); background: color-mix(in srgb, var(--lv-violet) 10%, transparent); color: var(--lv-accent-text); }
+.lieve-workspace .lieve-rich-text .quicktags-toolbar input.ed_button:focus-visible { outline: 2px solid var(--lv-violet); outline-offset: 1px; }
+.lieve-rich-binding { padding: 14px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: var(--lv-surface); }
+.lieve-rich-binding strong { display: block; color: var(--lv-accent-text); font: 600 12px/1.5 var(--lv-font-ui); overflow-wrap: anywhere; }
+.lieve-rich-binding p, .lieve-rich-status { margin: 8px 0 0; color: var(--lv-text-2); font: 12px/1.6 var(--lv-font-ui); }
+/* TinyMCE's portaled UI is outside the sidebar; never target native WordPress screens. */
+body.admin_page_lieve-builder :is(.mce-floatpanel, .mce-tooltip, #wp-link-wrap) { z-index: 100160; font-family: var(--lieve-rich-font-ui,system-ui); }
+body.admin_page_lieve-builder .mce-floatpanel { border-color: var(--lieve-rich-border,#e6e8ec); border-radius: 8px; background: var(--lieve-rich-surface,#fff); color: var(--lieve-rich-text,#262c38); }
+body.admin_page_lieve-builder .mce-floatpanel :is(.mce-text, label) { color: inherit; font-family: var(--lieve-rich-font-ui,system-ui); }
+body.admin_page_lieve-builder .mce-floatpanel .mce-ico { color: inherit; }
+body.admin_page_lieve-builder .mce-menu-item { background: transparent; color: var(--lieve-rich-text,#262c38); }
+body.admin_page_lieve-builder .mce-menu-item:is(:hover, .mce-selected, .mce-active) { background: var(--lieve-rich-gradient-soft,#f0edf9); color: var(--lieve-rich-accent-text,#6e36c9); }
+body.admin_page_lieve-builder #wp-link-backdrop { z-index: 100159; }
+body.admin_page_lieve-builder #wp-link-wrap { border: 1px solid var(--lieve-rich-border,#e6e8ec); border-radius: 10px; overflow: hidden; background: var(--lieve-rich-surface,#fff); color: var(--lieve-rich-text,#262c38); }
+body.admin_page_lieve-builder #wp-link-wrap :is(#link-modal-title, .submitbox, .link-target) { border-color: var(--lieve-rich-border,#e6e8ec); background: var(--lieve-rich-surface,#fff); color: inherit; }
+body.admin_page_lieve-builder #wp-link-wrap :is(input, button) { font-family: var(--lieve-rich-font-ui,system-ui); }
+@media (prefers-reduced-motion: reduce) { .lieve-workspace :is(.lieve-field-heading > .lieve-dynamic-button, .lieve-field-heading > .lieve-dynamic-button::before, .lieve-rich-tools > .lieve-dynamic-button, .lieve-rich-tools > .lieve-dynamic-button::before, .lieve-rich-text .wp-switch-editor, .lieve-rich-text .wp-switch-editor::before, .lieve-rich-text .mce-btn, .lieve-rich-text .mce-btn::before, .lieve-rich-text input.ed_button) { transition: none !important; } }

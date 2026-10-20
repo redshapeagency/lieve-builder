@@ -1,0 +1,89 @@
+/* Extension of Lieve's existing inspector and control system. Editor chrome only. */
+.lieve-workspace .lieve-motion { min-width: 0; font: 12px/1.6 var(--lv-font-ui); color: var(--lv-text); }
+.lieve-motion .lieve-control { display: grid; min-width: 0; margin: 0 0 var(--lv-inspector-field-gap); gap: var(--lv-inspector-label-gap); }
+.lieve-workspace .lieve-motion .lieve-control > span { display: flex; min-width: 0; min-height: 24px; align-items: center; color: var(--lv-text-2); font: 400 12px/18px var(--lv-font-ui); overflow-wrap: anywhere; }
+.lieve-motion .lieve-control-group-title { margin: 0; }
+.lieve-motion .lieve-interact-empty { margin-top: 12px; }
+.lieve-motion :is(input:not([type="checkbox"]), select) { width: 100%; min-width: 0; height: var(--lv-inspector-control-height); box-sizing: border-box; margin: 0; padding: 7px 9px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: var(--lv-surface); box-shadow: none; color: var(--lv-text); font: 12px/20px var(--lv-font-ui); transition: border-color .15s, background .15s, color .15s; }
+.lieve-motion input:not([type="checkbox"]):focus { border-color: var(--lv-violet); outline: none; box-shadow: var(--lv-ring); }
+.lieve-motion input::placeholder { color: var(--lv-muted); opacity: 1; }
+.lieve-motion input[data-inherited="true"]::placeholder { color: var(--lv-text-2); opacity: .55; }
+/* Last-child margin resets must not stretch the second field's label/input rows. */
+.lieve-motion-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: var(--lv-inspector-field-gap); }
+.lieve-workspace .lieve-motion-pair > .lieve-control { grid-template-rows: minmax(24px, auto) var(--lv-inspector-control-height); margin: 0; }
+.lieve-motion-row-tools { display: flex; min-width: 0; gap: 6px; margin-bottom: 16px; align-items: center; }
+.lieve-motion-row-tools > label { flex: 1; justify-content: flex-start; gap: 10px; }
+.lieve-motion .lieve-checkbox { min-width: 0; margin: 0; font-size: 12px; }
+.lieve-motion .lieve-motion-yoyo { display: flex; margin: 0 0 16px; gap: 10px; justify-content: space-between; }
+.lieve-motion .lieve-element-help { margin: 0 0 16px; }
+.lieve-workspace :is(.lieve-motion, .lieve-motion-shelf) .lieve-button-secondary { display: inline-flex; align-items: center; justify-content: center; min-width: 0; min-height: 32px; gap: 6px; padding: 0 9px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: transparent; box-shadow: none; transform: none; font: 500 11px/30px var(--lv-font-ui); transition: border-color .15s, background .15s, color .15s; }
+.lieve-workspace :is(.lieve-motion, .lieve-motion-shelf) .lieve-motion-icon { flex-shrink: 0; width: 32px; min-width: 32px; height: 32px; padding: 0; }
+.lieve-workspace .lieve-motion .lieve-button-secondary { font-size: 12px; }
+.lieve-workspace :is(.lieve-motion, .lieve-motion-shelf) .lieve-button-secondary:disabled { cursor: default; opacity: .4; }
+:is(.lieve-motion, .lieve-motion-shelf) .lieve-button-secondary > svg { width: 16px; height: 16px; flex-shrink: 0; }
+.lieve-motion-step-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 20px; margin-top: 6px; border-top: 1px solid var(--lv-border-soft); }
+.lieve-motion-context { margin: 6px 0 16px; color: var(--lv-text-2); font-size: 11px; }
+.lieve-motion-step { min-width: 0; margin-bottom: 12px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); overflow: clip; }
+.lieve-motion-step-title { display: flex; min-width: 0; gap: 4px; padding: 7px; align-items: center; background: var(--lv-surface-2); }
+.lieve-workspace .lieve-motion-disclosure { display: flex; flex: 1; min-width: 0; padding: 4px; gap: 8px; align-items: center; justify-content: space-between; border: 0; box-shadow: none; background: transparent; color: var(--lv-text); text-align: left; font: 12px/18px var(--lv-font-ui); cursor: pointer; transition: color .15s; }
+.lieve-motion-disclosure > span { min-width: 0; }
+.lieve-motion-disclosure strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+.lieve-motion-disclosure small { display: block; color: var(--lv-text-2); font-size: 10px; font-variant-numeric: tabular-nums; }
+.lieve-motion-disclosure svg { width: 14px; height: 14px; flex-shrink: 0; }
+.lieve-motion-disclosure[aria-expanded="true"] svg { transform: rotate(180deg); }
+.lieve-workspace .lieve-motion-disclosure:hover { color: var(--lv-accent-text); }
+.lieve-motion-step-body { padding: 14px 12px 16px; border-top: 1px solid var(--lv-border-soft); }
+.lieve-motion-values-heading, .lieve-motion-property { display: grid; min-width: 0; grid-template-columns: minmax(70px, 1fr) minmax(0, .8fr) minmax(0, .8fr) 28px; gap: 6px; align-items: center; }
+.lieve-motion-values-heading { margin-bottom: 6px; color: var(--lv-muted); font-size: 10px; }
+.lieve-motion-property { margin-bottom: 8px; }
+.lieve-motion-property > span { min-width: 0; font-size: 10px; line-height: 15px; overflow-wrap: anywhere; }
+.lieve-motion-property input { padding-inline: 7px !important; font-size: 11px !important; appearance: textfield; }
+.lieve-motion-property input::-webkit-inner-spin-button { appearance: none; }
+.lieve-workspace .lieve-motion-property .lieve-motion-icon { width: 28px; min-width: 28px; height: 30px; border-color: transparent; }
+.lieve-motion-add-property { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 6px; align-items: center; margin: 14px 0; }
+.lieve-motion-errors { margin: 12px 0; color: var(--lv-danger); font-size: 11px; }
+.lieve-motion-errors:empty { display: none; }
+.lieve-workspace .lieve-stage-wrap { grid-template-rows: auto minmax(0, 1fr) auto; }
+.lieve-motion-shelf { min-width: 0; max-width: 100%; border-top: 1px solid var(--lv-border); background: var(--lv-surface); color: var(--lv-text); font: 11px/1.5 var(--lv-font-ui); }
+.lieve-motion-shelf-heading { display: flex; min-width: 0; height: 42px; box-sizing: border-box; padding: 5px 14px; gap: 14px; align-items: center; }
+.lieve-workspace .lieve-motion-shelf-toggle { display: inline-flex; flex-shrink: 0; align-items: center; gap: 8px; padding: 4px 0; border: 0; box-shadow: none; background: transparent; color: var(--lv-text-2); font: 500 11px/22px var(--lv-font-ui); cursor: pointer; transition: color .15s; }
+.lieve-motion-shelf-toggle > svg { width: 16px; height: 16px; }
+.lieve-motion-shelf-toggle > svg:last-child { width: 12px; }
+.lieve-motion-shelf-toggle[aria-expanded="true"] > svg:last-child { transform: rotate(180deg); }
+.lieve-workspace .lieve-motion-shelf-toggle:hover { color: var(--lv-accent-text); }
+.lieve-motion-shelf-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lv-muted); }
+.lieve-motion-timeline-body { max-height: min(34vh, 300px); min-width: 0; overflow: auto; border-top: 1px solid var(--lv-border-soft); }
+.lieve-motion-transport { display: flex; min-width: 0; padding: 10px 14px; gap: 7px; align-items: center; }
+.lieve-motion-timeline-choice { width: 230px; min-width: 100px; max-width: 30%; }
+.lieve-workspace .lieve-motion-timeline-choice .lieve-ds-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; height: 32px; min-width: 0; box-sizing: border-box; padding: 0 9px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius-sm); background: transparent; box-shadow: none; color: var(--lv-text-2); text-align: left; font: 500 11px/30px var(--lv-font-ui); cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.lieve-motion-timeline-choice .lieve-ds-select-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lieve-motion-timeline-choice .lieve-ds-select-trigger > svg { width: 14px; height: 14px; flex-shrink: 0; }
+.lieve-workspace .lieve-motion-timeline-choice .lieve-ds-select-trigger:is(:hover,[aria-expanded="true"]) { border-color: var(--lieve-accent-border); background: var(--lv-gradient-soft); color: var(--lv-accent-text); box-shadow: none; }
+.lieve-motion-timeline-choice .lieve-ds-select-trigger:focus-visible { outline: 1px solid var(--lv-violet); outline-offset: 2px; }
+.lieve-motion-transport output { width: 48px; flex-shrink: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.lieve-motion-seek { display: flex; flex: 1; min-width: 40px; margin: 0; align-items: center; }
+.lieve-motion-seek input { width: 100%; height: 6px; margin: 0; padding: 0; appearance: none; border: 0; border-radius: 999px; background: var(--lv-border); accent-color: var(--lv-violet); cursor: ew-resize; }
+.lieve-motion-seek input::-webkit-slider-thumb { width: 13px; height: 13px; appearance: none; border: 0; border-radius: 50%; background: var(--lv-gradient); box-shadow: none; }
+.lieve-motion-seek input::-moz-range-thumb { width: 13px; height: 13px; border: 0; border-radius: 50%; background: var(--lv-gradient); box-shadow: none; }
+.lieve-motion-seek input:focus-visible { outline: 1px solid var(--lv-violet); outline-offset: 4px; }
+.lieve-motion-tracks { min-width: 360px; padding: 0 20px 10px 14px; }
+.lieve-motion-track, .lieve-motion-ruler { display: grid; min-width: 0; grid-template-columns: 130px minmax(0, 1fr); gap: 14px; align-items: center; }
+.lieve-motion-ruler { padding: 0 0 8px; color: var(--lv-muted); font-variant-numeric: tabular-nums; font-size: 10px; }
+.lieve-motion-ruler > div { display: flex; justify-content: space-between; }
+.lieve-motion-track { height: 38px; border-top: 1px solid var(--lv-border-soft); }
+.lieve-workspace .lieve-motion-track-name { overflow: hidden; padding: 0; border: 0; box-shadow: none; background: transparent; color: var(--lv-text-2); text-overflow: ellipsis; text-align: left; white-space: nowrap; font: 11px/24px var(--lv-font-ui); cursor: pointer; transition: color .15s; }
+.lieve-motion-track-lane { position: relative; height: 28px; border-radius: 5px; background: var(--lv-surface-2); }
+.lieve-workspace .lieve-motion-clip { position: absolute; top: 2px; height: 24px; min-width: 3px; max-width: 100%; padding: 0 6px; overflow: hidden; border: 0; border-radius: 5px; background: var(--lv-gradient-soft); box-shadow: none; color: var(--lv-accent-text); text-align: left; font: 500 10px/24px var(--lv-font-ui); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: grab; touch-action: none; user-select: none; }
+.lieve-workspace .lieve-motion-clip:active { cursor: grabbing; box-shadow: none; }
+.lieve-workspace .lieve-motion-trim { position: absolute; top: 3px; width: 10px; height: 22px; padding: 0; transform: translateX(-7px); border: 0; border-radius: 3px; box-shadow: none; background: transparent; cursor: ew-resize; touch-action: none; }
+.lieve-motion-trim::after { content: ''; position: absolute; inset: 5px 4px; background: var(--lv-accent-text); border-radius: 1px; opacity: .65; }
+.lieve-motion-timeline-help { margin: 0; padding: 4px 14px 12px; color: var(--lv-muted); font-size: 10px; }
+.lieve-workspace :is(.lieve-motion-shelf-toggle, .lieve-motion-track-name, .lieve-motion-clip, .lieve-motion-trim, .lieve-motion-disclosure):focus-visible { outline: 1px solid var(--lv-violet); outline-offset: 2px; }
+.lieve-motion [hidden], .lieve-motion-shelf [hidden] { display: none !important; }
+@media (max-width: 900px) {
+	.lieve-motion-transport { flex-wrap: wrap; }
+	.lieve-motion-timeline-choice { width: auto; flex: 1; max-width: none; }
+	.lieve-motion-seek { order: 1; flex-basis: 75%; }
+	.lieve-motion-shelf-heading { padding-inline: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .lieve-motion *, .lieve-motion *::before, .lieve-motion *::after, .lieve-motion-shelf *, .lieve-motion-shelf *::before, .lieve-motion-shelf *::after { transition: none !important; } }

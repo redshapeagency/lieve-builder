@@ -1,0 +1,42 @@
+{
+  "types": ["WebPage", "AboutPage", "ContactPage", "CollectionPage", "Article", "NewsArticle", "BlogPosting", "Organization", "LocalBusiness", "Person", "ImageObject", "BreadcrumbList", "ListItem", "Product", "Offer", "AggregateOffer", "FAQPage", "Question", "Answer", "Review", "Rating", "AggregateRating", "WebSite", "ItemList", "SearchAction"],
+  "text": ["name", "description", "headline", "alternateName", "caption", "text", "inLanguage", "sku", "priceCurrency"],
+  "urls": ["url", "sameAs", "contentUrl", "embedUrl", "thumbnailUrl", "license"],
+  "dates": ["datePublished", "dateModified", "priceValidUntil", "validFrom", "validThrough"],
+  "numbers": ["price", "lowPrice", "highPrice", "ratingValue", "bestRating", "worstRating"],
+  "nonnegativeNumbers": ["price", "lowPrice", "highPrice"],
+  "integers": ["position", "reviewCount", "ratingCount", "offerCount", "numberOfItems"],
+  "images": ["image", "logo"],
+  "nodesOrUrls": ["item", "mainEntity", "mainEntityOfPage", "isPartOf", "about", "mentions"],
+  "relations": {
+    "author": ["Person", "Organization"],
+    "publisher": ["Person", "Organization"],
+    "brand": ["Brand", "Organization"],
+    "offers": ["Offer", "AggregateOffer"],
+    "acceptedAnswer": ["Answer"],
+    "review": ["Review"],
+    "reviewRating": ["Rating"],
+    "aggregateRating": ["AggregateRating"]
+  },
+  "recommended": {
+    "WebPage": ["name", "url"],
+    "AboutPage": ["name", "url"],
+    "ContactPage": ["name", "url"],
+    "CollectionPage": ["name", "url"],
+    "Article": ["headline", "author", "datePublished", "image"],
+    "NewsArticle": ["headline", "author", "datePublished", "image"],
+    "BlogPosting": ["headline", "author", "datePublished", "image"],
+    "Organization": ["name", "url"],
+    "LocalBusiness": ["name", "address"],
+    "Person": ["name"],
+    "ImageObject": ["contentUrl"],
+    "WebSite": ["name", "url"],
+    "Product": ["name", "image", "offers"],
+    "Offer": ["price", "priceCurrency"],
+    "FAQPage": ["mainEntity"],
+    "Question": ["name", "acceptedAnswer"],
+    "Answer": ["text"],
+    "ListItem": ["position", "name"],
+    "BreadcrumbList": ["itemListElement"]
+  }
+}

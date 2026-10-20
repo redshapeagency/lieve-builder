@@ -1,0 +1,8 @@
+/* Structural behavior, not a visual skin for authored content. */
+[data-lieve-slider] > [data-lieve-slide][hidden], [data-lieve-navigation] [hidden] { display: none !important; }
+[data-lieve-slider][data-slider-swipe="true"] { touch-action: pan-y; }
+.lieve-lightbox { max-width: 94vw; max-height: 94dvh; overflow: auto; }
+.lieve-lightbox::backdrop { background: rgb(0 0 0 / .8); }
+.lieve-lightbox figure { margin: 0; }
+.lieve-lightbox img { display: block; max-width: 85vw; max-height: 78dvh; object-fit: contain; }
+.lieve-lightbox > div { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }

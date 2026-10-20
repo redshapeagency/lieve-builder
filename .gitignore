@@ -1,0 +1,66 @@
+# Lieve Builder: release-only repository.
+# Development originals are maintained separately. Allow only theme files here.
+# This excludes tests/, scripts/, release/, .github/, .impeccable/, npm/Playwright
+# configuration, local environments, generated archives and all other root items.
+# Add any new required root-level theme file explicitly to this allowlist.
+/*
+!/.gitignore
+
+# WordPress theme entry points.
+!/404.php
+!/archive.php
+!/footer-canvas.php
+!/footer.php
+!/front-page.php
+!/functions.php
+!/header-canvas.php
+!/header.php
+!/index.php
+!/page.php
+!/search.php
+!/single.php
+!/style.css
+
+# Theme preview shown in Appearance > Themes.
+!/screenshot.webp
+
+# Runtime code, template parts and bundled assets, including assets/vendor/gsap.
+!/inc/
+!/assets/
+!/template-parts/
+
+# Theme documentation and licensing. Third-party notices inside assets stay too.
+!/README.MD
+!/readme.txt
+!/LICENSE.txt
+
+# Exclude workstation metadata and scratch files even inside allowed directories.
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.idea/
+.vscode/
+.history/
+*.code-workspace
+*.sublime-workspace
+*.swp
+*.swo
+*~
+*.log
+*.bak
+*.orig
+*.rej
+
+# Never include installed dependencies, private environments or editor sessions.
+# Bundled runtime libraries in assets/vendor are deliberately NOT excluded.
+node_modules/
+.npm/
+.cache/
+.env
+.env.*
+.secrets/
+.auth/

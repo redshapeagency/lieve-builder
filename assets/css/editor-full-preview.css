@@ -1,0 +1,7 @@
+#lieve-builder-app .lieve-full-preview-modal { position: fixed; inset: 0; z-index: 100010; display: grid; place-items: center; min-height: 0; padding: 24px; background: transparent; }
+.lieve-full-preview-modal .lieve-template-dialog { display: flex; flex-direction: column; width: min(640px, 100%); min-height: 0; max-height: calc(100dvh - 48px); }
+.lieve-full-preview-form { padding: 24px; display: grid; gap: 18px; min-height: 0; overflow: auto; }
+.lieve-full-preview-form .lieve-control { margin: 0; }
+.lieve-full-preview-form .lieve-element-help { margin: 0; }
+.lieve-full-preview-actions { display: flex; justify-content: flex-end; gap: 10px; margin: 0 -24px -24px; padding: 18px 24px; border-top: 1px solid var(--lm-border-soft); }
+.lieve-full-preview-form [data-preview-error] { margin: 0; color: var(--lv-danger, #b32d2e); overflow-wrap: anywhere; }

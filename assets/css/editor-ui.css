@@ -1,0 +1,146 @@
+/* Shared chrome contract. Load after feature sheets; never import into the canvas.
+ * Dense desktop controls and branded neutral/primary actions are intentional. */
+#lieve-builder-app {
+	--lv-ui-space-1: 4px;
+	--lv-ui-space-2: 8px;
+	--lv-ui-space-3: 12px;
+	--lv-ui-space-4: 16px;
+	--lv-ui-space-6: 24px;
+	--lv-ui-control: 36px;
+	--lv-ui-compact: 32px;
+	--lv-ui-copy: 12px;
+	--lv-ui-meta: 11px;
+	--lv-ui-feedback: .15s;
+	--lv-ui-enter: .18s;
+	--lv-ui-exit: .12s;
+	--lv-ui-field-surface: var(--lv-surface);
+	--lv-ui-disabled: .4;
+	--lv-ui-danger-soft: color-mix(in srgb, var(--lv-danger) 9%, transparent);
+	--lv-inspector-field-gap: var(--lv-ui-space-4);
+	--lv-inspector-section-gap: var(--lv-ui-space-6);
+	--lv-inspector-control-height: var(--lv-ui-control);
+}
+#lieve-builder-app[data-color-mode="dark"] { --lv-ui-field-surface: var(--lv-surface-2); }
+
+/* One typography/number vocabulary, confined to actual UI islands. Code editors
+ * and the content of both composition and Rich Text iframes keep their own fonts. */
+#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf, .lieve-workspace-footer, .lieve-context-menu, .lieve-token-picker) { font-family: var(--lv-font-ui); }
+#lieve-builder-app :is(.lieve-control-group-title, .lieve-interact h3, .lieve-interact h4, .lieve-motion h3, .lieve-gradient-heading > span) { color: var(--lv-text); font: 600 var(--lv-ui-copy)/18px var(--lv-font-ui); }
+#lieve-builder-app :is(.lieve-interact-disclosure > span, .lieve-motion-disclosure small, .lieve-ec-result, .lieve-context-menu kbd, .lieve-context-transfer-label) { font-size: var(--lv-ui-meta); line-height: 17px; }
+#lieve-builder-app :is(.lieve-element-category-count, .lieve-tree-count, .lieve-style-category-heading small, .lieve-viewport-label, .lieve-motion-transport output, .lieve-seo-count) { font-variant-numeric: tabular-nums; }
+#lieve-builder-app :is(.lieve-inspector-section, .lieve-workspace-panel, .lieve-element-catalogue, .lieve-context-menu, .lieve-dynamic-config) { overscroll-behavior: contain; scroll-padding-block: var(--lv-ui-space-4); scrollbar-width: thin; scrollbar-color: var(--lv-border) transparent; }
+#lieve-builder-app :is(.lieve-control, .lieve-style-control, .lieve-seo-language, .lieve-head-row) { scroll-margin-block: var(--lv-ui-space-4); }
+
+/* Navigation has fixed metrics: selection never changes weight, width or radius.
+ * Existing underlines continue to indicate authored settings, independently. */
+#lieve-builder-app :is(.lieve-workspace-tabs, .lieve-inspector-tabs) { gap: 6px; }
+#lieve-builder-app :is(.lieve-workspace-tabs, .lieve-inspector-tabs) > [role="tab"] { min-height: 38px; font: 500 var(--lv-ui-copy)/20px var(--lv-font-ui); border-radius: var(--lv-radius-sm); }
+#lieve-builder-app .lieve-style-categories { gap: 6px; }
+#lieve-builder-app .lieve-style-categories > [role="tab"] { min-height: 38px; padding-block: 0; }
+#lieve-builder-app .lieve-header-actions > .lieve-icon-button { width: 40px; height: 40px; flex: 0 0 40px; }
+#lieve-builder-app .lieve-document-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#lieve-builder-app .lieve-document-title { min-width: 0; }
+#lieve-builder-app .lieve-template-settings .lieve-ds-select-trigger { min-height: var(--lv-ui-control); }
+#lieve-builder-app .lieve-device-bar :is(.lieve-drawer-toggle, .lieve-panels-reset) { min-height: var(--lv-ui-control); font-size: var(--lv-ui-copy); }
+
+/* Secondary actions use the same quiet base and fading hover as Cancel. Feature
+ * action size is explicit; titlebar actions retain their 40px primary rhythm. */
+#lieve-builder-app :is(.lieve-left-panel, .lieve-inspector, .lieve-motion-shelf) .lieve-button-secondary {
+	min-height: var(--lv-ui-compact);
+	gap: 6px;
+	border-radius: var(--lv-radius-sm);
+	font: 500 var(--lv-ui-copy)/20px var(--lv-font-ui);
+	box-shadow: none;
+	transition: border-color var(--lv-ui-feedback), background var(--lv-ui-feedback), color var(--lv-ui-feedback);
+}
+#lieve-builder-app :is(.lieve-repeater-add, .lieve-attribute-add, .lieve-gradient-add) { min-height: var(--lv-ui-control); }
+#lieve-builder-app :is(.lieve-icon-button, .lieve-panels-reset, .lieve-inspector-heading [data-element-menu], .lieve-tree-actions) { position: relative; isolation: isolate; background: transparent; transition: border-color var(--lv-ui-feedback), background var(--lv-ui-feedback), color var(--lv-ui-feedback); }
+#lieve-builder-app :is(.lieve-icon-button, .lieve-panels-reset, .lieve-inspector-heading [data-element-menu], .lieve-tree-actions)::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--lv-gradient-soft); opacity: 0; pointer-events: none; transition: opacity var(--lv-ui-feedback) ease; }
+#lieve-builder-app :is(.lieve-icon-button, .lieve-panels-reset, .lieve-inspector-heading [data-element-menu], .lieve-tree-actions):not(:disabled):is(:hover, :focus-visible) { background: transparent; color: var(--lv-accent-text); }
+#lieve-builder-app :is(.lieve-icon-button, .lieve-panels-reset, .lieve-inspector-heading [data-element-menu], .lieve-tree-actions):not(:disabled):is(:hover, :focus-visible)::before { opacity: 1; }
+#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf) :is(.lieve-button-secondary, .lieve-icon-button, .lieve-section-action, .lieve-field-reset, .lieve-workspace-tool):disabled { opacity: var(--lv-ui-disabled); cursor: default; }
+#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf) :is(.lieve-button-secondary, .lieve-icon-button, .lieve-section-action, .lieve-field-reset, .lieve-workspace-tool):disabled::before { opacity: 0; }
+
+/* Text/select fields are fields, not gradient buttons. Compound units, color,
+ * media and variable controls intentionally retain their single outside border. */
+#lieve-builder-app :is(.lieve-inspector, .lieve-left-panel) .lieve-control > :is(input[type="text"], input[type="url"], input[type="number"], input[type="email"], select:not([multiple]), .lieve-ds-select-trigger) { min-height: var(--lv-ui-control); font: 400 var(--lv-ui-copy)/20px var(--lv-font-ui); background-color: var(--lv-ui-field-surface); }
+#lieve-builder-app :is(.lieve-inspector, .lieve-left-panel) .lieve-control > :is(input, select, textarea):disabled { opacity: .6; cursor: not-allowed; }
+#lieve-builder-app :is(.lieve-inspector, .lieve-left-panel) .lieve-ds-select-trigger:disabled { opacity: .5; cursor: default; }
+#lieve-builder-app :is(.lieve-inspector, .lieve-left-panel) .lieve-control > :is(input, textarea)[readonly] { color: var(--lv-text-2); background: var(--lv-surface-3); }
+#lieve-builder-app :is(.lieve-inspector, .lieve-left-panel) .lieve-control > :is(input:not([type="checkbox"]), textarea):focus { outline: none; border-color: var(--lv-violet); box-shadow: var(--lv-ring); }
+#lieve-builder-app :is(.lieve-inspector, .lieve-left-panel) .lieve-control > :is(input, textarea)[aria-invalid="true"] { border-color: var(--lv-danger); }
+#lieve-builder-app :is(.lieve-inspector, .lieve-left-panel) .lieve-control > :is(input, textarea)[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-danger) 16%, transparent); }
+#lieve-builder-app :is(.lieve-seo-field-heading label, .lieve-dynamic-option label) { font: 400 var(--lv-ui-copy)/18px var(--lv-font-ui); color: var(--lv-text-2); }
+#lieve-builder-app :is(.lieve-head-search input, .lieve-style-search input) { background-color: var(--lv-ui-field-surface); }
+#lieve-builder-app :is(.lieve-editor-zoom-control, .lieve-motion-timeline-choice) .lieve-ds-select-trigger { font-size: var(--lv-ui-copy); }
+#lieve-builder-app :is(.lieve-editor-zoom-control, .lieve-motion-timeline-choice) .lieve-ds-select-trigger[aria-expanded="true"] { border-color: var(--lv-violet); background: var(--lv-ui-field-surface); color: var(--lv-text); }
+
+/* Repeaters share title/body rhythm, while simple Content disclosures stay compact. */
+#lieve-builder-app :is(.lieve-interact-row-heading, .lieve-motion-step-title) { min-height: 60px; padding: var(--lv-ui-space-3); gap: var(--lv-ui-space-2); }
+#lieve-builder-app :is(.lieve-interact .lieve-interact-body, .lieve-motion-step-body, .lieve-repeater-fields) { padding: var(--lv-ui-space-4); }
+#lieve-builder-app .lieve-motion-row-tools > label { justify-content: space-between; }
+#lieve-builder-app .lieve-repeater-item > summary { min-height: 44px; padding: 10px 12px; font: 500 var(--lv-ui-copy)/18px var(--lv-font-ui); list-style: none; transition: background var(--lv-ui-feedback), color var(--lv-ui-feedback); }
+#lieve-builder-app .lieve-repeater-item > summary::-webkit-details-marker { display: none; }
+#lieve-builder-app .lieve-repeater-item > summary:hover { background: var(--lv-gradient-faint); color: var(--lv-accent-text); }
+#lieve-builder-app .lieve-repeater-item > summary:focus-visible { outline: 2px solid var(--lv-violet); outline-offset: -3px; border-radius: inherit; }
+#lieve-builder-app :is(.lieve-interact-row-heading > svg, .lieve-motion-disclosure svg, .lieve-seo-section > summary svg) { transition: transform var(--lv-ui-feedback) ease; }
+#lieve-builder-app :is(.lieve-interact-disclosure, .lieve-motion-disclosure):focus-visible { outline-offset: -2px; border-radius: 4px; }
+#lieve-builder-app :is(.lieve-interact-intro, .lieve-motion-step-heading, .lieve-listing-layout-heading) { border-color: var(--lv-border-soft); }
+#lieve-builder-app :is(.lieve-interact-empty, .lieve-inspector-empty) { color: var(--lv-muted); font: 400 var(--lv-ui-copy)/20px var(--lv-font-ui); }
+#lieve-builder-app :is(.lieve-interact-error, .lieve-motion-errors, .lieve-seo-error, .lieve-attribute-error) { color: var(--lv-danger); font: 400 var(--lv-ui-meta)/17px var(--lv-font-ui); }
+#lieve-builder-app :is(.lieve-interact-error, .lieve-motion-errors, .lieve-seo-error, .lieve-attribute-error):not(:empty) { overflow-wrap: anywhere; }
+#lieve-builder-app :is([data-interact-action="remove"], [data-item-action="remove"], [data-attribute-action="delete"], [data-gradient-action="remove"], [data-motion-action="remove-step"], [data-motion-action="remove-timeline"], .lieve-context-menu .is-danger):not(:disabled):is(:hover, :focus-visible) { background: var(--lv-ui-danger-soft); color: var(--lv-danger); }
+
+/* Popovers/context actions share menu typography, bounded scrolling and spacing. */
+#lieve-builder-app .lieve-context-menu { max-height: min(560px, calc(100dvh - 24px)); overflow-y: auto; border-radius: var(--lv-radius); background: var(--lv-surface); color: var(--lv-text); }
+#lieve-builder-app .lieve-context-title { color: var(--lv-text-2); font: 600 var(--lv-ui-copy)/18px var(--lv-font-ui); }
+#lieve-builder-app .lieve-context-menu button { min-height: var(--lv-ui-compact); color: var(--lv-text-2); font: 400 var(--lv-ui-copy)/18px var(--lv-font-ui); transition: background var(--lv-ui-feedback), color var(--lv-ui-feedback); }
+#lieve-builder-app .lieve-context-menu > button + button { margin-top: 2px; }
+#lieve-builder-app .lieve-context-menu button.is-danger { color: var(--lv-danger); }
+#lieve-builder-app .lieve-context-menu button:not(:disabled):is(:hover, :focus-visible) { color: var(--lv-accent-text); }
+#lieve-builder-app .lieve-context-menu button.is-danger:not(:disabled):is(:hover, :focus-visible) { color: var(--lv-danger); background: var(--lv-ui-danger-soft); }
+#lieve-builder-app .lieve-context-menu .lieve-context-transfer-action { width: auto; font-size: var(--lv-ui-meta); }
+#lieve-builder-app .lieve-context-menu :is(kbd, [role="separator"]) { color: var(--lv-muted); }
+#lieve-builder-app .lieve-context-menu [role="separator"] { background: var(--lv-border-soft); }
+#lieve-builder-app .lieve-token-picker .lieve-ds-select-list { display: flex; flex-direction: column; gap: var(--lv-ui-space-1); }
+#lieve-builder-app .lieve-token-group > .lieve-ds-select-option + .lieve-ds-select-option { margin-top: var(--lv-ui-space-1); }
+
+/* Feedback is a legible themed surface, not an unrelated black/red rectangle. */
+#lieve-builder-app .lieve-toast { right: 16px; bottom: 48px; padding: 14px 16px; gap: 12px; border: 1px solid var(--lv-border); border-radius: var(--lv-radius); background: var(--lv-surface); color: var(--lv-text); box-shadow: var(--lv-shadow-md); font: 400 var(--lv-ui-copy)/20px var(--lv-font-ui); transform: translateY(8px); transition: opacity var(--lv-ui-exit) ease, transform var(--lv-ui-exit) ease; }
+#lieve-builder-app .lieve-toast.is-visible { transform: none; transition-duration: var(--lv-ui-enter); }
+#lieve-builder-app .lieve-toast.is-error { border-color: color-mix(in srgb, var(--lv-danger) 45%, var(--lv-border)); background: var(--lv-surface); color: var(--lv-text); }
+#lieve-builder-app .lieve-toast [data-toast-title] { color: var(--lv-danger); font: 600 var(--lv-ui-copy)/18px var(--lv-font-ui); }
+#lieve-builder-app .lieve-toast [data-toast-dismiss] { min-width: 32px; width: 32px; height: 32px; min-height: 32px; margin: -4px -6px -4px 0; }
+#lieve-builder-app .lieve-toast [data-toast-dismiss]:hover { color: var(--lv-accent-text); background: var(--lv-gradient-soft); }
+
+/* Pointer focus never leaves an active shadow behind; keyboard focus stays real.
+ * Include the Motion shelf, which is outside both sidebar islands. */
+#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf, .lieve-workspace-footer) :is(button, a):focus:not(:focus-visible) { outline: none; box-shadow: none; }
+#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf, .lieve-workspace-footer) :is(button, a):focus-visible { outline: 2px solid var(--lv-violet); outline-offset: 2px; }
+#lieve-builder-app :is(.lieve-left-panel, .lieve-inspector) :is(.lieve-ds-select-trigger, .lieve-field-reset):focus-visible { outline-offset: 1px; }
+#lieve-builder-app .lieve-tree-row:focus-visible { outline: 1px solid var(--lv-violet); outline-offset: -1px; }
+/* Tree rows already own the full-width keyboard cue; don't draw a second box
+ * around the label after committing an inline rename with Enter. */
+#lieve-builder-app :is(.lieve-tree-select, .lieve-tree-toggle, .lieve-tree-actions):focus-visible { outline: none; box-shadow: none; }
+#lieve-builder-app .lieve-panel-resizer:active { outline: none; box-shadow: none; }
+
+@media (max-width: 900px) {
+	#lieve-builder-app :is(.lieve-left-panel, .lieve-inspector) { max-width: calc(100% - 24px); }
+	#lieve-builder-app :is(.lieve-left-panel, .lieve-inspector) .lieve-control > :is(input[type="text"], input[type="url"], input[type="number"], input[type="email"], textarea, select, .lieve-ds-select-trigger) { font-size: 16px; }
+	#lieve-builder-app .lieve-toast { right: 12px; bottom: 44px; max-width: calc(100vw - 24px); }
+}
+@media (pointer: coarse) {
+	#lieve-builder-app .lieve-workspace-tools { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+	#lieve-builder-app :is(.lieve-workspace-tool, .lieve-context-menu button, .lieve-inspector-tabs > button, .lieve-workspace-tabs > [data-panel-tab]) { min-height: 44px; }
+	#lieve-builder-app .lieve-tree-actions { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+	#lieve-builder-app { --lv-ui-feedback: 0s; --lv-ui-enter: 0s; --lv-ui-exit: 0s; }
+	#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf, .lieve-context-menu, .lieve-token-picker, .lieve-toast) *,
+	#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf, .lieve-context-menu, .lieve-token-picker, .lieve-toast) *::before,
+	#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf, .lieve-context-menu, .lieve-token-picker, .lieve-toast) *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+}
+@media (forced-colors: active) {
+	#lieve-builder-app :is(.lieve-editor-header, .lieve-left-panel, .lieve-inspector, .lieve-device-bar, .lieve-motion-shelf) :is(button, a):focus-visible { outline-color: Highlight; }
+	#lieve-builder-app :is(.lieve-workspace-tabs, .lieve-inspector-tabs) > [aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+}

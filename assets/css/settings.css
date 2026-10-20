@@ -1,0 +1,116 @@
+/* Settings uses the same workspace, actions and focus treatment as the token managers. */
+.lieve-settings-page .lieve-settings-form.lieve-ds-page-card { display: block; width: 100%; max-width: none; margin: 28px 0 0; padding: 0; }
+.lieve-settings-page .lieve-settings-workspace { min-height: 0; }
+.lieve-settings-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 20px 24px; border-bottom: 1px solid var(--ds-border); }
+/* The tab/button skin stays shared with Templates; draft markers do not change metrics. */
+.lieve-settings-tabs [data-settings-tab] { position: relative; }
+.lieve-settings-tabs [data-settings-dirty="true"]::after { content: ''; position: absolute; width: 20px; height: 2px; bottom: 4px; left: calc(50% - 10px); border-radius: 2px; background: var(--lieve-accent-end); pointer-events: none; }
+.lieve-settings-tabs [data-settings-dirty="true"][aria-selected="true"]::after { background: #fff; }
+.lieve-settings-page .lieve-ds a:focus-visible { outline: 2px solid var(--lieve-violet); outline-offset: 3px; box-shadow: none; }
+.lieve-settings-panel { min-width: 0; padding: 24px; outline: none; }
+.lieve-settings-panel:focus-visible { outline: 2px solid var(--lieve-accent-end,#8044e3); outline-offset: -3px; }
+.lieve-settings-section-head { margin-bottom: 12px; }
+.lieve-settings-panel > .lieve-settings-section-head { margin-bottom: 24px; }
+.lieve-settings-section-head h2 { margin: 0 0 8px; color: var(--ds-text); font-size: 18px; font-weight: 600; line-height: 1.4; }
+.lieve-settings-section-head h3 { margin: 0 0 8px; color: var(--ds-text); font-size: 14px; font-weight: 600; line-height: 1.5; }
+.lieve-settings-section-head p { max-width: 75ch; margin: 0; color: var(--ds-muted); font-size: 13px; line-height: 1.7; }
+.lieve-settings-group { min-width: 0; margin: 0; padding: 0; border: 0; }
+.lieve-settings-group + .lieve-settings-group, .lieve-settings-group + .lieve-settings-output { margin-top: 28px; padding-top: 28px; border-top: 1px solid var(--ds-border); }
+.lieve-settings-group-help { max-width: 75ch; margin: 0; color: var(--ds-muted); font-size: 13px; line-height: 1.7; }
+.lieve-settings-page .lieve-settings-post-types { margin-bottom: 0; }
+.lieve-settings-page .lieve-settings-post-types > legend { margin-bottom: 8px; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.lieve-settings-page .lieve-settings-post-types > p { font-size: 13px; }
+.lieve-settings-output-head, .lieve-settings-appearance-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
+.lieve-settings-output-head > div, .lieve-settings-appearance-head > div { flex: 1 1 420px; min-width: 0; }
+.lieve-settings-output-head > button, .lieve-settings-appearance-head > button { flex: 0 0 auto; }
+.lieve-settings-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(200px,360px); align-items: start; gap: 20px 40px; min-width: 0; padding: 20px 0; border-bottom: 1px solid var(--ds-border); }
+.lieve-settings-group > .lieve-settings-section-head + .lieve-settings-row { padding-top: 12px; }
+.lieve-settings-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.lieve-settings-row label:not(.lieve-settings-value), .lieve-settings-row strong { color: var(--ds-text); font-size: 13px; font-weight: 500; }
+.lieve-settings-row p { max-width: 70ch; margin: 6px 0 0; color: var(--ds-muted); font-size: 13px; line-height: 1.7; }
+.lieve-settings-page #lieve-setting-fonts-help a { color: var(--lieve-accent-end,#8044e3); text-decoration: none; transition: color .15s !important; }
+.lieve-settings-page #lieve-setting-fonts-help a:is(:hover,:focus-visible) { color: var(--lieve-accent-ink-strong,#4c2486); text-decoration: none; }
+.lieve-settings-value { width: 100%; min-width: 0; margin: 0; }
+.lieve-settings-unit { position: relative; }
+.lieve-settings-page .lieve-settings-unit input { padding-right: 42px; font-variant-numeric: tabular-nums; }
+.lieve-settings-unit > span { position: absolute; right: 14px; top: 50%; color: var(--ds-muted); transform: translateY(-50%); pointer-events: none; }
+.lieve-settings-unit input::-webkit-inner-spin-button, .lieve-settings-unit input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.lieve-settings-unit input { appearance: textfield; -moz-appearance: textfield; }
+.lieve-settings-popup-control { display: flex; align-items: center; box-sizing: border-box; min-height: 40px; gap: 10px; cursor: pointer; }
+.lieve-settings-popup-switch { position: relative; display: inline-flex; flex: 0 0 40px; width: 40px; height: 24px; border-radius: 999px; }
+.lieve-settings-popup-switch input[type="checkbox"] { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; opacity: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lieve-settings-popup-switch input:focus-visible + .lieve-template-toggle-track { outline: 2px solid var(--lieve-violet); outline-offset: 3px; }
+.lieve-settings-popup-switch input:disabled { cursor: default; }
+.lieve-settings-popup-switch input:disabled + .lieve-template-toggle-track { opacity: .45; }
+.lieve-settings-color { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+.lieve-settings-color input { flex: 1; min-width: 0; }
+.lieve-settings-gradient { height: 40px; border-radius: var(--lieve-radius-sm); }
+.lieve-settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lieve-settings-page a.lieve-conditions-cancel { text-decoration: none; white-space: normal; }
+.lieve-settings-system { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 48px; margin: 8px 0 24px; }
+.lieve-settings-system > div { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--ds-border); }
+.lieve-settings-system dt { color: var(--ds-muted); }
+.lieve-settings-system dd { margin: 0; font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.lieve-settings-explanation { margin-top: 16px; }
+.lieve-settings-methods { display: grid; margin: 0; gap: 12px; }
+.lieve-settings-methods > div { display: grid; grid-template-columns: minmax(100px,.4fr) minmax(0,1fr); gap: 8px 20px; }
+.lieve-settings-methods dt { color: var(--ds-text); font-size: 12px; font-weight: 600; }
+.lieve-settings-methods dd { margin: 0; color: var(--ds-muted); font-size: 12px; line-height: 1.7; }
+.lieve-settings-page .lieve-ds-footer { flex-wrap: wrap; }
+.lieve-settings-page .lieve-ds-footer > [data-settings-status] { flex: 1 1 220px; }
+.lieve-settings-page .lieve-ds input { caret-color: var(--lieve-accent-end,#8044e3); }
+.lieve-settings-page .lieve-ds input::placeholder { color: #646970; opacity: 1; }
+.lieve-settings-page .lieve-ds ::selection { color: #1d2327; background: rgba(var(--lieve-accent-end-rgb,128,68,227),.18); }
+.lieve-settings-page .lieve-settings-value input[aria-invalid="true"] { border-color: #d63638; }
+.lieve-settings-output-target { width: min(100%,420px); margin: 24px 0 0; }
+#lieve-settings-panel-markup > .lieve-settings-output { margin-top: 28px; }
+.lieve-settings-output-target > label { margin-bottom: 8px; color: var(--ds-text); font-size: 13px; font-weight: 500; }
+[data-output-manager] select { display: none; }
+.lieve-settings-select select { display: none; }
+.lieve-settings-select .lieve-ds-select-trigger { width: 100%; }
+.lieve-settings-page .lieve-settings-output-note { margin: 18px 0 0; max-width: 75ch; color: var(--ds-muted); font-size: 12px; line-height: 1.7; }
+.lieve-settings-element-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin: 28px 0 24px; padding-top: 24px; border-top: 1px solid var(--ds-border); }
+.lieve-settings-page .lieve-settings-element-head h3 { margin: 0; color: var(--ds-text); font-size: 14px; font-weight: 600; }
+.lieve-settings-page :is([data-output-reset],[data-output-reset-all]):disabled { opacity: .5; cursor: default; pointer-events: none; }
+.lieve-settings-defaults { min-width: 0; margin: 0; padding: 0; border: 0; }
+.lieve-settings-defaults legend, .lieve-settings-custom > label { margin: 0 0 6px; padding: 0; color: var(--ds-text); font-size: 13px; font-weight: 500; }
+.lieve-settings-defaults > p, .lieve-settings-custom > p { max-width: 75ch; margin: 0; color: var(--ds-muted); font-size: 12px; line-height: 1.7; }
+.lieve-settings-class-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 36px; margin-top: 12px; }
+.lieve-settings-class-option { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-width: 0; min-height: 60px; margin: 0; padding: 12px 0; border-bottom: 1px solid var(--ds-border); cursor: pointer; }
+.lieve-settings-class-label { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--ds-text); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.lieve-settings-page .lieve-settings-class-label code { margin: 0; padding: 0; background: transparent; color: inherit; font-size: 12px; }
+.lieve-settings-class-label small { color: var(--ds-muted); font-size: 12px; }
+.lieve-settings-custom { max-width: 680px; margin-top: 28px; }
+.lieve-settings-custom > p { margin-top: 8px; }
+.lieve-settings-page .lieve-settings-class-option input[type="checkbox"] { margin: 0; }
+.lieve-settings-page .lieve-settings-class-menu { position: fixed; z-index: 100001; }
+.lieve-settings-class-menu .lieve-ds-select-option { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.lieve-settings-class-menu .lieve-ds-select-option > span { flex: 1; min-width: 0; }
+.lieve-settings-class-menu .lieve-ds-select-option > small { color: var(--ds-muted); font-size: 11px; }
+.lieve-settings-class-menu .lieve-ds-select-option.is-chosen > small { color: #fff; }
+.lieve-settings-preserved { margin-top: 24px; }
+.lieve-settings-preserved ul { margin: 0; padding: 0; list-style: none; }
+.lieve-settings-preserved li { display: grid; grid-template-columns: minmax(180px,.9fr) minmax(0,1.1fr); align-items: baseline; gap: 6px 24px; margin: 0; padding: 12px 0; color: var(--ds-muted); font-size: 12px; line-height: 1.65; }
+.lieve-settings-preserved li + li { border-top: 1px solid var(--ds-border); }
+.lieve-settings-preserved li:last-child { padding-bottom: 0; }
+.lieve-settings-preserved code { margin: 0; padding: 0; color: var(--ds-text); background: transparent; overflow-wrap: anywhere; }
+.lieve-settings-page :is(.lieve-settings-output,.lieve-settings-select) button.lieve-ds-select-trigger { transition: border-color .15s, background .15s, color .15s !important; box-shadow: none !important; }
+.lieve-settings-page :is(.lieve-settings-output,.lieve-settings-select) button.lieve-ds-select-trigger:is([aria-expanded="true"],:focus-visible) { border-color: var(--ds-focus) !important; box-shadow: var(--lieve-ring,0 0 0 3px rgba(var(--lieve-accent-end-rgb,128,68,227),.1)) !important; outline: none; }
+@media (max-width: 960px) {
+	.lieve-settings-row { grid-template-columns: minmax(0,1fr) minmax(200px,300px); gap: 20px; }
+}
+@media (max-width: 680px) {
+	.lieve-settings-tabs { padding: 16px; }
+	.lieve-settings-panel { padding: 20px 16px; }
+	.lieve-settings-row { grid-template-columns: minmax(0,1fr); gap: 12px; padding: 20px 0; }
+	.lieve-settings-output-target { width: 100%; margin: 20px 0 0; }
+	.lieve-settings-class-list { grid-template-columns: minmax(0,1fr); }
+	.lieve-settings-element-head { align-items: flex-start; }
+	.lieve-settings-preserved li { grid-template-columns: minmax(0,1fr); }
+	.lieve-settings-system { grid-template-columns: minmax(0,1fr); }
+	.lieve-settings-methods > div { grid-template-columns: minmax(0,1fr); gap: 4px; }
+	.lieve-settings-page .lieve-ds-footer { position: static; padding: 18px; gap: 12px; }
+	.lieve-settings-page .lieve-ds-footer > [data-settings-status] { flex-basis: 100%; }
+}
+.lieve-settings-page-ids { margin-bottom: 24px; }
+.lieve-settings-page-ids .lieve-settings-custom { margin-top: 16px; }

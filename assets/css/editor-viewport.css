@@ -1,0 +1,80 @@
+/* Parent chrome: fit large viewports visually without changing their CSS pixels. */
+/* Reserve geometry, but never paint the raw placeholder or incomplete zoom UI. */
+.lieve-stage-scroll[data-viewport-pending] > *, .lieve-editor-zoom-control[data-viewport-pending] { visibility: hidden; }
+.lieve-viewport-host { position: relative; flex-shrink: 0; margin-inline: auto; background: #fff; border-radius: 2px; box-shadow: 0 2px 12px rgba(16,24,40,.07); overflow: hidden; }
+.lieve-viewport-frame { display: block; max-width: none; border: 0; transform-origin: top left; opacity: 0; transition: none; }
+.lieve-viewport-frame.is-ready { opacity: 1; }
+/* Frame only: no WordPress admin layout, no inherited editor UI spacing. */
+html:has(> body.lieve-preview-document) { margin: 0; padding: 0; scrollbar-gutter: auto; }
+body.lieve-preview-document { display: block; position: static; width: 100%; height: auto; min-height: 100vh; margin: 0; padding: 0; background: #fff; overflow: auto; }
+body.lieve-preview-document #lieve-canvas { display: block; width: 100%; min-height: 100vh; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; overflow: visible; contain: none; transition: none; }
+/* Passive hints use the same inverse scale, with breathing room inside small roots.
+   No padding or font is assigned to their authored layout container. */
+body.lieve-preview-document #lieve-canvas .lieve-editor-children:empty::after {
+	max-width: max(0px, calc(100% - min(20%, 4vw, calc(16px * var(--lv-canvas-ui-scale, 1)))));
+	font-size: calc(11px * var(--lv-canvas-ui-scale, 1));
+}
+body.lieve-preview-document #lieve-canvas .lieve-image-placeholder {
+	max-width: 100%; padding-inline: min(2vw, calc(8px * var(--lv-canvas-ui-scale, 1))); box-sizing: border-box;
+	font-size: calc(13px * var(--lv-canvas-ui-scale, 1)); overflow-wrap: anywhere; text-align: center;
+}
+body.lieve-preview-document #lieve-canvas .lieve-editor-preview-message {
+	max-width: 100%; font-size: calc(11px * var(--lv-canvas-ui-scale, 1)); overflow-wrap: anywhere;
+}
+/* Quiet initial code loading: no text/card flash, and no spinner for fast responses. */
+body.lieve-preview-document #lieve-canvas .lieve-code-preview-loading {
+	display: grid;
+	place-items: center;
+	min-block-size: calc(32px * var(--lv-canvas-ui-scale, 1));
+	pointer-events: none;
+}
+body.lieve-preview-document #lieve-canvas .lieve-code-preview-loading > span {
+	width: calc(18px * var(--lv-canvas-ui-scale, 1));
+	height: calc(18px * var(--lv-canvas-ui-scale, 1));
+	border-radius: 50%;
+	background: conic-gradient(from 0deg, transparent, var(--lv-teal) 120deg, var(--lv-violet) 300deg, transparent 330deg);
+	-webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px * var(--lv-canvas-ui-scale, 1)), #000 0);
+	mask: radial-gradient(farthest-side, transparent calc(100% - 2px * var(--lv-canvas-ui-scale, 1)), #000 0);
+	opacity: 0;
+	animation: lieve-code-loading-reveal .15s cubic-bezier(.23, 1, .32, 1) .18s both, lieve-code-loading-spin 1s linear .18s infinite;
+}
+@keyframes lieve-code-loading-reveal { to { opacity: 1; } }
+@keyframes lieve-code-loading-spin { to { transform: rotate(1turn); } }
+/* Deliberate editor-only state, never mistaken for authored PHP output. */
+body.lieve-preview-document #lieve-canvas .lieve-code-preview-notice {
+	display: flex; flex-direction: column; align-items: flex-start; box-sizing: border-box; width: 100%; max-width: 100%;
+	padding: calc(24px * var(--lv-canvas-ui-scale, 1)) min(5vw, calc(24px * var(--lv-canvas-ui-scale, 1)));
+	gap: calc(8px * var(--lv-canvas-ui-scale, 1)); border: 1px dashed #c3c4c7; border-radius: calc(8px * var(--lv-canvas-ui-scale, 1));
+	background: #f7f8fa; color: #50575e; font: calc(12px * var(--lv-canvas-ui-scale, 1))/1.65 var(--lv-font-ui); overflow-wrap: anywhere;
+}
+body.lieve-preview-document #lieve-canvas .lieve-code-preview-notice strong { color: #1d2327; font: 600 calc(13px * var(--lv-canvas-ui-scale, 1))/1.5 var(--lv-font-ui); }
+body.lieve-preview-document #lieve-canvas .lieve-code-preview-notice :is(span,small) { max-width: 65ch; font: inherit; }
+body.lieve-preview-document #lieve-canvas .lieve-code-preview-notice small { color: #646970; }
+/* Compensate frame scaling only for this editor UI, never for authored elements.
+   Viewport-relative padding lets the same readable sizes fit narrow previews. */
+body.lieve-preview-document #lieve-canvas .lieve-canvas-empty {
+	--lv-empty-scale: var(--lv-canvas-ui-scale, 1);
+	min-height: max(calc(240px * var(--lv-empty-scale)), calc(100vh - var(--lv-inherited-height, 0px)));
+	padding: clamp(calc(20px * var(--lv-empty-scale)), 8vh, calc(64px * var(--lv-empty-scale))) min(6vw, calc(30px * var(--lv-empty-scale)));
+	gap: calc(14px * var(--lv-empty-scale));
+	font-size: calc(16px * var(--lv-empty-scale));
+}
+body.lieve-preview-document #lieve-canvas .lieve-canvas-empty .lieve-empty-symbol {
+	width: calc(64px * var(--lv-empty-scale)); height: calc(64px * var(--lv-empty-scale));
+	margin-bottom: calc(6px * var(--lv-empty-scale)); border-radius: calc(16px * var(--lv-empty-scale)); flex-shrink: 0;
+}
+body.lieve-preview-document #lieve-canvas .lieve-canvas-empty .lieve-empty-symbol svg { width: calc(30px * var(--lv-empty-scale)); height: calc(30px * var(--lv-empty-scale)); }
+body.lieve-preview-document #lieve-canvas .lieve-canvas-empty > strong { max-width: 100%; font-size: calc(22px * var(--lv-empty-scale)); overflow-wrap: anywhere; text-wrap: balance; }
+body.lieve-preview-document #lieve-canvas .lieve-canvas-empty > span { max-width: min(100%, calc(360px * var(--lv-empty-scale))); font-size: calc(13px * var(--lv-empty-scale)); color: #646970; }
+body.lieve-preview-document #lieve-canvas .lieve-canvas-empty .lieve-button-primary {
+	max-width: 100%; min-width: min(100%, calc(164px * var(--lv-empty-scale))); min-height: calc(38px * var(--lv-empty-scale));
+	margin-top: calc(6px * var(--lv-empty-scale)); padding: 0 min(5vw, calc(18px * var(--lv-empty-scale)));
+	border-top-width: calc(1px * var(--lv-empty-scale)); border-bottom-width: calc(1px * var(--lv-empty-scale));
+	border-radius: calc(var(--lv-radius-sm) * var(--lv-empty-scale)); font-size: calc(12px * var(--lv-empty-scale));
+}
+@media (prefers-reduced-motion: reduce) {
+	.lieve-viewport-frame { transition: none; }
+	body.lieve-preview-document #lieve-canvas .lieve-code-preview-loading > span { animation: lieve-code-loading-reveal .15s linear .18s both; }
+}
+/* The popup hint fits the dialog, not the entire composition viewport. */
+body.lieve-preview-document #lieve-canvas [data-editor-popup-shell] .lieve-canvas-empty { min-height: calc(180px * var(--lv-canvas-ui-scale,1)); padding: calc(24px * var(--lv-canvas-ui-scale,1)) min(6vw, calc(24px * var(--lv-canvas-ui-scale,1))); }

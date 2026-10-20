@@ -1,0 +1,23 @@
+/* A template inspector, using the incumbent controls rather than another modal. */
+.lieve-workspace .lieve-popup-tabs { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.lieve-popup-panel .lieve-control-group { background: var(--lv-surface); padding: 18px 16px; }
+.lieve-popup-panel .lieve-control-group-title { margin-bottom: 14px; }
+.lieve-popup-panel .lieve-control input { width: 100%; box-sizing: border-box; }
+.lieve-popup-switch { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--lv-border-soft); cursor: pointer; }
+.lieve-popup-switch:first-of-type { padding-top: 0; }
+.lieve-popup-switch:last-of-type { border-bottom: 0; }
+.lieve-popup-switch > span { display: grid; min-width: 0; gap: 5px; }
+.lieve-popup-switch strong { color: var(--lv-text); font-size: 12px; font-weight: 500; }
+.lieve-popup-switch small { color: var(--lv-muted); font-size: 11px; line-height: 1.6; }
+.lieve-workspace .lieve-popup-switch input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
+.lieve-popup-dismiss-warning { margin: 14px 0 0; padding: 12px; border-radius: 8px; color: var(--lv-text); background: var(--lv-gradient-soft); font-size: 11px; line-height: 1.6; }
+.lieve-popup-preview-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 12px; }
+.lieve-workspace .lieve-popup-panel-close { width: 30px; height: 30px; padding: 0; flex: 0 0 auto; }
+.lieve-popup-panel-close svg { width: 16px; height: 16px; }
+.lieve-popup-inspector-tools { display: flex; height: 48px; padding: 0 16px; align-items: center; border-bottom: 1px solid var(--lv-border-soft); }
+.lieve-workspace #lieve-popup-settings { display: flex; width: 100%; height: 36px; gap: 8px; padding: 0 10px; white-space: nowrap; font-size: 12px; }
+#lieve-popup-settings > span { flex: 1; text-align: left; }
+#lieve-popup-settings > svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.lieve-workspace :is(.lieve-popup-inspector-tools, #lieve-popup-settings)[hidden] { display: none !important; }
+.lieve-inspector:has(> .lieve-popup-inspector-tools:not([hidden])) > #lieve-inspector-content { height: calc(100% - 48px); }
+.lieve-workspace [data-popup-setting][aria-invalid="true"] { border-color: var(--lv-danger) !important; }

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "limit": 8,
+  "stepLimit": 32,
+  "targetLimit": 200,
+  "eases": {"none":"Linear","power1.out":"Smooth out","power2.out":"Strong out","power2.inOut":"Smooth in/out","power3.out":"Expressive out","expo.out":"Exponential out","sine.inOut":"Sine in/out","back.out(1.2)":"Gentle overshoot"},
+  "triggers": {"load":"Page ready","view":"Enter viewport","manual":"Controlled by Interact","scroll":"Scroll progress"},
+  "properties": {
+    "x":{"label":"Move X (px)","type":"number","min":-100000,"max":100000},
+    "y":{"label":"Move Y (px)","type":"number","min":-100000,"max":100000},
+    "z":{"label":"Move Z (px)","type":"number","min":-100000,"max":100000},
+    "xPercent":{"label":"Move X (%)","type":"number","min":-10000,"max":10000},
+    "yPercent":{"label":"Move Y (%)","type":"number","min":-10000,"max":10000},
+    "scale":{"label":"Scale","type":"number","min":0,"max":100},
+    "scaleX":{"label":"Scale X","type":"number","min":0,"max":100},
+    "scaleY":{"label":"Scale Y","type":"number","min":0,"max":100},
+    "rotation":{"label":"Rotate (deg)","type":"number","min":-36000,"max":36000},
+    "rotationX":{"label":"Rotate X (deg)","type":"number","min":-36000,"max":36000},
+    "rotationY":{"label":"Rotate Y (deg)","type":"number","min":-36000,"max":36000},
+    "opacity":{"label":"Opacity","type":"number","min":0,"max":1},
+    "color":{"label":"Text color","type":"color"},
+    "backgroundColor":{"label":"Background color","type":"color"},
+    "borderRadius":{"label":"Border radius","type":"length"}
+  }
+}

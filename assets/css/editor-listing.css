@@ -1,0 +1,12 @@
+/* Inherit the inspector's typography, spacing, switches, inputs and reset buttons. */
+.lieve-listing-inspector { --lv-markup-action-size: 32px; --lv-markup-action-gap: 8px; }
+.lieve-listing-inspector .lieve-listing-switch { display: flex; justify-content: space-between; gap: 12px; margin-bottom: var(--lv-inspector-field-gap, 16px); }
+.lieve-listing-switch > input { flex-shrink: 0; }
+.lieve-listing-layout-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: var(--lv-inspector-section-gap, 20px) 0 12px; padding-top: var(--lv-inspector-section-gap, 20px); border-top: 1px solid var(--lv-border-soft); }
+.lieve-listing-layout-heading > strong { flex: 1; color: var(--lv-text); font: 600 12px/18px var(--lv-font-ui); }
+.lieve-listing-layout-heading > span { color: var(--lv-text-2); font: 400 11px/18px var(--lv-font-ui); }
+.lieve-listing-notice { padding: 12px; margin: 12px 0 16px; background: var(--lv-surface-2); border-radius: var(--lv-radius-sm); color: var(--lv-text-2); font: 400 11px/17px var(--lv-font-ui); overflow-wrap: anywhere; }
+.lieve-listing-inspector input.is-inherited::placeholder { color: var(--lv-text-2); opacity: .85; }
+.lieve-listing-inspector [aria-invalid="true"] { border-color: var(--lv-danger); }
+.lieve-listing-inspector .lieve-element-help a { color: var(--lv-accent-text); text-decoration: none; transition: color .15s; }
+.lieve-listing-inspector .lieve-element-help a:hover { color: var(--lv-violet); text-decoration: none; }
