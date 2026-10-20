@@ -1,10 +1,17 @@
 # Lieve Builder
 
-A WordPress theme by TheOneWP with an integrated visual builder for pages, templates and linked components.
+[![Version 1.0.0](https://img.shields.io/badge/version-1.0.0-8044E3?style=flat-square)](#changelog)
+[![WordPress 6.5+](https://img.shields.io/badge/WordPress-6.5%2B-21759B?style=flat-square&logo=wordpress&logoColor=white)](https://wordpress.org/)
+[![PHP 7.4+](https://img.shields.io/badge/PHP-7.4%2B-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
+[![Original code license: GPL-2.0-or-later](https://img.shields.io/badge/Original_code-GPL--2.0--or--later-16C6C0?style=flat-square)](LICENSE.txt)
+[![By TheOneWP](https://img.shields.io/badge/by-TheOneWP-8044E3?style=flat-square)](https://www.theonewp.com)
 
-**Version:** `1.0.0` · **Requires:** WordPress 6.5+ and PHP 7.4+
+A lightweight WordPress theme by TheOneWP with an integrated visual builder for pages, templates and linked components.
 
-Use a test site and keep backups before activation or updates. Distribution remains blocked pending the product-specific GSAP authorization review and release acceptance checks.
+[Quick start](#quick-start) · [Builder](#the-builder) · [Templates](#templates-and-components) · [Libraries](#global-libraries) · [Settings](#settings) · [Licensing](#release-scope-and-licensing)
+
+> [!IMPORTANT]
+> Use a test site and keep backups before activation or updates. Distribution remains blocked pending the product-specific GSAP authorization review and release acceptance checks.
 
 ## Quick start
 
