@@ -11,7 +11,10 @@ while ( have_posts() ) :
 	the_post();
 	$post_id = get_the_ID();
 
-	if ( lieve_builder_is_enabled( $post_id ) ) {
+	// Static revocation falls back here: builder output must honor WordPress password visibility too.
+	if ( post_password_required( $post_id ) ) {
+		echo get_the_password_form( $post_id );
+	} elseif ( lieve_builder_is_enabled( $post_id ) ) {
 		lieve_render_document( lieve_get_document( $post_id ) );
 	} elseif ( ! lieve_render_matching_template( 'content', $post_id ) ) {
 		?>

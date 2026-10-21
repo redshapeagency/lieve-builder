@@ -6,7 +6,7 @@
  let data = config.data, busy = false, server = 'nginx';
  const pageRoot = root.closest('.lieve-static-page');
  const status = root.querySelector('[data-static-status]');
- const labels = {dynamic: 'WordPress', stale: 'Needs generation', blocked: 'Not compatible', ready: 'Snapshot ready'};
+ const labels = {dynamic: 'WordPress', stale: 'Needs generation', blocked: 'Not compatible', ready: 'Snapshot ready', error: 'Recovery required'};
  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
  const safeUrl = value => { try { const url = new URL(value); return /^https?:$/.test(url.protocol) ? esc(url.href) : '#'; } catch { return '#'; } };
  const pathLabel = value => { try { return new URL(value).pathname; } catch { return 'Invalid permalink'; } };
@@ -47,9 +47,10 @@
   root.querySelector('[data-static-list]').innerHTML = data.pages.map(page => `<tr data-static-id="${page.id}" id="static-page-${page.id}"><td data-label="Static mode"><label class="lieve-static-switch"><input type="checkbox" data-static-select="${page.id}" aria-label="Static mode for ${esc(page.title)}" ${page.selected ? 'checked' : ''}><span aria-hidden="true"></span></label></td><td data-label="Page"><a class="lieve-static-title" href="${safeUrl(page.edit)}">${esc(page.title)}</a><a class="lieve-static-url" href="${safeUrl(page.url)}" target="_blank" rel="noopener">${esc(pathLabel(page.url))}</a></td><td data-label="Status"><span class="lieve-static-status is-${esc(page.status)}">${esc(labels[page.status] || labels.stale)}</span>${page.message && page.selected ? `<span class="lieve-static-reason">${esc(page.message)}</span>` : ''}</td><td data-label="Generated"><span class="lieve-static-generated">${esc(page.generated || '—')}</span>${page.bytes ? `<small>${(page.bytes / 1024).toFixed(1)} KB HTML</small>` : ''}</td><td data-label="Actions"><button type="button" class="lieve-conditions-cancel" data-static-generate="${page.id}">${page.status === 'ready' ? 'Regenerate' : 'Generate'}</button></td></tr>`).join('');
   root.querySelectorAll('[data-static-setting]').forEach(control => { control.checked = data.settings[control.dataset.staticSetting]; });
   const badge = root.querySelector('[data-static-server-status]');
-  badge.textContent = data.settings.active ? 'Server delivery active' : data.settings.verified ? 'Server verified · delivery paused' : 'Server setup required';
-  badge.className = `lieve-static-status is-${data.settings.active ? 'ready' : data.settings.verified ? 'dynamic' : 'stale'}`;
-  root.querySelector('[data-static-server-note]').textContent = data.settings.active ? 'Verified requests are delivered by the web server, without running PHP.' : data.settings.verified ? 'Routing is verified. Enable delivery and generate fresh snapshots to serve selected pages.' : 'You can generate snapshots now. PHP-free delivery needs the server rules below and a successful verification.';
+  const problem = data.settings.safety && data.settings.safety !== 'ok';
+  badge.textContent = problem ? (data.settings.safety === 'unsafe' ? 'Unsafe delivery · host action required' : 'Delivery fenced · recovery required') : data.settings.active ? 'Server delivery active' : data.settings.verified ? 'Server verified · delivery paused' : 'Server setup required';
+  badge.className = `lieve-static-status is-${problem ? 'blocked' : data.settings.active ? 'ready' : data.settings.verified ? 'dynamic' : 'stale'}`;
+  root.querySelector('[data-static-server-note]').textContent = problem ? `${data.settings.error} ${data.settings.recovery}` : data.settings.active ? 'Verified requests are delivered by the web server, without running PHP.' : data.settings.verified ? 'Routing is verified. Enable delivery and generate fresh snapshots to serve selected pages.' : 'You can generate snapshots now. PHP-free delivery needs the server rules below and a successful verification.';
   filter(); syncDisabled();
   if (focusId) root.querySelector(`[data-static-${focusType}="${focusId}"]`)?.focus({preventScroll: true});
  }

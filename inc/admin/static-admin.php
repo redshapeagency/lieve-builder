@@ -3,7 +3,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 function lieve_static_admin_assets( $hook ) {
-	if ( get_plugin_page_hookname( 'lieve-static-delivery', 'lieve-dashboard' ) !== $hook ) { return; }
+	if ( get_plugin_page_hookname( 'lieve-static-delivery', 'lieve-dashboard' ) !== $hook || ! current_user_can( 'manage_options' ) ) { return; }
 	wp_enqueue_style( 'lieve-static-base', LIEVE_URL . 'assets/css/design-system.css', array( 'lieve-builder-conditions' ), lieve_asset_version( 'assets/css/design-system.css' ) );
 	wp_enqueue_style( 'lieve-static', LIEVE_URL . 'assets/css/static-delivery.css', array( 'lieve-static-base' ), lieve_asset_version( 'assets/css/static-delivery.css' ) );
 	wp_enqueue_script( 'lieve-static', LIEVE_URL . 'assets/js/static-delivery.js', array(), lieve_asset_version( 'assets/js/static-delivery.js' ), true );
@@ -12,7 +12,7 @@ function lieve_static_admin_assets( $hook ) {
 add_action( 'admin_enqueue_scripts', 'lieve_static_admin_assets', 30 );
 
 function lieve_static_status_label( $status ) {
-	$labels = array( 'dynamic' => 'WordPress', 'stale' => 'Needs generation', 'blocked' => 'Not compatible', 'ready' => 'Snapshot ready' );
+	$labels = array( 'dynamic' => 'WordPress', 'stale' => 'Needs generation', 'blocked' => 'Not compatible', 'ready' => 'Snapshot ready', 'error' => 'Recovery required' );
 	return $labels[ $status ] ?? 'Needs generation';
 }
 function lieve_static_admin_row( $page ) {
@@ -29,6 +29,9 @@ function lieve_static_admin_row( $page ) {
 function lieve_render_static_page() {
 	if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'You do not have permission to manage static delivery.', 'lieve-builder' ) ); }
 	$data = lieve_static_payload(); $settings = $data['settings'];
+	$problem = 'ok' !== $settings['safety'];
+	$label = $problem ? ( 'unsafe' === $settings['safety'] ? 'Unsafe delivery · host action required' : 'Delivery fenced · recovery required' ) : ( $settings['active'] ? 'Server delivery active' : ( $settings['verified'] ? 'Server verified · delivery paused' : 'Server setup required' ) );
+	$note = $problem ? $settings['error'] . ' ' . $settings['recovery'] : ( $settings['active'] ? 'Verified requests are delivered by the web server, without running PHP.' : ( $settings['verified'] ? 'Routing is verified. Enable delivery and generate fresh snapshots to serve selected pages.' : 'You can generate snapshots now. PHP-free delivery needs the server rules below and a successful verification.' ) );
 	?>
 	<div class="wrap lieve-admin-page lieve-design-page lieve-token-page lieve-static-page">
 		<?php lieve_render_admin_header( __( 'Static Delivery', 'lieve-builder' ), __( 'Publish public pages as HTML snapshots. Keep WordPress for everything dynamic.', 'lieve-builder' ) ); ?>
@@ -38,7 +41,7 @@ function lieve_render_static_page() {
 					<div><h2>Page delivery</h2><p>Snapshots include the final HTML, matching templates and existing CSS and JavaScript. Assets stay on their original URLs.</p></div>
 					<div class="lieve-static-options"><label class="lieve-static-option"><span>Enable static delivery<small>Only selected, compatible pages</small></span><span class="lieve-static-switch"><input type="checkbox" data-static-setting="enabled" <?php checked( $settings['enabled'] ); ?>><span aria-hidden="true"></span></span></label><label class="lieve-static-option"><span>Automatic regeneration<small>Queue fresh copies after source changes</small></span><span class="lieve-static-switch"><input type="checkbox" data-static-setting="automatic" <?php checked( $settings['automatic'] ); ?>><span aria-hidden="true"></span></span></label></div>
 				</div>
-				<div class="lieve-static-server-state"><span class="lieve-static-status <?php echo $settings['active'] ? 'is-ready' : ( $settings['verified'] ? 'is-dynamic' : 'is-stale' ); ?>" data-static-server-status><?php echo $settings['active'] ? 'Server delivery active' : ( $settings['verified'] ? 'Server verified · delivery paused' : 'Server setup required' ); ?></span><p data-static-server-note><?php echo $settings['active'] ? 'Verified requests are delivered by the web server, without running PHP.' : ( $settings['verified'] ? 'Routing is verified. Enable delivery and generate fresh snapshots to serve selected pages.' : 'You can generate snapshots now. PHP-free delivery needs the server rules below and a successful verification.' ); ?></p><a href="#lieve-static-setup">Server setup</a></div>
+				<div class="lieve-static-server-state"><span class="lieve-static-status <?php echo $problem ? 'is-blocked' : ( $settings['active'] ? 'is-ready' : ( $settings['verified'] ? 'is-dynamic' : 'is-stale' ) ); ?>" data-static-server-status><?php echo esc_html( $label ); ?></span><p data-static-server-note><?php echo esc_html( $note ); ?></p><a href="#lieve-static-setup">Server setup</a></div>
 				<div class="lieve-ds-toolbar"><label class="lieve-ds-search"><?php echo lieve_font_icon( 'search' ); ?><input type="search" data-static-search placeholder="Search pages…" aria-label="Search pages"></label><span class="lieve-static-toolbar-note">Static mode is opt-in for every page.</span><button type="button" class="lieve-conditions-save" data-static-generate-all>Generate Selected</button></div>
 				<div class="lieve-static-table-wrap"><table class="lieve-static-table"><thead><tr><th scope="col">Static mode</th><th scope="col">Page</th><th scope="col">Status</th><th scope="col">Generated</th><th scope="col">Actions</th></tr></thead><tbody data-static-list><?php foreach ( $data['pages'] as $page ) { lieve_static_admin_row( $page ); } ?></tbody></table><div class="lieve-static-empty" data-static-empty <?php echo $data['pages'] ? 'hidden' : ''; ?>><h3><?php echo $data['pages'] ? 'No matching pages' : 'No pages yet'; ?></h3><p>Create a public page with LieveBuilder, then enable its static mode here.</p></div></div>
 				<footer class="lieve-ds-footer"><span role="status" aria-live="polite" data-static-status>Changes are saved immediately. Incompatible pages always use WordPress.</span><button type="button" class="lieve-conditions-cancel" data-static-refresh>Refresh Status</button></footer>
@@ -54,7 +57,8 @@ function lieve_render_static_page() {
 				<p class="lieve-static-setup-status" role="status" aria-live="polite" data-static-setup-status></p>
 				<div class="lieve-static-instructions">
 					<p><strong>Safety first.</strong> Only anonymous GET and HEAD requests without cookies, query parameters or authorization use snapshots. Missing files, forms, WooCommerce, protected pages and unsupported elements stay on WordPress.</p>
-					<p><strong>Keep copies fresh.</strong> Source changes remove snapshots immediately. Automatic regeneration uses WP-Cron; configure a real scheduled cron for a site primarily served without PHP. External plugin data changes can call <code>lieve_static_invalidate()</code>.</p>
+					<p><strong>Keep copies fresh.</strong> Source changes fence delivery before snapshot cleanup. Storage failures require recovery and are never reported as a successful disable. Automatic regeneration uses WP-Cron; configure a real scheduled cron for a site primarily served without PHP. External plugin data changes can call <code>lieve_static_invalidate()</code> and must check its result.</p>
+					<p><strong>Emergency recovery.</strong> <?php echo esc_html( lieve_static_recovery_message() ); ?> Local revocation cannot recall an in-flight response or a copy already held by a browser, proxy or CDN. The generated rules send <code>Cache-Control: no-store</code>; independently configured caches still need their own purge.</p>
 					<p><strong>Hosting requirements.</strong> This beta supports single-site root installations with a standard, local <code>wp-content</code> directory. Preserve your host’s security headers when installing the rules. Disable upstream HTML caching unless its invalidation and bypass rules are also configured.</p>
 				</div>
 				<div class="lieve-static-config-tabs" role="group" aria-label="Server configuration">
@@ -76,3 +80,12 @@ function lieve_static_page_row_action( $actions, $post ) {
 	return $actions;
 }
 add_filter( 'page_row_actions', 'lieve_static_page_row_action', 10, 2 );
+
+/** Visibility revocation may happen outside this screen. Alert administrators on their next request. */
+function lieve_static_admin_notice() {
+	if ( ! current_user_can( 'manage_options' ) ) { return; }
+	$settings = lieve_static_settings(); $state = lieve_static_gate_state();
+	if ( $state['inspectable'] && ! $settings['failure'] && ( ! $state['present'] || ( $settings['enabled'] && hash_equals( lieve_static_config_signature(), (string) $settings['verified'] ) ) ) ) { return; }
+	echo '<div class="notice notice-error"><p><strong>Static Delivery: ' . esc_html( $state['fenced'] ? 'recovery required.' : 'delivery may still be active; host action required.' ) . '</strong> ' . esc_html( lieve_static_recovery_message() ) . ' <a href="' . esc_url( admin_url( 'admin.php?page=lieve-static-delivery' ) ) . '">Review Static Delivery</a></p></div>';
+}
+add_action( 'admin_notices', 'lieve_static_admin_notice' );

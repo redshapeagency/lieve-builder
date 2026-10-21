@@ -36,7 +36,7 @@
 .lieve-static-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 6px; color: #50575e; background: #f0f1f3; font-size: 11px; font-weight: 500; line-height: 1.4; white-space: nowrap; }
 .lieve-static-status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .lieve-static-status.is-ready { color: #176b50; background: #eaf6ef; }
-.lieve-static-status.is-blocked { color: #9d3535; background: #fcf0ef; }
+.lieve-static-status.is-blocked, .lieve-static-status.is-error { color: #9d3535; background: #fcf0ef; }
 .lieve-static-status.is-stale { color: #775324; background: #faf3e8; }
 .lieve-static-reason { display: block; font-size: 12px; color: #646970; margin-top: 7px; line-height: 1.5; max-width: 64ch; }
 .lieve-static-generated { font-size: 12px; font-variant-numeric: tabular-nums; color: #50575e; }
