@@ -1,6 +1,6 @@
 # Lieve Builder
 
-[![Version 1.0.2](https://img.shields.io/badge/version-1.0.2-8044E3?style=flat-square)](#changelog)
+[![Version 1.0.3](https://img.shields.io/badge/version-1.0.3-8044E3?style=flat-square)](#changelog)
 [![WordPress 6.5+](https://img.shields.io/badge/WordPress-6.5%2B-21759B?style=flat-square&logo=wordpress&logoColor=white)](https://wordpress.org/)
 [![PHP 7.4+](https://img.shields.io/badge/PHP-7.4%2B-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
 [![Original code license: GPL-2.0-or-later](https://img.shields.io/badge/Original_code-GPL--2.0--or--later-16C6C0?style=flat-square)](LICENSE.txt)
@@ -149,13 +149,21 @@ Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Anime.js 
 
 ## Changelog
 
+### 1.0.3
+
+- New: Branded builder startup screen with light/dark modes, reduced-motion support, loading recovery and a 900 ms minimum display time.
+- Fixed: PHP 7.4 compatibility when rendering dynamic attributes in Custom Code.
+- Fixed: Context menu access from Custom Code previews.
+- Improved: Scrollable context menus with More actions and Back to top controls.
+- Improved: Uniform widget cards with aligned labels and compact integration badges.
+- Updated: GitHub release descriptions are fully user-managed, without mandatory migration notices.
+
 ### 1.0.2
 
-- New: Standardized release packaging on lieve-builder.zip with GitHub SHA-256 verification.
+- New: Standardized release packaging on lieve-builder.zip with GitHub SHA-256 verification and ZIP validation for WordPress updates.
 - Fixed: Rendering delays in the visual editor.
 - Fixed: Canvas scrolling while zoomed inside the builder.
 - Fixed: Replaced GSAP with Anime.js for Lieve Motion, removing the GSAP dependency.
-- Fixed: WordPress updates, package integrity checks and ZIP validation.
 
 ### 1.0.1
 

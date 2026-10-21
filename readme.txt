@@ -2,7 +2,7 @@
 Contributors: lieve-builder
 Requires at least: 6.5
 Requires PHP: 7.4
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,12 +74,19 @@ Lieve's original code is GPLv2 or later; see LICENSE.txt. Motion uses locally bu
 
 == Changelog ==
 
+= 1.0.3 =
+* New: Branded builder startup screen with light/dark modes, reduced-motion support, loading recovery and a 900 ms minimum display time.
+* Fixed: PHP 7.4 compatibility when rendering dynamic attributes in Custom Code.
+* Fixed: Context menu access from Custom Code previews.
+* Improved: Scrollable context menus with More actions and Back to top controls.
+* Improved: Uniform widget cards with aligned labels and compact integration badges.
+* Updated: GitHub release descriptions are fully user-managed, without mandatory migration notices.
+
 = 1.0.2 =
-* New: Standardized release packaging on lieve-builder.zip with GitHub SHA-256 verification.
+* New: Standardized release packaging on lieve-builder.zip with GitHub SHA-256 verification and ZIP validation for WordPress updates.
 * Fixed: Rendering delays in the visual editor.
 * Fixed: Canvas scrolling while zoomed inside the builder.
 * Fixed: Replaced GSAP with Anime.js for Lieve Motion, removing the GSAP dependency.
-* Fixed: WordPress updates, package integrity checks and ZIP validation.
 
 = 1.0.1 =
 * Fixed: Custom Code preview initialization and dynamic data context after PHP queries.
