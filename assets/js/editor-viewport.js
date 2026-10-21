@@ -32,7 +32,7 @@
 			return canInlineCss( css ) ? css : null;
 		} catch ( error ) { return null; } // Unloaded or cross-origin sheets use the normal link fallback.
 	}
-	function create( { canvas, app, styles = [], styleTexts = {}, inlineCss = '', initialWidth = 1279, onResize = () => {} } ) {
+	function create( { canvas, app, styles = [], styleTexts = {}, inlineCss = '', initialWidth = 1279, onResize = () => {}, onReady = () => {} } ) {
 		const stage = canvas.closest( '.lieve-stage-scroll' );
 		const zoomSelect = app.querySelector( '[data-editor-zoom]' ); const zoomListeners = new Set();
 		let stylesReady = false; let contentReady = false; let revealed = false;
@@ -127,6 +127,7 @@
 			layout(); revealed = true; frame.classList.add( 'is-ready' );
 			stage.removeAttribute( 'data-viewport-pending' ); stage.setAttribute( 'aria-busy', 'false' );
 			zoomSelect?.closest( '.lieve-editor-zoom-control' )?.removeAttribute( 'data-viewport-pending' );
+			onReady();
 		}
 		zoomSelect?.addEventListener( 'change', () => { if ( ! setZoom( zoomSelect.value ) ) { zoomSelect.value = zoom; } } );
 		const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver( layout ) : null;

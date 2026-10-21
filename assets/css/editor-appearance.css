@@ -1,5 +1,7 @@
 /* Editor appearance only: no inversion, frontend rules or authored-node overrides. */
-.lieve-workspace[data-color-mode="dark"] {
+.lieve-workspace[data-color-mode="dark"],
+.lieve-editor-startup[data-color-mode="dark"],
+.lieve-editor-no-script[data-color-mode="dark"] {
 	--lv-bg: #10141d;
 	--lv-surface: #181e29;
 	--lv-surface-2: #202735;

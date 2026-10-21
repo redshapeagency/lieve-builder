@@ -229,7 +229,7 @@
 
 	const canvas = document.getElementById( 'lieve-canvas' );
 	window.LieveWorkspace?.createPanelResize( { app, storageKey: config.layoutStorageKey } );
-	const viewport = window.LieveViewport?.create( { canvas, app, styles: config.viewportStyles || [], styleTexts: config.viewportStyleTexts || {}, inlineCss: config.viewportInlineCss || '', initialWidth: config.breakpoints?.find( item => item.base )?.width, onResize: () => window.requestAnimationFrame( updateSelectionOutline ) } ) || null;
+	const viewport = window.LieveViewport?.create( { canvas, app, styles: config.viewportStyles || [], styleTexts: config.viewportStyleTexts || {}, inlineCss: config.viewportInlineCss || '', initialWidth: config.breakpoints?.find( item => item.base )?.width, onResize: () => window.requestAnimationFrame( updateSelectionOutline ), onReady: () => window.LieveEditorStartup?.ready() } ) || null;
 	function onEditorDocuments( type, listener, options ) {
 		[ ...new Set( [ document, canvas.ownerDocument || document ] ) ].forEach( doc => doc.addEventListener( type, listener, options ) );
 	}
@@ -1201,7 +1201,7 @@
 	renderAll();
 	canvasInitializing = false;
 	if ( viewport ) { viewport.markContentReady(); }
-	else { canvas.closest( '.lieve-stage-scroll' ).removeAttribute( 'data-viewport-pending' ); canvas.closest( '.lieve-stage-scroll' ).setAttribute( 'aria-busy', 'false' ); zoomSelect?.closest( '.lieve-editor-zoom-control' )?.removeAttribute( 'data-viewport-pending' ); }
+	else { canvas.closest( '.lieve-stage-scroll' ).removeAttribute( 'data-viewport-pending' ); canvas.closest( '.lieve-stage-scroll' ).setAttribute( 'aria-busy', 'false' ); zoomSelect?.closest( '.lieve-editor-zoom-control' )?.removeAttribute( 'data-viewport-pending' ); window.LieveEditorStartup?.ready(); }
 	}
 	window.LieveBuilder = { initialize };
 	if ( document.getElementById( 'lieve-builder-app' ) ) { initialize(); }

@@ -1,0 +1,51 @@
+/* Startup is editor chrome, never part of the authored canvas or frontend. */
+.lieve-editor-startup {
+	position: fixed;
+	z-index: 120000;
+	inset: 0;
+	display: grid;
+	box-sizing: border-box;
+	place-items: center;
+	padding: 32px 24px;
+	overflow: auto;
+	background: var(--lv-surface);
+	color: var(--lv-text);
+	font-family: var(--lv-font-ui);
+	text-align: center;
+	opacity: 1;
+	transition: opacity .12s cubic-bezier(.23, 1, .32, 1);
+}
+.lieve-editor-startup-content { display: flex; width: min(100%, 360px); min-width: 0; flex-direction: column; align-items: center; }
+.lieve-editor-startup-logo { display: block; width: 72px; height: 72px; margin-bottom: 20px; flex: 0 0 auto; }
+.lieve-editor-startup h1 { margin: 0; color: inherit; font: 700 22px/30px var(--lv-font-ui); letter-spacing: -.025em; }
+.lieve-editor-startup h1 span { font-weight: 400; }
+.lieve-editor-startup-status { margin: 10px 0 24px; color: var(--lv-muted); font: 400 13px/20px var(--lv-font-ui); }
+.lieve-editor-startup-progress { width: 144px; height: 3px; overflow: hidden; border-radius: 2px; background: var(--lv-border); }
+.lieve-editor-startup-progress::after { content: ''; display: block; width: 40%; height: 100%; border-radius: inherit; background: var(--lv-gradient); animation: lieve-editor-startup-progress 1.2s linear infinite; }
+.lieve-editor-startup-error, .lieve-editor-startup-actions { display: none; }
+.lieve-editor-startup-error { margin: 16px 0 24px; color: var(--lv-text-2); font: 400 13px/21px var(--lv-font-ui); overflow-wrap: anywhere; }
+.lieve-editor-startup-actions { width: 100%; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.lieve-editor-startup-actions :is(a, button) { box-sizing: border-box; min-height: 40px; margin: 0; font-family: var(--lv-font-ui); font-size: 13px; font-weight: 500; text-decoration: none; }
+.lieve-editor-startup-actions .lieve-button-secondary { position: relative; isolation: isolate; background: transparent; transition: border-color .15s, background .15s, color .15s; }
+.lieve-editor-startup-actions .lieve-button-secondary::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: var(--lv-gradient-soft); opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.lieve-editor-startup-actions .lieve-button-secondary:is(:hover, :focus-visible) { color: var(--lv-accent-text); border-color: var(--lieve-accent-border); }
+.lieve-editor-startup-actions .lieve-button-secondary:is(:hover, :focus-visible)::before { opacity: 1; }
+.lieve-editor-startup-actions :is(a, button):focus:not(:focus-visible) { outline: none; box-shadow: none; }
+.lieve-editor-startup-actions :is(a, button):focus-visible { outline: 2px solid var(--lv-violet); outline-offset: 3px; box-shadow: none; }
+.lieve-editor-startup[data-state="error"] :is(.lieve-editor-startup-status, .lieve-editor-startup-progress) { display: none; }
+.lieve-editor-startup[data-state="error"] .lieve-editor-startup-error { display: block; }
+.lieve-editor-startup[data-state="error"] .lieve-editor-startup-actions { display: flex; }
+.lieve-editor-startup[data-state="error"] .lieve-editor-startup-progress::after { animation: none; }
+.lieve-editor-startup[data-state="ready"] { opacity: 0; pointer-events: none; }
+.lieve-editor-startup[data-state="ready"] .lieve-editor-startup-progress::after { animation: none; }
+.lieve-editor-no-script { position: fixed; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 24px; background: var(--lv-surface); color: var(--lv-text); font: 400 14px/22px var(--lv-font-ui); text-align: center; }
+.lieve-editor-no-script p { margin: 0; }
+@keyframes lieve-editor-startup-progress { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
+@media (prefers-reduced-motion: reduce) {
+	.lieve-editor-startup, .lieve-editor-startup-actions :is(a, button), .lieve-editor-startup-actions .lieve-button-secondary::before { transition: none; }
+	.lieve-editor-startup-progress::after { animation: none; transform: translateX(75%); }
+}
+@media (forced-colors: active) {
+	.lieve-editor-startup-progress { background: CanvasText; }
+	.lieve-editor-startup-progress::after { background: Highlight; }
+}

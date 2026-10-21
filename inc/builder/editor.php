@@ -206,6 +206,8 @@ function lieve_editor_assets( $hook_suffix ) {
 	}
 
 	$layout_storage_key = 'lieve-builder:panels:' . admin_url() . ':' . get_current_user_id();
+	wp_enqueue_script( 'lieve-builder-startup', LIEVE_URL . 'assets/js/editor-startup.js', array(), lieve_asset_version( 'assets/js/editor-startup.js' ), false );
+	wp_enqueue_style( 'lieve-builder-startup', LIEVE_URL . 'assets/css/editor-startup.css', array( 'lieve-builder-appearance' ), lieve_asset_version( 'assets/css/editor-startup.css' ) );
 	wp_enqueue_script( 'lieve-builder-history', LIEVE_URL . 'assets/js/editor-history.js', array(), lieve_asset_version( 'assets/js/editor-history.js' ), false );
 	wp_enqueue_script( 'lieve-builder-full-preview', LIEVE_URL . 'assets/js/editor-full-preview.js', array( 'lieve-builder-conditions' ), lieve_asset_version( 'assets/js/editor-full-preview.js' ), false );
 	wp_enqueue_style( 'lieve-builder-full-preview', LIEVE_URL . 'assets/css/editor-full-preview.css', array( 'lieve-builder-appearance' ), lieve_asset_version( 'assets/css/editor-full-preview.css' ) );
@@ -425,8 +427,22 @@ function lieve_render_editor_page() {
 	$preview_breakpoints = lieve_breakpoint_definitions();
 	usort( $preview_breakpoints, function( $a, $b ) { return $b['width'] <=> $a['width']; } );
 	?>
+	<div id="lieve-editor-startup" class="lieve-editor-startup" data-color-mode="<?php echo esc_attr( $color_mode ); ?>" data-state="loading" aria-busy="true">
+		<div class="lieve-editor-startup-content">
+			<span class="lieve-editor-startup-logo" aria-hidden="true"><?php echo lieve_brand_logo(); ?></span>
+			<h1>Lieve<span>Builder</span></h1>
+			<p class="lieve-editor-startup-status" role="status"><?php esc_html_e( 'Opening your workspace…', 'lieve-builder' ); ?></p>
+			<div class="lieve-editor-startup-progress" aria-hidden="true"></div>
+			<p class="lieve-editor-startup-error" role="alert"><?php esc_html_e( 'The workspace could not finish loading. Reload the editor to try again.', 'lieve-builder' ); ?></p>
+			<div class="lieve-editor-startup-actions">
+				<a class="lieve-button-primary" href="<?php echo esc_url( lieve_builder_url( $post_id ) ); ?>"><?php esc_html_e( 'Reload editor', 'lieve-builder' ); ?></a>
+				<a class="lieve-button-secondary" href="<?php echo esc_url( $exit_url ); ?>"<?php echo lieve_editor_exit_link_attributes(); ?>><?php echo esc_html( lieve_editor_exit_link_label() ); ?></a>
+			</div>
+		</div>
+	</div>
+	<?php wp_print_inline_script_tag( 'if(window.LieveEditorStartup){window.LieveEditorStartup.start();}else{document.getElementById("lieve-editor-startup").dataset.state="error";document.getElementById("lieve-editor-startup").setAttribute("aria-busy","false");}' ); ?>
 	<template id="lieve-builder-shell">
-	<div id="lieve-builder-app" class="lieve-builder-app lieve-workspace" data-post-id="<?php echo esc_attr( $post_id ); ?>" data-component-mode="<?php echo lieve_is_component($post_id) ? 'true' : 'false'; ?>" data-color-mode="<?php echo esc_attr( $color_mode ); ?>">
+	<div id="lieve-builder-app" class="lieve-builder-app lieve-workspace" inert aria-busy="true" data-post-id="<?php echo esc_attr( $post_id ); ?>" data-component-mode="<?php echo lieve_is_component($post_id) ? 'true' : 'false'; ?>" data-color-mode="<?php echo esc_attr( $color_mode ); ?>">
 		<header class="lieve-editor-header">
 			<div class="lieve-editor-brand"><span class="lieve-mark" aria-hidden="true"><?php echo lieve_brand_logo(); ?></span><strong class="lieve-brand-name">Lieve<span>Builder</span></strong></div>
 			<div class="lieve-document-context">
@@ -610,7 +626,7 @@ function lieve_render_editor_page() {
 		</div>
 	</div>
 	</template>
-	<noscript><div class="wrap"><p><?php esc_html_e( 'JavaScript is required to load the visual editor.', 'lieve-builder' ); ?></p><a href="<?php echo esc_url( $exit_url ); ?>"<?php echo lieve_editor_exit_link_attributes(); ?>><?php echo esc_html( lieve_editor_exit_link_label() ); ?></a></div></noscript>
+	<noscript><style>#lieve-editor-startup { display: none; }</style><div class="lieve-editor-no-script" data-color-mode="<?php echo esc_attr( $color_mode ); ?>"><p><?php esc_html_e( 'JavaScript is required to load the visual editor.', 'lieve-builder' ); ?></p><a class="lieve-button-secondary" href="<?php echo esc_url( $exit_url ); ?>"<?php echo lieve_editor_exit_link_attributes(); ?>><?php echo esc_html( lieve_editor_exit_link_label() ); ?></a></div></noscript>
 	<?php
 	wp_print_inline_script_tag( 'window.LieveBuilder?.initialize();' );
 }
