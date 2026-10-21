@@ -88,6 +88,10 @@
 				}
 				if ( data.type === 'select' && record.shown ) record.select?.( frame.dataset.lieveCodeNode );
 				if ( data.type === 'wheel' && record.shown && ! layer.hidden ) { window.LieveViewport?.scrollFrom( owner, data, frame ); }
+				if ( data.type === 'contextmenu' && record.shown && ! layer.hidden && typeof data.clientX === 'number' && Number.isFinite( data.clientX ) && typeof data.clientY === 'number' && Number.isFinite( data.clientY ) && data.clientX >= 0 && data.clientX <= frame.offsetWidth && data.clientY >= 0 && data.clientY <= frame.offsetHeight && frame.offsetWidth > 0 && frame.offsetHeight > 0 ) {
+					const rect = record.portal.getBoundingClientRect();
+					if ( rect.width > 0 && rect.height > 0 ) record.contextMenu?.( frame.dataset.lieveCodeNode, rect.left + data.clientX * rect.width / frame.offsetWidth, rect.top + data.clientY * rect.height / frame.offsetHeight, record.portal );
+				}
 				if ( data.type === 'error' ) {
 					record.initializationError = null; reportError( frame, record, data.message );
 				}

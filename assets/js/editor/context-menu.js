@@ -5,7 +5,7 @@
 	function closeContextMenu( restoreFocus = false ) {
 		if ( ! lieveContext.contextMenu || lieveContext.contextMenu.hidden ) { return; }
 		lieveContext.contextMenu.hidden = true;
-		if ( restoreFocus && lieveContext.contextReturnFocus?.isConnected ) { lieveContext.contextReturnFocus.focus(); }
+		if ( restoreFocus && lieveContext.contextReturnFocus?.isConnected ) { lieveContext.contextReturnFocus.focus( { preventScroll: true } ); }
 	}
 
 	function copyElementStyles( node ) {
@@ -125,11 +125,11 @@
 		lieveContext.selectElement( id ); const node = lieveContext.findNode( lieveContext.state.document.children, id ); if ( ! node ) { return; }
 		lieveContext.contextReturnFocus = lieveContext.canvas.querySelector( '.lieve-editor-node[data-id="' + window.CSS.escape( id ) + '"]' );
 		if ( ! lieveContext.contextMenu ) {
-			lieveContext.contextMenu = document.createElement( 'div' ); lieveContext.contextMenu.className = 'lieve-context-menu'; lieveContext.contextMenu.setAttribute( 'role', 'menu' ); lieveContext.contextMenu.setAttribute( 'aria-label', 'Element actions' ); lieveContext.app.appendChild( lieveContext.contextMenu );
+			lieveContext.contextMenu = document.createElement( 'div' ); lieveContext.contextMenu.className = 'lieve-context-menu'; lieveContext.contextMenu.setAttribute( 'role', 'presentation' ); lieveContext.app.appendChild( lieveContext.contextMenu );
 			lieveContext.contextMenu.addEventListener( 'click', ( event ) => { const button = event.target.closest( '[data-context-action]' ); if ( button && ! button.disabled ) { runContextAction( button.dataset.contextAction ); } } );
 			lieveContext.contextMenu.addEventListener( 'keydown', ( event ) => {
-				const buttons = Array.from( lieveContext.contextMenu.querySelectorAll( 'button:not(:disabled)' ) ); const index = buttons.indexOf( document.activeElement );
-				if ( [ 'ArrowDown', 'ArrowUp', 'Home', 'End' ].includes( event.key ) ) { event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : ( index + ( event.key === 'ArrowDown' ? 1 : -1 ) + buttons.length ) % buttons.length; buttons[ next ]?.focus(); }
+				const buttons = Array.from( lieveContext.contextMenu.querySelectorAll( '[data-context-action]:not(:disabled)' ) ); const index = buttons.indexOf( document.activeElement );
+				if ( [ 'ArrowDown', 'ArrowUp', 'Home', 'End' ].includes( event.key ) ) { event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : index < 0 ? ( event.key === 'ArrowDown' ? 0 : buttons.length - 1 ) : ( index + ( event.key === 'ArrowDown' ? 1 : -1 ) + buttons.length ) % buttons.length; buttons[ next ]?.focus(); }
 				if ( [ 'ArrowLeft', 'ArrowRight' ].includes( event.key ) ) { const row = event.target.closest( '.lieve-context-transfer' ); if ( row ) { event.preventDefault(); const actions = Array.from( row.querySelectorAll( 'button:not(:disabled)' ) ); const at = actions.indexOf( document.activeElement ); actions[ ( at + ( event.key === 'ArrowRight' ? 1 : -1 ) + actions.length ) % actions.length ]?.focus(); } }
 				if ( event.key === 'Escape' ) { event.preventDefault(); event.stopPropagation(); closeContextMenu( true ); }
 				if ( event.key === 'Tab' ) { closeContextMenu(); }
@@ -138,15 +138,30 @@
 		const parent = lieveContext.findParent( lieveContext.state.document.children, id ); const siblings = parent ? parent.children : lieveContext.state.document.children; const index = siblings.findIndex( ( item ) => item.id === id );
 		const button = ( action, label, shortcut = '', disabled = false, danger = false ) => '<button type="button" role="menuitem" data-context-action="' + action + '"' + ( disabled ? ' disabled' : '' ) + ( danger ? ' class="is-danger"' : '' ) + '><span>' + label + '</span>' + ( shortcut ? '<kbd>' + shortcut + '</kbd>' : '' ) + '</button>';
 		const divider = '<div role="separator"></div>';
-		lieveContext.contextMenu.innerHTML = '<div class="lieve-context-title">' + lieveContext.elementIcon( node.type ) + '<span>' + lieveContext.escapeHtml( node.props.editorLabel || lieveContext.labels[ node.type ] || node.type ) + '</span></div>' +
+		lieveContext.contextMenu.innerHTML = '<div class="lieve-context-title">' + lieveContext.elementIcon( node.type ) + '<span>' + lieveContext.escapeHtml( node.props.editorLabel || lieveContext.labels[ node.type ] || node.type ) + '</span></div><div class="lieve-context-scroll" role="menu" aria-label="Element actions">' +
 			button( 'content', 'Edit content' ) + button( 'style', 'Edit style' ) + button( 'rename', 'Rename in Structure' ) + ( lieveContext.config.canCreateComponents && !lieveContext.config.componentMode && node.type!=='component' ? button('create-component','Create linked component…') : '' ) + divider +
 			button( 'duplicate', 'Duplicate', '⌘/Ctrl D' ) + button( 'copy', 'Copy element' ) + button( 'cut', 'Cut element' ) + button( 'paste', 'Paste after', '', ! lieveContext.copiedElement ) + ( lieveContext.canNest( node.type ) ? button( 'paste-inside', 'Paste inside', '', ! lieveContext.copiedElement ) : '' ) + divider +
 			contextTransferRow( 'copy', canTransferElementClasses( node ), canTransferElementInteractions( node ) ) + contextTransferRow( 'paste', canTransferElementClasses( node ), canTransferElementInteractions( node ) ) + button( 'reset-styles', 'Reset all styles' ) + divider +
 			button( 'up', 'Move up', '', index === 0 ) + button( 'down', 'Move down', '', index === siblings.length - 1 ) + button( 'parent', 'Select parent', '', ! parent ) + button( 'root', 'Move to root', '', ! parent ) + button( 'wrap', 'Wrap in Container' ) +
-			( lieveContext.canNest( node.type ) ? button( 'collapse', lieveContext.state.collapsedIds.has( id ) ? 'Expand children' : 'Collapse children' ) : '' ) + button( 'add', 'Add element…' ) + divider + button( 'delete', 'Delete', 'Del', false, true );
+			( lieveContext.canNest( node.type ) ? button( 'collapse', lieveContext.state.collapsedIds.has( id ) ? 'Expand children' : 'Collapse children' ) : '' ) + button( 'add', 'Add element…' ) + divider + button( 'delete', 'Delete', 'Del', false, true ) + '</div><div class="lieve-context-overflow" hidden><button type="button" class="lieve-context-scroll-control" aria-label="Show more element actions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span>More actions</span></button></div>';
 		lieveContext.contextMenu.hidden = false; lieveContext.contextMenu.style.left = '0px'; lieveContext.contextMenu.style.top = '0px';
+		const scroll = lieveContext.contextMenu.querySelector( '.lieve-context-scroll' ), overflow = lieveContext.contextMenu.querySelector( '.lieve-context-overflow' ), scrollControl = overflow.querySelector( 'button' );
+		scroll.scrollTop = 0;
+		overflow.hidden = scroll.scrollHeight <= scroll.clientHeight + 1;
+		const updateScrollControl = () => {
+			const atEnd = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop <= 1;
+			scrollControl.classList.toggle( 'is-at-end', atEnd );
+			scrollControl.querySelector( 'span' ).textContent = atEnd ? 'Back to top' : 'More actions';
+			scrollControl.setAttribute( 'aria-label', atEnd ? 'Scroll to the first element action' : 'Show more element actions' );
+		};
+		scroll.addEventListener( 'scroll', updateScrollControl, { passive: true } );
+		scrollControl.addEventListener( 'click', () => {
+			const atEnd = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop <= 1;
+			scroll.scrollTo( { top: atEnd ? 0 : Math.min( scroll.scrollHeight - scroll.clientHeight, scroll.scrollTop + scroll.clientHeight * .75 ), behavior: window.matchMedia?.( '(prefers-reduced-motion: reduce)' ).matches ? 'instant' : 'smooth' } );
+		} );
+		updateScrollControl();
 		const rect = lieveContext.contextMenu.getBoundingClientRect(); lieveContext.contextMenu.style.left = Math.max( 8, Math.min( x, window.innerWidth - rect.width - 8 ) ) + 'px'; lieveContext.contextMenu.style.top = Math.max( 8, Math.min( y, window.innerHeight - rect.height - 8 ) ) + 'px';
-		lieveContext.contextMenu.querySelector( 'button:not(:disabled)' )?.focus();
+		scroll.querySelector( '[data-context-action]:not(:disabled)' )?.focus( { preventScroll: true } );
 	}
 	return { closeContextMenu, copyElementStyles, elementClassAssignments, elementClassSummary, syncElementClassSummary, canTransferElementClasses, copyElementClasses, pasteElementClasses, canTransferElementInteractions, copyElementInteractions, pasteElementInteractions, contextTransferRow, runContextAction, openContextMenu };
 	};

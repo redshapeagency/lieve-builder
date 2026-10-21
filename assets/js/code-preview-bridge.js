@@ -51,6 +51,18 @@
 	document.addEventListener( 'auxclick', preventLinkNavigation, true );
 	document.addEventListener( 'pointerdown', () => send( 'select' ), true );
 	document.addEventListener( 'focusin', () => send( 'select' ) );
+	// Context menus do not bubble out of an opaque-origin preview. Send only a
+	// local point; the editor supplies the owning node and permitted actions.
+	document.addEventListener( 'contextmenu', event => {
+		event.preventDefault();
+		send( 'contextmenu', { clientX: event.clientX, clientY: event.clientY } );
+	}, true );
+	document.addEventListener( 'keydown', event => {
+		if ( event.key !== 'ContextMenu' && ! ( event.shiftKey && event.key === 'F10' ) ) return;
+		event.preventDefault();
+		const rect = event.target?.getBoundingClientRect?.() || document.body.getBoundingClientRect();
+		send( 'contextmenu', { clientX: Math.max( 0, Math.min( window.innerWidth - 1, rect.left + 16 ) ), clientY: Math.max( 0, Math.min( window.innerHeight - 1, rect.top + 20 ) ) } );
+	}, true );
 	// This opaque-origin frame is portaled outside the canvas, so native wheel
 	// chaining cannot reach it. Keep local scrollers native; bridge their edges.
 	document.addEventListener( 'wheel', event => {

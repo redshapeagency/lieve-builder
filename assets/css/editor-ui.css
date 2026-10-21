@@ -92,10 +92,19 @@
 #lieve-builder-app :is([data-interact-action="remove"], [data-item-action="remove"], [data-attribute-action="delete"], [data-gradient-action="remove"], [data-motion-action="remove-step"], [data-motion-action="remove-timeline"], .lieve-context-menu .is-danger):not(:disabled):is(:hover, :focus-visible) { background: var(--lv-ui-danger-soft); color: var(--lv-danger); }
 
 /* Popovers/context actions share menu typography, bounded scrolling and spacing. */
-#lieve-builder-app .lieve-context-menu { max-height: min(560px, calc(100dvh - 24px)); overflow-y: auto; border-radius: var(--lv-radius); background: var(--lv-surface); color: var(--lv-text); }
+#lieve-builder-app .lieve-context-menu { display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - 24px)); overflow: hidden; border-radius: var(--lv-radius); background: var(--lv-surface); color: var(--lv-text); }
+#lieve-builder-app .lieve-context-menu[hidden] { display: none; }
+#lieve-builder-app .lieve-context-title { flex: 0 0 auto; }
+#lieve-builder-app .lieve-context-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--lv-border) transparent; scroll-padding-block: 4px; }
 #lieve-builder-app .lieve-context-title { color: var(--lv-text-2); font: 600 var(--lv-ui-copy)/18px var(--lv-font-ui); }
 #lieve-builder-app .lieve-context-menu button { min-height: var(--lv-ui-compact); color: var(--lv-text-2); font: 400 var(--lv-ui-copy)/18px var(--lv-font-ui); transition: background var(--lv-ui-feedback), color var(--lv-ui-feedback); }
-#lieve-builder-app .lieve-context-menu > button + button { margin-top: 2px; }
+#lieve-builder-app .lieve-context-scroll > button + button { margin-top: 2px; }
+#lieve-builder-app .lieve-context-overflow { flex: 0 0 auto; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--lv-border-soft); }
+#lieve-builder-app .lieve-context-overflow[hidden] { display: none; }
+#lieve-builder-app .lieve-context-menu .lieve-context-scroll-control { justify-content: center; gap: 6px; background: var(--lv-surface-2); }
+#lieve-builder-app .lieve-context-menu .lieve-context-scroll-control:not(:disabled):is(:hover, :focus-visible) { background: var(--lv-gradient-soft); }
+#lieve-builder-app .lieve-context-scroll-control svg { width: 14px; height: 14px; flex: 0 0 14px; color: var(--lv-accent-text); }
+#lieve-builder-app .lieve-context-scroll-control.is-at-end svg { transform: rotate(180deg); }
 #lieve-builder-app .lieve-context-menu button.is-danger { color: var(--lv-danger); }
 #lieve-builder-app .lieve-context-menu button:not(:disabled):is(:hover, :focus-visible) { color: var(--lv-accent-text); }
 #lieve-builder-app .lieve-context-menu button.is-danger:not(:disabled):is(:hover, :focus-visible) { color: var(--lv-danger); background: var(--lv-ui-danger-soft); }

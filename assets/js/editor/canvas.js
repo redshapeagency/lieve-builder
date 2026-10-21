@@ -274,7 +274,7 @@
 			}
 			visual.querySelectorAll( 'style[data-lieve-styles]' ).forEach( ( item ) => item.remove() );
 			window.LieveListings?.mount( visual, true );
-			window.LieveCodePreview?.mount( visual, { select: id => { if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) selectElement( id ); }, resize: () => { updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); } } );
+			window.LieveCodePreview?.mount( visual, { select: id => { lieveContext.closeContextMenu(); if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) selectElement( id ); }, contextMenu: ( id, x, y, origin ) => { if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) { lieveContext.openContextMenu( id, x, y ); lieveContext.contextReturnFocus = origin; } }, resize: () => { updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); } } );
 			revealSelectedPreview();
 			if ( visual.isConnected ) { renderCanvasStyles(); }
 		}

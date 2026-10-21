@@ -151,17 +151,19 @@ Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Anime.js 
 
 ### 1.0.2
 
-- Standardized releases on lieve-builder.zip with mandatory GitHub SHA-256 verification.
-- Hardened native updates, ZIP validation and explicit legacy migration guidance.
+- New: Standardized release packaging on lieve-builder.zip with GitHub SHA-256 verification.
+- Fixed: Rendering delays in the visual editor.
+- Fixed: Canvas scrolling while zoomed inside the builder.
+- Fixed: Replaced GSAP with Anime.js for Lieve Motion, removing the GSAP dependency.
+- Fixed: WordPress updates, package integrity checks and ZIP validation.
 
 ### 1.0.1
 
-- Fixed Custom Code preview initialization and dynamic data context after PHP queries.
-- Improved draft recovery startup and consistent widget card sizing.
-- Replaced the initial Overview with a permission-aware operational dashboard.
-- Added verified GitHub release updates through WordPress.
-- Replaced Motion's engine with locally bundled Anime.js, preserving saved timelines.
+- Fixed: Custom Code preview initialization and dynamic data context after PHP queries.
+- Improved: Draft recovery startup and consistent widget card sizing.
+- Updated: Replaced the initial Overview with a permission-aware operational dashboard.
+- New: Added verified GitHub release updates through WordPress.
 
 ### 1.0.0
 
-- Initial commit.
+- New: Initial commit.

@@ -113,7 +113,7 @@ function lieve_custom_code_dynamic( $source, $language ) {
 	foreach ( $parts as &$part ) {
 		if ( ! preg_match( $pattern, $part ) || preg_match( '~^<(?:script\b|style\b|!--)~i', $part ) ) { continue; }
 		$part = preg_replace_callback( $pattern, $replace, $part );
-		if ( str_starts_with( $part, '<' ) ) { $part = function_exists( 'lieve_safe_html' ) ? lieve_safe_html( $part ) : wp_kses_post( $part ); } // Keep theme-supported inert tags, validating dynamic attributes too.
+		if ( isset( $part[0] ) && '<' === $part[0] ) { $part = function_exists( 'lieve_safe_html' ) ? lieve_safe_html( $part ) : wp_kses_post( $part ); } // Keep theme-supported inert tags, validating dynamic attributes too.
 	}
 	unset( $part ); return implode( '', $parts );
 }
