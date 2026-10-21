@@ -1,4 +1,4 @@
-/* Lieve-owned, versioned animation data. No executable GSAP configuration. */
+/* Lieve-owned, versioned animation data. No executable engine configuration. */
 ( function( root, factory ) {
 	'use strict';
 	if ( typeof module === 'object' && module.exports ) { module.exports = factory( require( '../../inc/builder/motion-catalog.json' ) ); }

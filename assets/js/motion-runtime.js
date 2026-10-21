@@ -1,4 +1,4 @@
-/* GSAP is an adapter: all authored data belongs to Lieve Motion. */
+/* Lieve Motion runtime: validated documents, local animation adapter and scoped lifecycle. */
 ( function( root, factory ) {
 	'use strict';
 	if ( typeof module === 'object' && module.exports ) { module.exports = factory; }
@@ -21,48 +21,44 @@
 		return target ? [ target ] : [];
 	}
 	function compile( { source, row, breakpoints = [], device = null, width = win.innerWidth, preview = false, resume = null, onUpdate = () => {} } ) {
-		if ( ! win.gsap?.context || ! model || Object.keys( model.errors( row ) ).length ) { throw new Error( 'This Motion timeline cannot be played. Check its settings and the GSAP asset.' ); }
+		if ( ! win.LieveMotionEngine?.create || ! model || Object.keys( model.errors( row ) ).length ) { throw new Error( 'This Motion timeline cannot be played. Check its settings and the local animation asset.' ); }
 		if ( ! row.enabled || ! inRange( row, width ) ) { throw new Error( 'This timeline is disabled at the current viewport width.' ); }
-		const isReduced = reduced(); let timeline; let context; let destroyed = false;
+		const isReduced = reduced(); let engine; let destroyed = false;
 		const handles = [];
 		try {
-			context = win.gsap.context( () => {}, source );
-			context.add( () => {
-				timeline = win.gsap.timeline( { paused: true, repeat: row.trigger === 'scroll' ? 0 : row.repeat, yoyo: row.yoyo, onUpdate: () => onUpdate( timeline?.time() || 0, Boolean( timeline?.isActive() ) ), onComplete: () => onUpdate( timeline.duration(), false ), onReverseComplete: () => onUpdate( 0, false ) } );
-				row.steps.forEach( raw => {
-					const step = model.effective( raw, breakpoints, width, device ); const targets = resolve( source, step, preview );
-					if ( ! targets.length ) { throw new Error( 'No element matches the target of “' + ( step.name || 'Animation' ) + '”.' ); }
-					const to = { ...step.to, duration: step.duration, stagger: step.stagger, ease: step.ease, immediateRender: false };
-					if ( Object.keys( step.from ).length ) { timeline.fromTo( targets, { ...step.from }, to, step.start ); }
-					else { timeline.to( targets, to, step.start ); }
-				} );
+			const steps = row.steps.map( raw => {
+				const step = model.effective( raw, breakpoints, width, device ), targets = resolve( source, step, preview );
+				if ( ! targets.length ) { throw new Error( 'No element matches the target of “' + ( step.name || 'Animation' ) + '”.' ); }
+				return { step, targets };
 			} );
-		} catch ( error ) { if ( context ) { context.revert(); } else { timeline?.revert(); } throw error; }
+			engine = win.LieveMotionEngine.create( { row, steps, onUpdate } );
+		} catch ( error ) { engine?.destroy(); throw error; }
 		function command( action ) {
 			if ( destroyed ) { return false; }
-			if ( isReduced ) { if ( row.reduced === 'finish' ) { timeline.totalTime( timeline.duration(), true ).pause(); } return true; }
-			if ( action === 'play' ) { timeline.play(); } else if ( action === 'pause' ) { timeline.pause(); } else if ( action === 'restart' ) { timeline.restart(); } else if ( action === 'reverse' ) { timeline.reverse(); } else if ( action === 'reset' ) { timeline.pause( 0, true ); } else { return false; } return true;
+			if ( ! [ 'play', 'pause', 'restart', 'reverse', 'reset' ].includes( action ) ) { return false; }
+			if ( isReduced ) { if ( row.reduced === 'finish' ) { engine.seek( engine.duration() ); } return true; }
+			return engine.command( action );
 		}
-		function seek( seconds ) { if ( ! destroyed && ! isReduced ) { timeline.pause().time( Math.max( 0, Math.min( timeline.duration(), seconds ) ), true ); onUpdate( timeline.time(), false ); } }
-		function destroy() { if ( destroyed ) { return; } destroyed = true; handles.forEach( fn => fn() ); context.revert(); }
-		if ( ! preview && ! isReduced ) {
-			if ( row.trigger === 'scroll' && win.ScrollTrigger ) {
-				win.gsap.registerPlugin( win.ScrollTrigger );
-				const scroll = win.ScrollTrigger.create( { trigger: source, start: 'top ' + row.scrollStart + '%', end: 'bottom ' + row.scrollEnd + '%', animation: timeline, scrub: true, invalidateOnRefresh: true } ); handles.push( () => scroll.kill() );
-			} else if ( resume?.started ) {
-				timeline.totalTime( Math.min( resume.time, timeline.totalDuration() ), true ).reversed( Boolean( resume.reversed ) ); if ( resume.paused ) { timeline.pause(); } else if ( resume.reversed ) { timeline.reverse(); } else { timeline.play(); }
+		function seek( seconds ) { if ( ! destroyed && ! isReduced ) { engine.seek( seconds ); } }
+		function destroy() { if ( destroyed ) { return; } destroyed = true; handles.forEach( fn => fn() ); engine.destroy(); }
+		try { if ( ! preview && ! isReduced ) {
+			if ( row.trigger === 'scroll' ) {
+				handles.push( engine.scroll( source, row.scrollStart, row.scrollEnd ) );
+			} else if ( resume?.initialized ) {
+				engine.restore( resume );
 			} else if ( row.trigger === 'view' && win.IntersectionObserver ) {
 				const view = new win.IntersectionObserver( entries => { if ( entries.some( item => item.isIntersecting ) ) { command( 'play' ); view.disconnect(); } }, { threshold: .05 } ); view.observe( source ); handles.push( () => view.disconnect() );
 			} else if ( row.trigger !== 'manual' ) { command( 'play' ); }
-		} else if ( ! preview && isReduced && row.reduced === 'finish' ) { command( 'play' ); }
-		return { command, seek, destroy, duration: () => timeline.duration(), reduced: isReduced, timeline };
+		} else if ( ! preview && isReduced && row.reduced === 'finish' ) { command( 'play' ); } }
+		catch ( error ) { destroy(); throw error; }
+		return { command, seek, destroy, duration: engine.duration, time: engine.time, snapshot: engine.snapshot, reduced: isReduced };
 	}
-	function unmount( source ) { mounted.get( source )?.handles.forEach( handle => handle.destroy() ); mounted.delete( source ); }
+	function unmount( source ) { mounted.get( source )?.handles.slice().reverse().forEach( handle => handle.destroy() ); mounted.delete( source ); }
 	function scan( force = false ) {
 		if ( ! active ) { return; }
 		mounted.forEach( ( value, source ) => {
 			if ( ! source.isConnected || force || source.getAttribute( 'data-lieve-motion' ) !== value.signature ) {
-				if ( source.isConnected && source.getAttribute( 'data-lieve-motion' ) === value.signature ) { playback.set( source, { signature: value.signature, states: new Map( value.handles.map( handle => [ handle.id, { time: handle.timeline.totalTime(), paused: handle.timeline.paused(), reversed: handle.timeline.reversed(), started: handle.timeline.totalTime() > 0 || ! handle.timeline.paused() || [ 'manual', 'load' ].includes( handle.trigger ) } ] ) ) } ); }
+				if ( source.isConnected && source.getAttribute( 'data-lieve-motion' ) === value.signature ) { playback.set( source, { signature: value.signature, states: new Map( value.handles.map( handle => [ handle.id, handle.snapshot() ] ) ) } ); }
 				unmount( source );
 			}
 		} );
@@ -80,7 +76,7 @@
 	function control( id, action ) { let found = false; mounted.forEach( entry => entry.handles.forEach( handle => { if ( handle.id === id ) { found = handle.command( action ) || found; } } ) ); if ( ! found ) { throw new Error( 'The Motion timeline is unavailable at this viewport.' ); } return true; }
 	const preference = win.matchMedia?.( '(prefers-reduced-motion: reduce)' );
 	function start() {
-		if ( active || ! model || ! win.gsap ) { return; } active = true;
+		if ( active || ! model || ! win.LieveMotionEngine ) { return; } active = true;
 		if ( document.readyState === 'loading' ) { document.addEventListener( 'DOMContentLoaded', scan, { once: true } ); } else { scan(); }
 		win.addEventListener( 'resize', schedule ); preference?.addEventListener?.( 'change', schedule );
 		if ( win.MutationObserver ) { observer = new win.MutationObserver( schedule ); observer.observe( document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: [ 'data-lieve-motion' ] } ); }

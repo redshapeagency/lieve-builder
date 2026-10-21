@@ -63,7 +63,7 @@ function lieve_motion_errors( $row ) {
 	return $errors;
 }
 
-/** Keep only the public schema: GSAP callbacks, plugins, arbitrary properties and URLs never pass. */
+/** Keep only the public schema: executable callbacks, arbitrary properties and URLs never pass. */
 function lieve_sanitize_motion( $rows ) {
 	if ( ! is_array( $rows ) ) { return array(); }
 	$clean = array(); $keys = array( 'version', 'id', 'name', 'enabled', 'trigger', 'repeat', 'yoyo', 'reduced', 'minWidth', 'maxWidth', 'scrollStart', 'scrollEnd', 'steps' );
@@ -99,11 +99,11 @@ function lieve_validate_document_motion( $document ) {
 }
 
 function lieve_enqueue_motion( $editor = false ) {
-	wp_enqueue_script( 'lieve-gsap', LIEVE_URL . 'assets/vendor/gsap/gsap.min.js', array(), '3.15.0', ! $editor );
-	wp_enqueue_script( 'lieve-gsap-scroll', LIEVE_URL . 'assets/vendor/gsap/ScrollTrigger.min.js', array( 'lieve-gsap' ), '3.15.0', ! $editor );
+	wp_enqueue_script( 'lieve-anime', LIEVE_URL . 'assets/vendor/animejs/anime.umd.min.js', array(), '4.5.0', ! $editor );
+	wp_enqueue_script( 'lieve-motion-engine', LIEVE_URL . 'assets/js/motion-engine.js', array( 'lieve-anime' ), lieve_asset_version( 'assets/js/motion-engine.js' ), ! $editor );
 	wp_enqueue_script( 'lieve-motion-model', LIEVE_URL . 'assets/js/motion-model.js', array(), lieve_asset_version( 'assets/js/motion-model.js' ), ! $editor );
 	wp_localize_script( 'lieve-motion-model', 'LieveMotionCatalog', lieve_motion_catalog() );
-	wp_enqueue_script( 'lieve-motion-runtime', LIEVE_URL . 'assets/js/motion-runtime.js', array( 'lieve-motion-model', 'lieve-gsap-scroll' ), lieve_asset_version( 'assets/js/motion-runtime.js' ), ! $editor );
+	wp_enqueue_script( 'lieve-motion-runtime', LIEVE_URL . 'assets/js/motion-runtime.js', array( 'lieve-motion-model', 'lieve-motion-engine' ), lieve_asset_version( 'assets/js/motion-runtime.js' ), ! $editor );
 }
 
 /** Template duplication remaps Motion and Interact links together with element IDs. */

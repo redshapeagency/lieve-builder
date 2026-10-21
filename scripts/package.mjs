@@ -1,52 +1,118 @@
-/** Deterministic whitelist ZIP. Distribution is blocked without product-specific authorization. */
+/** Deterministic installable ZIP, with one inventory policy and independent verification. */
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const manifest = JSON.parse(fs.readFileSync(path.join(root, 'release/manifest.json')));
-const stylesheet = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
-const header = name => stylesheet.match(new RegExp('^'+name+':\\s*(.+)$','m'))?.[1].trim() || '';
-const version = header('Version');
+const policy = JSON.parse(fs.readFileSync(path.join(root, 'release/manifest.json')));
+const identity = 'https://github.com/redshapeagency/lieve-builder', limit = 104857600;
+const fail = message => { throw Error(message); };
+const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const stable = value => typeof value === 'string' && /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(value);
+const headers = css => Object.fromEntries(['Theme Name','Version','Requires at least','Requires PHP','Update URI','Text Domain','Template'].map(key => [key, css.match(new RegExp('^[ \\t/*#@]*'+key+':[ \\t]*(.*)$','mi'))?.[1].replace(/\s*\*\/.*/, '').trim() || '']));
+const theme = headers(fs.readFileSync(path.join(root, 'style.css'), 'utf8')), version = theme.Version;
+const runtimeVersion = bytes => bytes.toString().match(/define\s*\(\s*['"]LIEVE_VERSION['"]\s*,\s*['"]([^'"]+)['"]\s*\)/)?.[1];
+if (policy.theme !== 'lieve-builder' || !stable(version) || theme['Theme Name'] !== 'Lieve Builder' || theme['Update URI'] !== identity || theme['Text Domain'] !== policy.theme || theme.Template || runtimeVersion(fs.readFileSync(path.join(root, 'functions.php'))) !== version) fail('Invalid theme identity or inconsistent runtime/stylesheet version.');
+for (const key of ['Requires at least','Requires PHP']) if (!/^\d+(?:\.\d+){1,3}$/.test(theme[key])) fail('Invalid release requirements.');
+const readme=fs.readFileSync(path.join(root,'readme.txt'),'utf8');
+if (readme.match(/^Stable tag: (.+)$/m)?.[1].trim() !== version) fail('WordPress readme version differs from the theme.');
+for (const key of ['Requires at least','Requires PHP']) if (readme.match(new RegExp('^'+key+': (.+)$','m'))?.[1].trim() !== theme[key]) fail('WordPress readme requirements differ from the theme.');
+for (const file of ['package.json','package-lock.json']) if (fs.existsSync(path.join(root,file)) && JSON.parse(fs.readFileSync(path.join(root,file),'utf8')).version !== version) fail('Development package metadata differs from the theme version.');
 const tagIndex = process.argv.indexOf('--tag');
-if (tagIndex !== -1 && ![version, 'v'+version].includes(process.argv[tagIndex+1])) throw Error('Release tag must match the theme version.');
-if (header('Update URI') !== 'https://github.com/redshapeagency/lieve-builder') throw Error('Unexpected theme update identity.');
-if (fs.readFileSync(path.join(root,'functions.php'),'utf8').match(/define\( 'LIEVE_VERSION', '([^']+)' \)/)?.[1] !== version) throw Error('Runtime and stylesheet versions differ.');
-if (!/^[a-z0-9-]+$/.test(manifest.theme) || !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(version)) throw Error('Invalid theme slug or release version.');
-const files = [...manifest.files];
-function collect(dir) {
-  for (const item of fs.readdirSync(path.join(root, dir), {withFileTypes:true})) {
-    if (item.name.startsWith('.')) continue;
-    const name = dir + '/' + item.name;
-    if (item.isSymbolicLink()) throw Error('Symlinks cannot enter a release: ' + name);
-    if (item.isDirectory()) collect(name);
-    else if (manifest.extensions.includes(path.extname(item.name).toLowerCase())) files.push(name);
-    else throw Error('Unlisted asset type: ' + name);
+if (tagIndex !== -1 && ![version, 'v'+version].includes(process.argv[tagIndex+1])) fail('Release tag must match the theme version.');
+for (const key of ['files','directories','extensions','excludedNames','excludedSuffixes']) if (!Array.isArray(policy[key]) || !policy[key].length || !policy[key].every(value => typeof value === 'string' && value)) fail('Invalid release inventory policy: '+key);
+const excluded = name => name.startsWith('.') || policy.excludedNames.includes(name.toLowerCase()) || policy.excludedSuffixes.some(suffix => name.toLowerCase().endsWith(suffix));
+const safe = file => typeof file === 'string' && file.length <= 1024 && !/[\x00-\x1f\x7f\\:]/.test(file) && file.split('/').every(part => part && part !== '..' && !excluded(part));
+const sources = new Map();
+let directoryCount=1;
+function collect(file, directory = false, depth = 0) {
+  if (!safe(file) || depth > 20) fail('Unsafe release path: '+file);
+  const stat = fs.lstatSync(path.join(root, file));
+  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile())) fail('Missing, linked or invalid release path: '+file);
+  if (directory) {
+    if (++directoryCount > 5000) fail('Release exceeds the directory limit.');
+    for (const item of fs.readdirSync(path.join(root, file)).sort()) {
+      if (excluded(item)) continue;
+      const child = file+'/'+item, info = fs.lstatSync(path.join(root, child));
+      collect(child, info.isDirectory(), depth+1);
+    }
+  } else {
+    if (!policy.extensions.includes(path.extname(file).toLowerCase()) || sources.has(file)) fail('Unlisted or duplicate release file: '+file);
+    if (stat.size > limit || sources.size >= 5000) fail('Release exceeds size/file limits.');
+    sources.set(file, fs.readFileSync(path.join(root, file)));
   }
 }
-manifest.directories.forEach(collect); files.sort();
-for (const file of files) { if (path.isAbsolute(file) || file.split(/[\\/]/).includes('..') || !fs.lstatSync(path.join(root,file)).isFile()) throw Error('Missing or unsafe release file: ' + file); }
-const inventory = files.map(file=>({file,sha256:crypto.createHash('sha256').update(fs.readFileSync(path.join(root,file))).digest('hex')}));
-if (process.argv.includes('--check')) { console.log(JSON.stringify({version,files:files.length,bytes:files.reduce((n,file)=>n+fs.statSync(path.join(root,file)).size,0),distribution:'blocked until product-specific GSAP authorization is reviewed'},null,2)); process.exit(0); }
-const development = process.argv.includes('--development');
-if (!development) {
-  const evidencePath = process.env.LIEVE_GSAP_AUTHORIZATION;
-  if (!evidencePath || !fs.existsSync(evidencePath)) throw Error('DISTRIBUTION BLOCKED: reviewed, product-specific GSAP authorization is required. Local development remains available.');
-  const evidence = JSON.parse(fs.readFileSync(evidencePath,'utf8'));
-  if (evidence.product !== 'Lieve Builder' || evidence.engine !== 'GSAP' || evidence.approved !== true || !evidence.reference || !evidence.reviewedBy || !/^\d{4}-\d{2}-\d{2}$/.test(evidence.reviewedAt || '')) throw Error('DISTRIBUTION BLOCKED: incomplete authorization review record.');
-}
-// ZIP32, stable paths/order/timestamps/permissions; no workstation metadata.
+policy.files.forEach(file => collect(file)); policy.directories.forEach(file => collect(file, true, 1));
+const files = [...sources.keys()].sort(), bytes = [...sources.values()].reduce((n, data) => n+data.length, 0);
+if (bytes > limit || files.some(file => /(?:^|\/)(?:gsap|ScrollTrigger)(?:[./-]|$)/i.test(file))) fail('Release contains an unsupported dependency or exceeds the size limit.');
+for (const required of ['style.css','functions.php','inc/bootstrap.php','assets/vendor/animejs/LICENSE.md','assets/vendor/animejs/NOTICE.md']) if (!sources.has(required)) fail('Missing required runtime file or dependency notice: '+required);
+if (process.argv.includes('--check')) { console.log(JSON.stringify({version,files:files.length,bytes,distribution:'requires release acceptance; Anime.js MIT notices included'},null,2)); process.exit(0); }
+
 const crc32 = buffer => { let crc=0xffffffff; for(const byte of buffer){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);} return (crc^0xffffffff)>>>0; };
-const entries = files.map(file=>({name:manifest.theme+'/'+file,data:fs.readFileSync(path.join(root,file))}));
-if (development) entries.push({name:manifest.theme+'/DEVELOPMENT-ONLY.txt',data:Buffer.from('LOCAL DEVELOPMENT ONLY. NOT CLEARED FOR DISTRIBUTION. GSAP product-specific authorization and release acceptance gates are pending.\n')});
-const chunks=[],central=[];let offset=0;
-for(const entry of entries){
-  const name=Buffer.from(entry.name),data=zlib.deflateRawSync(entry.data,{level:9}),crc=crc32(entry.data);
-  const header=Buffer.alloc(30);header.writeUInt32LE(0x04034b50);header.writeUInt16LE(20,4);header.writeUInt16LE(0x800,6);header.writeUInt16LE(8,8);header.writeUInt16LE(33,12);header.writeUInt32LE(crc,14);header.writeUInt32LE(data.length,18);header.writeUInt32LE(entry.data.length,22);header.writeUInt16LE(name.length,26);
-  chunks.push(header,name,data);
-  const directory=Buffer.alloc(46);directory.writeUInt32LE(0x02014b50);directory.writeUInt16LE(0x314,4);directory.writeUInt16LE(20,6);directory.writeUInt16LE(0x800,8);directory.writeUInt16LE(8,10);directory.writeUInt16LE(33,14);directory.writeUInt32LE(crc,16);directory.writeUInt32LE(data.length,20);directory.writeUInt32LE(entry.data.length,24);directory.writeUInt16LE(name.length,28);directory.writeUInt32LE(0x81a40000,38);directory.writeUInt32LE(offset,42);central.push(directory,name);offset+=header.length+name.length+data.length;
+/** Parse central AND local records; reject extra roots, duplicate paths and trailing data. */
+function verify(archive, metadata, filename) {
+  if (filename !== policy.theme+'-'+version+(metadata.development?'-DEVELOPMENT-DO-NOT-DISTRIBUTE':'')+'.zip') fail('Noncanonical package filename.');
+  if (archive.length < 22 || archive.length > limit || metadata.schema !== 2 || metadata.theme !== policy.theme || metadata.version !== version || typeof metadata.development !== 'boolean' || metadata.package !== filename || metadata.size !== archive.length || metadata.sha256 !== hash(archive) || metadata.update_uri !== identity || metadata.requires !== theme['Requires at least'] || metadata.requires_php !== theme['Requires PHP']) fail('Package manifest identity, requirements, size or SHA-256 mismatch.');
+  const expected = new Map(files.map(file => [file, sources.get(file)]));
+  if (metadata.development) expected.set('DEVELOPMENT-ONLY.txt', Buffer.from('LOCAL DEVELOPMENT ONLY. NOT CLEARED FOR DISTRIBUTION. Release acceptance gates are pending.\n'));
+  if (!Array.isArray(metadata.files) || metadata.files.length !== expected.size) fail('Invalid release inventory.');
+  const inventory = new Map();
+  for (const item of metadata.files) {
+    if (!item || !safe(item.file) || inventory.has(item.file) || !expected.has(item.file) || item.sha256 !== hash(expected.get(item.file)) || item.size !== expected.get(item.file).length) fail('Manifest inventory differs from the checked-out source.');
+    inventory.set(item.file, item);
+  }
+  const end = archive.length-22;
+  if (archive.readUInt32LE(end) !== 0x06054b50 || archive.readUInt16LE(end+4) || archive.readUInt16LE(end+6) || archive.readUInt16LE(end+20)) fail('Invalid ZIP end record.');
+  const count = archive.readUInt16LE(end+10), start = archive.readUInt32LE(end+16), length = archive.readUInt32LE(end+12);
+  if (count !== expected.size || archive.readUInt16LE(end+8) !== count || start+length !== end) fail('Invalid ZIP central directory.');
+  let cursor=start, local=0; const seen = new Set();
+  for (let i=0;i<count;i++) {
+    if (cursor+46 > end || archive.readUInt32LE(cursor) !== 0x02014b50) fail('Invalid ZIP directory entry.');
+    const nameLength=archive.readUInt16LE(cursor+28), name=archive.subarray(cursor+46,cursor+46+nameLength).toString('utf8');
+    const size=archive.readUInt32LE(cursor+20), expanded=archive.readUInt32LE(cursor+24), crc=archive.readUInt32LE(cursor+16), offset=archive.readUInt32LE(cursor+42);
+    const file=name.slice(policy.theme.length+1), item=inventory.get(file);
+    if (!name.startsWith(policy.theme+'/') || !item || seen.has(file) || archive.readUInt16LE(cursor+8) !== 0x800 || archive.readUInt16LE(cursor+10) !== 8 || archive.readUInt16LE(cursor+30) || archive.readUInt16LE(cursor+32) || archive.readUInt16LE(cursor+34) || archive.readUInt32LE(cursor+38) !== 0x81a40000 || expanded !== item.size || offset !== local || local+30+nameLength+size > start) fail('Unsafe ZIP path, metadata or file bounds.');
+    if (archive.readUInt32LE(local) !== 0x04034b50 || archive.readUInt16LE(local+6) !== 0x800 || archive.readUInt16LE(local+8) !== 8 || archive.readUInt32LE(local+14) !== crc || archive.readUInt32LE(local+18) !== size || archive.readUInt32LE(local+22) !== expanded || archive.readUInt16LE(local+26) !== nameLength || archive.readUInt16LE(local+28) || archive.subarray(local+30,local+30+nameLength).toString('utf8') !== name) fail('ZIP local/central records disagree.');
+    const content=zlib.inflateRawSync(archive.subarray(local+30+nameLength,local+30+nameLength+size),{maxOutputLength:Math.max(1,expanded)});
+    if (content.length !== expanded || crc32(content) !== crc || hash(content) !== item.sha256) fail('ZIP content failed CRC/SHA-256 verification.');
+    seen.add(file); cursor+=46+nameLength; local+=30+nameLength+size;
+  }
+  if (cursor !== end || local !== start) fail('ZIP has unaccounted records.');
+}
+const verifyIndex=process.argv.indexOf('--verify');
+if (verifyIndex !== -1) {
+  const target=process.argv[verifyIndex+1]; if (!target) fail('Supply a ZIP to --verify.');
+  verify(fs.readFileSync(target),JSON.parse(fs.readFileSync(target+'.manifest.json','utf8')),path.basename(target));
+  console.log('Verified ZIP, root, headers, inventory, CRC and SHA-256.'); process.exit(0);
+}
+const development=process.argv.includes('--development');
+if (!development && process.env.LIEVE_RELEASE_ACCEPTED !== 'true') fail('DISTRIBUTION BLOCKED: release acceptance is not confirmed. Complete native, browser and target-host checks before setting LIEVE_RELEASE_ACCEPTED=true.');
+const entries=files.map(file=>({file,data:sources.get(file)}));
+if (development) entries.push({file:'DEVELOPMENT-ONLY.txt',data:Buffer.from('LOCAL DEVELOPMENT ONLY. NOT CLEARED FOR DISTRIBUTION. Release acceptance gates are pending.\n')});
+const chunks=[],central=[]; let offset=0;
+for (const entry of entries) {
+  const name=Buffer.from(policy.theme+'/'+entry.file),data=zlib.deflateRawSync(entry.data,{level:9}),crc=crc32(entry.data);
+  const local=Buffer.alloc(30);local.writeUInt32LE(0x04034b50);local.writeUInt16LE(20,4);local.writeUInt16LE(0x800,6);local.writeUInt16LE(8,8);local.writeUInt16LE(33,12);local.writeUInt32LE(crc,14);local.writeUInt32LE(data.length,18);local.writeUInt32LE(entry.data.length,22);local.writeUInt16LE(name.length,26);
+  chunks.push(local,name,data);
+  const directory=Buffer.alloc(46);directory.writeUInt32LE(0x02014b50);directory.writeUInt16LE(0x314,4);directory.writeUInt16LE(20,6);directory.writeUInt16LE(0x800,8);directory.writeUInt16LE(8,10);directory.writeUInt16LE(33,14);directory.writeUInt32LE(crc,16);directory.writeUInt32LE(data.length,20);directory.writeUInt32LE(entry.data.length,24);directory.writeUInt16LE(name.length,28);directory.writeUInt32LE(0x81a40000,38);directory.writeUInt32LE(offset,42);central.push(directory,name);offset+=local.length+name.length+data.length;
 }
 const centralData=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50);end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(centralData.length,12);end.writeUInt32LE(offset,16);
-const target=path.resolve(process.env.LIEVE_PACKAGE_DIR || '/tmp',manifest.theme+'-'+version+(development?'-DEVELOPMENT-DO-NOT-DISTRIBUTE':'')+'.zip');
-const archive=Buffer.concat([...chunks,centralData,end]);fs.writeFileSync(target,archive);fs.writeFileSync(target+'.manifest.json',JSON.stringify({theme:manifest.theme,version,development,requires:header('Requires at least'),requires_php:header('Requires PHP'),update_uri:header('Update URI'),sha256:crypto.createHash('sha256').update(archive).digest('hex'),files:inventory},null,2)+'\n');console.log(target);
+const filename=policy.theme+'-'+version+(development?'-DEVELOPMENT-DO-NOT-DISTRIBUTE':'')+'.zip';
+const archive=Buffer.concat([...chunks,centralData,end]);
+const metadata={schema:2,theme:policy.theme,version,development,package:filename,size:archive.length,requires:theme['Requires at least'],requires_php:theme['Requires PHP'],update_uri:identity,sha256:hash(archive),files:entries.map(entry=>({file:entry.file,sha256:hash(entry.data),size:entry.data.length}))};
+verify(archive,metadata,filename);
+const output=path.resolve(process.env.LIEVE_PACKAGE_DIR || '/tmp');fs.mkdirSync(output,{recursive:true});
+const target=path.join(output,filename),sidecar=Buffer.from(JSON.stringify(metadata,null,2)+'\n');
+// Never replace a different artifact pair, even when rerunning a job for the same tag.
+if (fs.existsSync(target) || fs.existsSync(target+'.manifest.json')) {
+  if (!fs.existsSync(target) || !fs.existsSync(target+'.manifest.json') || !archive.equals(fs.readFileSync(target)) || !sidecar.equals(fs.readFileSync(target+'.manifest.json'))) fail('Conflicting or incomplete existing package; use a clean output directory.');
+} else {
+  const stage=fs.mkdtempSync(path.join(output,'.lieve-package-')); let moved=false;
+  try {
+    fs.writeFileSync(path.join(stage,filename),archive,{flag:'wx'});fs.writeFileSync(path.join(stage,filename+'.manifest.json'),sidecar,{flag:'wx'});
+    fs.linkSync(path.join(stage,filename),target);moved=true;fs.linkSync(path.join(stage,filename+'.manifest.json'),target+'.manifest.json');
+  } catch (error) { if (moved) fs.unlinkSync(target); throw error; }
+  finally { fs.rmSync(stage,{recursive:true,force:true}); }
+}
+console.log(target);

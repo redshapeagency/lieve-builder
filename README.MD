@@ -11,7 +11,7 @@ A lightweight WordPress theme by TheOneWP with an integrated visual builder for 
 [Quick start](#quick-start) · [Builder](#the-builder) · [Templates](#templates-and-components) · [Libraries](#global-libraries) · [Settings](#settings) · [Licensing](#release-scope-and-licensing)
 
 > [!IMPORTANT]
-> Use a test site and keep backups before activation or updates. Distribution remains blocked pending the product-specific GSAP authorization review and release acceptance checks.
+> Use a test site and keep backups before activation or updates. Public distribution requires release acceptance checks.
 
 ## Quick start
 
@@ -137,15 +137,15 @@ Changes invalidate snapshots; regeneration uses WP-Cron. Configure real schedule
 
 Install the updater-enabled version manually once. While Lieve or a child theme is active, WordPress checks stable releases from [redshapeagency/lieve-builder](https://github.com/redshapeagency/lieve-builder). **Settings → System → Check for updates** refreshes the check without installing anything.
 
-Updates require attached `lieve-builder-VERSION.zip` and `.zip.manifest.json` assets, compatible WordPress/PHP versions and a matching SHA-256. Source-code archives and prereleases are excluded. The included GitHub workflow prepares assets only after distribution authorization and release acceptance. Back up before updating; theme-file customizations are replaced.
+Updates require attached `lieve-builder-VERSION.zip` and `.zip.manifest.json` assets, compatible WordPress/PHP versions and verified ZIP/file hashes. Keep the parent folder named `lieve-builder`. Source archives and prereleases are excluded. The workflow requires release acceptance. Back up before updating; theme-file customizations are replaced.
 
 ## Release scope and licensing
 
-Cross-browser/device checks, checkout/payment flows, integrations and production-host delivery need acceptance testing. Automated checks do not certify product readiness. Motion provides timelines and ScrollTrigger playback, not the complete GSAP plugin suite.
+Cross-browser/device checks, checkout/payment flows, integrations and production-host delivery need acceptance testing. Automated checks do not certify product readiness. Motion uses locally bundled Anime.js for timelines, scroll-linked playback and Interact controls. Existing saved timelines retain their identifiers and easing choices.
 
-Development tests and release tooling belong to the development source, not the installable theme. Public distribution remains blocked until the GSAP authorization review and release checks are completed.
+Development tests and release tooling belong to the development source, not the installable theme. Public packaging requires explicit release acceptance.
 
-Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Bundled GSAP assets are separately licensed; see the [GSAP notice](assets/vendor/gsap/NOTICE.md). The theme license does not authorize their redistribution in this product.
+Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Anime.js is MIT-licensed; its [notice](assets/vendor/animejs/NOTICE.md) and [license](assets/vendor/animejs/LICENSE.md) are included. GSAP is not bundled; custom JavaScript calling its API must be rewritten.
 
 ## Changelog
 
@@ -155,6 +155,7 @@ Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Bundled G
 - Improved draft recovery startup and consistent widget card sizing.
 - Replaced the initial Overview with a permission-aware operational dashboard.
 - Added verified GitHub release updates through WordPress.
+- Replaced Motion's engine with locally bundled Anime.js, preserving saved timelines.
 
 ### 1.0.0
 

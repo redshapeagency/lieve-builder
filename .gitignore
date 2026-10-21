@@ -25,7 +25,7 @@
 # Theme preview shown in Appearance > Themes.
 !/screenshot.webp
 
-# Runtime code, template parts and bundled assets, including assets/vendor/gsap.
+# Runtime code, template parts and bundled assets, including assets/vendor/animejs.
 !/inc/
 !/assets/
 !/template-parts/
@@ -44,6 +44,7 @@
 !/scripts/
 /scripts/*
 !/scripts/package.mjs
+!/scripts/release-assets.mjs
 !/release/
 /release/*
 !/release/manifest.json

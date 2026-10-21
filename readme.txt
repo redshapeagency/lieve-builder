@@ -25,7 +25,7 @@ Main features:
 * Private draft previews, recovery copies and WordPress Revisions.
 * Optional Static Delivery snapshots with verified server routing.
 
-Use a test site and keep backups. Public distribution remains blocked pending product-specific GSAP authorization and release acceptance checks.
+Use a test site and keep backups. Public distribution requires release acceptance checks.
 
 See README.MD for usage, defaults and limitations.
 
@@ -66,11 +66,11 @@ No. Output page metadata starts off. Lieve defers output to recognized active SE
 
 = How do GitHub updates work? =
 
-Install the updater-enabled version manually once. WordPress then checks stable GitHub releases with attached installable ZIP and verification manifest. Settings > System offers Check for updates. Back up before updating.
+Install the updater-enabled version manually once in lieve-builder. While Lieve or its child theme is active, WordPress checks stable releases with verified ZIP and manifest. Settings > System offers Check for updates. Back up first.
 
 == License and Third-Party Assets ==
 
-Lieve's original code is GPLv2 or later; see LICENSE.txt. Bundled GSAP assets have a separate license and distribution gate; see assets/vendor/gsap/NOTICE.md. The theme license does not authorize their redistribution in this product.
+Lieve's original code is GPLv2 or later; see LICENSE.txt. Motion uses locally bundled Anime.js under MIT; see assets/vendor/animejs/NOTICE.md and LICENSE.md in that directory. No GSAP runtime assets are bundled.
 
 == Changelog ==
 
@@ -79,6 +79,7 @@ Lieve's original code is GPLv2 or later; see LICENSE.txt. Bundled GSAP assets ha
 * Improved draft recovery startup and consistent widget card sizing.
 * Replaced the initial Overview with a permission-aware operational dashboard.
 * Added verified GitHub release updates through WordPress.
+* Replaced Motion's engine with locally bundled Anime.js, preserving saved timelines.
 
 = 1.0.0 =
 * Initial commit.
