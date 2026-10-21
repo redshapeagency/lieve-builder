@@ -51,6 +51,26 @@
 	document.addEventListener( 'auxclick', preventLinkNavigation, true );
 	document.addEventListener( 'pointerdown', () => send( 'select' ), true );
 	document.addEventListener( 'focusin', () => send( 'select' ) );
+	// This opaque-origin frame is portaled outside the canvas, so native wheel
+	// chaining cannot reach it. Keep local scrollers native; bridge their edges.
+	document.addEventListener( 'wheel', event => {
+		if ( event.defaultPrevented || event.ctrlKey || event.metaKey || event.cancelable === false ) return;
+		let dx = event.deltaX, dy = event.deltaY;
+		if ( event.shiftKey && ! dx ) { dx = dy; dy = 0; }
+		for ( let node = event.target?.nodeType === 3 ? event.target.parentElement : event.target; node; node = node.parentElement || node.getRootNode?.().host ) {
+			if ( node.nodeType !== 1 ) continue;
+			const css = window.getComputedStyle( node );
+			const canScroll = ( horizontal, delta ) => {
+				if ( ! delta || ! /^(auto|scroll|overlay)$/.test( horizontal ? css.overflowX : css.overflowY ) ) return false;
+				const extent = ( horizontal ? node.scrollWidth - node.clientWidth : node.scrollHeight - node.clientHeight );
+				const position = horizontal ? node.scrollLeft : node.scrollTop;
+				return extent > 0 && ( horizontal && css.direction === 'rtl' ? delta < 0 ? position > -extent : position < 0 : delta < 0 ? position > 0 : position < extent );
+			};
+			if ( canScroll( true, dx ) || canScroll( false, dy ) ) return;
+		}
+		event.preventDefault();
+		send( 'wheel', { deltaX: event.deltaX, deltaY: event.deltaY, deltaMode: event.deltaMode, shiftKey: event.shiftKey } );
+	}, { passive: false } );
 	window.addEventListener( 'error', event => send( 'error', { message: String( event.message || 'JavaScript preview error.' ).slice( 0, 240 ) } ) );
 	window.addEventListener( 'unhandledrejection', () => send( 'error', { message: 'An asynchronous script failed in this preview.' } ) );
 } )();

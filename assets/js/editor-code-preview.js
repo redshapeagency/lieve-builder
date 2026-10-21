@@ -87,6 +87,7 @@
 					}
 				}
 				if ( data.type === 'select' && record.shown ) record.select?.( frame.dataset.lieveCodeNode );
+				if ( data.type === 'wheel' && record.shown && ! layer.hidden ) { window.LieveViewport?.scrollFrom( owner, data, frame ); }
 				if ( data.type === 'error' ) {
 					record.initializationError = null; reportError( frame, record, data.message );
 				}

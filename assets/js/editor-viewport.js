@@ -1,6 +1,19 @@
 /* A real, same-origin viewport. Authored markup cannot execute scripts here. */
 ( function () {
 	'use strict';
+	const scrollers = new WeakMap();
+	function consumeScroll( element, delta, horizontal, scale = 1 ) {
+		if ( ! element || ! delta ) { return delta; }
+		const key = horizontal ? 'scrollLeft' : 'scrollTop';
+		const extent = Math.max( 0, ( element[ horizontal ? 'scrollWidth' : 'scrollHeight' ] || 0 ) - ( element[ horizontal ? 'clientWidth' : 'clientHeight' ] || 0 ) );
+		if ( ! extent ) { return delta; }
+		const rtl = horizontal && element.ownerDocument?.defaultView?.getComputedStyle( element ).direction === 'rtl';
+		const before = element[ key ] || 0, next = Math.max( rtl ? -extent : 0, Math.min( rtl ? 0 : extent, before + delta / scale ) );
+		if ( next === before ) { return delta; }
+		if ( typeof element.scrollTo === 'function' ) { element.scrollTo( { left: horizontal ? next : element.scrollLeft, top: horizontal ? element.scrollTop : next, behavior: 'instant' } ); }
+		else { element[ key ] = next; }
+		return delta - ( element[ key ] - before ) * scale;
+	}
 	function canInlineCss( css ) {
 		if ( /@import\b/i.test( css ) ) { return false; }
 		for ( const match of css.matchAll( /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*\)/gi ) ) {
@@ -62,15 +75,44 @@
 		frame.contentWindow?.addEventListener( 'blur', away ); frame.contentWindow?.addEventListener( 'focus', returned );
 		document.addEventListener?.( 'visibilitychange', () => { if ( document.visibilityState === 'hidden' ) { wasAway = true; } else { returned(); } } );
 		let width = Number.isInteger( initialWidth ) && initialWidth >= 240 && initialWidth <= 7680 ? initialWidth : 1279; let scale = 1; let zoom = 'fit';
+		function scroll( input, target = canvas ) {
+			if ( ! input || input.defaultPrevented || input.ctrlKey || input.metaKey ) { return false; }
+			const mode = input.deltaMode ?? 0, x = input.deltaX ?? 0, y = input.deltaY ?? 0;
+			if ( ! [ 0, 1, 2 ].includes( mode ) || ! Number.isFinite( x ) || ! Number.isFinite( y ) ) { return false; }
+			const unit = mode === 1 ? 16 : mode === 2 ? stage.clientHeight : 1;
+			let dx = Math.max( -10000, Math.min( 10000, x * unit ) ), dy = Math.max( -10000, Math.min( 10000, y * unit ) );
+			if ( input.shiftKey && ! dx ) { dx = dy; dy = 0; }
+			const initialX = dx, initialY = dy, root = doc.scrollingElement || doc.documentElement;
+			// Preserve nested scrolling, then hand the remaining movement through
+			// the canvas viewport and its parent stage instead of trapping the wheel.
+			for ( let node = target?.nodeType === 3 ? target.parentElement : target; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement || node.getRootNode?.().host ) {
+				const css = doc.defaultView?.getComputedStyle( node ) || window.getComputedStyle( node );
+				if ( /^(auto|scroll|overlay)$/.test( css.overflowX ) ) { dx = consumeScroll( node, dx, true, scale ); }
+				if ( /^(auto|scroll|overlay)$/.test( css.overflowY ) ) { dy = consumeScroll( node, dy, false, scale ); }
+				if ( ! dx && ! dy ) { break; }
+			}
+			const route = ( delta, horizontal ) => {
+				if ( delta < 0 ) { delta = consumeScroll( root, delta, horizontal, scale ); }
+				delta = consumeScroll( stage, delta, horizontal );
+				return delta > 0 ? consumeScroll( root, delta, horizontal, scale ) : delta;
+			};
+			dx = route( dx, true ); dy = route( dy, false );
+			return dx !== initialX || dy !== initialY;
+		}
+		scrollers.set( doc, scroll );
+		doc.addEventListener?.( 'wheel', event => { if ( event.cancelable !== false && scroll( event, event.target ) ) { event.preventDefault(); } }, { passive: false } );
 		function layout() {
 			const padding = window.getComputedStyle( stage );
 			const available = Math.max( 1, stage.clientWidth - parseFloat( padding.paddingLeft || 0 ) - parseFloat( padding.paddingRight || 0 ) );
 			const height = Math.max( 240, stage.clientHeight - parseFloat( padding.paddingTop || 0 ) - parseFloat( padding.paddingBottom || 0 ) );
 			const fitScale = Math.min( 1, available / width ); scale = zoom === 'fit' ? fitScale : Number( zoom ) / 100;
+			// Zoom scales both axes of the same viewport. Cancelling scale out of
+			// its height makes an enlarged canvas impossible to pan vertically.
+			const viewportHeight = Math.round( height / fitScale );
 			// Canvas hints stay screen-sized; authored content still uses the real viewport/zoom.
 			doc.documentElement.style.setProperty( '--lv-canvas-ui-scale', String( 1 / scale ) );
-			host.style.width = width * scale + 'px'; host.style.height = height + 'px';
-			frame.style.width = width + 'px'; frame.style.height = Math.round( height / scale ) + 'px';
+			host.style.width = width * scale + 'px'; host.style.height = ( zoom === 'fit' ? height : viewportHeight * scale ) + 'px';
+			frame.style.width = width + 'px'; frame.style.height = viewportHeight + 'px';
 			frame.style.transform = 'scale(' + scale + ')';
 			if ( zoomSelect ) { const fitOption = zoomSelect.querySelector( '[value="fit"]' ); if ( fitOption ) { fitOption.textContent = 'Fit · ' + Math.max( 1, Math.round( fitScale * 100 ) ) + '%'; } zoomSelect.value = zoom; }
 			frame.dataset.zoomMode = zoom; frame.dataset.viewportWidth = String( width ); frame.dataset.previewScale = String( scale ); zoomListeners.forEach( listener => listener() ); onResize();
@@ -112,5 +154,5 @@
 			},
 		};
 	}
-	window.LieveViewport = { create, loadedCss };
+	window.LieveViewport = { create, loadedCss, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
 }() );

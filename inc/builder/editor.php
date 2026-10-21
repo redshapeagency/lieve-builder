@@ -555,7 +555,7 @@ function lieve_render_editor_page() {
 					<span id="lieve-viewport-label" class="lieve-viewport-label"><?php esc_html_e( 'Responsive preview', 'lieve-builder' ); ?></span>
 					<button type="button" class="lieve-drawer-toggle" data-toggle-drawer="properties" aria-expanded="false"><?php esc_html_e( 'Properties', 'lieve-builder' ); ?></button>
 				</div>
-				<div class="lieve-stage-scroll" data-viewport-pending aria-busy="true">
+				<div class="lieve-stage-scroll" data-viewport-pending aria-busy="true" tabindex="0" role="region" aria-label="<?php esc_attr_e( 'Canvas workspace', 'lieve-builder' ); ?>">
 					<div id="lieve-canvas" class="lieve-canvas is-desktop" aria-label="<?php esc_attr_e( 'Composition Area', 'lieve-builder' ); ?>"></div>
 				</div>
 			</main>

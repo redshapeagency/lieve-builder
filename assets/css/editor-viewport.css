@@ -1,4 +1,6 @@
 /* Parent chrome: fit large viewports visually without changing their CSS pixels. */
+.lieve-stage-scroll { min-width: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-color: var(--lv-border) transparent; }
+.lieve-stage-scroll:focus-visible { outline: 1px solid var(--lv-violet); outline-offset: -2px; }
 /* Reserve geometry, but never paint the raw placeholder or incomplete zoom UI. */
 .lieve-stage-scroll[data-viewport-pending] > *, .lieve-editor-zoom-control[data-viewport-pending] { visibility: hidden; }
 .lieve-viewport-host { position: relative; flex-shrink: 0; margin-inline: auto; background: #fff; border-radius: 2px; box-shadow: 0 2px 12px rgba(16,24,40,.07); overflow: hidden; }
