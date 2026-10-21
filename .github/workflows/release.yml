@@ -48,13 +48,15 @@ jobs:
           NODE
       - name: Validate identity, tag and package inventory
         run: node scripts/package.mjs --check --tag "$RELEASE_TAG"
-      - name: Build installable ZIP and SHA-256 manifest
-        run: node scripts/package.mjs --tag "$RELEASE_TAG"
-      - name: Independently verify archive and sidecar before upload
+      - name: Explain legacy updater migration
         run: |
-          VERSION="${RELEASE_TAG#v}"
-          node scripts/package.mjs --verify "$LIEVE_PACKAGE_DIR/lieve-builder-$VERSION.zip" --tag "$RELEASE_TAG"
-          unzip -t "$LIEVE_PACKAGE_DIR/lieve-builder-$VERSION.zip"
+          echo '::warning::Legacy updaters expecting versioned ZIPs and sidecars require a one-time manual installation. No legacy assets will be published. Add the documented migration notice to existing release notes.'
+      - name: Build the single installable asset
+        run: node scripts/package.mjs --tag "$RELEASE_TAG"
+      - name: Independently verify the single archive before upload
+        run: |
+          node scripts/package.mjs --verify "$LIEVE_PACKAGE_DIR/lieve-builder.zip" --tag "$RELEASE_TAG"
+          unzip -t "$LIEVE_PACKAGE_DIR/lieve-builder.zip"
       - name: Attach assets (never overwrite published assets)
         env:
           GH_TOKEN: ${{ github.token }}

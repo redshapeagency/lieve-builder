@@ -135,9 +135,9 @@ Changes invalidate snapshots; regeneration uses WP-Cron. Configure real schedule
 
 ## GitHub updates
 
-Install the updater-enabled version manually once. While Lieve or a child theme is active, WordPress checks stable releases from [redshapeagency/lieve-builder](https://github.com/redshapeagency/lieve-builder). **Settings → System → Check for updates** refreshes the check without installing anything.
+While Lieve or its child theme is active, WordPress checks stable releases from [redshapeagency/lieve-builder](https://github.com/redshapeagency/lieve-builder). **Settings → System → Check for updates** refreshes detection without installing.
 
-Updates require attached `lieve-builder-VERSION.zip` and `.zip.manifest.json` assets, compatible WordPress/PHP versions and verified ZIP/file hashes. Keep the parent folder named `lieve-builder`. Source archives and prereleases are excluded. The workflow requires release acceptance. Back up before updating; theme-file customizations are replaced.
+Releases attach only `lieve-builder.zip`, with root `lieve-builder/`. GitHub's SHA-256 digest is mandatory; missing/invalid digests block installation. Version and WordPress/PHP requirements are verified. Source archives and prereleases are excluded. **Legacy updaters require one manual theme update to migrate.** Back up first; theme-file customizations are replaced. Release acceptance remains required.
 
 ## Release scope and licensing
 
@@ -151,8 +151,8 @@ Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Anime.js 
 
 ### 1.0.2
 
-- Hardened GitHub releases, package verification and native WordPress updates.
-- Improved bulk-update safety, caching and error handling.
+- Standardized releases on lieve-builder.zip with mandatory GitHub SHA-256 verification.
+- Hardened native updates, ZIP validation and explicit legacy migration guidance.
 
 ### 1.0.1
 

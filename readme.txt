@@ -66,7 +66,7 @@ No. Output page metadata starts off. Lieve defers output to recognized active SE
 
 = How do GitHub updates work? =
 
-Install the updater-enabled version manually once in lieve-builder. While Lieve or its child theme is active, WordPress checks stable releases with verified ZIP and manifest. Settings > System offers Check for updates. Back up first.
+Releases provide only lieve-builder.zip, verified with GitHub's SHA-256 digest. Legacy updaters need one manual installation to migrate. Settings > System checks updates while Lieve or its child is active. Back up first.
 
 == License and Third-Party Assets ==
 
@@ -75,8 +75,8 @@ Lieve's original code is GPLv2 or later; see LICENSE.txt. Motion uses locally bu
 == Changelog ==
 
 = 1.0.2 =
-* Hardened GitHub releases, package verification and native WordPress updates.
-* Improved bulk-update safety, caching and error handling.
+* Standardized releases on lieve-builder.zip with mandatory GitHub SHA-256 verification.
+* Hardened native updates, ZIP validation and explicit legacy migration guidance.
 
 = 1.0.1 =
 * Fixed Custom Code preview initialization and dynamic data context after PHP queries.
