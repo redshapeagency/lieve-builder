@@ -2,7 +2,7 @@
 Contributors: lieve-builder
 Requires at least: 6.5
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -10,7 +10,7 @@ WordPress theme by TheOneWP with an integrated visual builder for pages, templat
 
 == Description ==
 
-Lieve Builder combines a live visual canvas, nested Structure tree and responsive element inspector. Content starts without decorative styling; native WordPress and integration content can retain its own styles.
+Lieve Builder provides a visual canvas, nested Structure and responsive inspector. Elements start unstyled; WordPress and integration content may retain styles.
 
 Main features:
 
@@ -73,6 +73,10 @@ Install the updater-enabled version manually once in lieve-builder. While Lieve 
 Lieve's original code is GPLv2 or later; see LICENSE.txt. Motion uses locally bundled Anime.js under MIT; see assets/vendor/animejs/NOTICE.md and LICENSE.md in that directory. No GSAP runtime assets are bundled.
 
 == Changelog ==
+
+= 1.0.2 =
+* Hardened GitHub releases, package verification and native WordPress updates.
+* Improved bulk-update safety, caching and error handling.
 
 = 1.0.1 =
 * Fixed Custom Code preview initialization and dynamic data context after PHP queries.

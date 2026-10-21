@@ -1,6 +1,6 @@
 # Lieve Builder
 
-[![Version 1.0.1](https://img.shields.io/badge/version-1.0.1-8044E3?style=flat-square)](#changelog)
+[![Version 1.0.2](https://img.shields.io/badge/version-1.0.2-8044E3?style=flat-square)](#changelog)
 [![WordPress 6.5+](https://img.shields.io/badge/WordPress-6.5%2B-21759B?style=flat-square&logo=wordpress&logoColor=white)](https://wordpress.org/)
 [![PHP 7.4+](https://img.shields.io/badge/PHP-7.4%2B-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
 [![Original code license: GPL-2.0-or-later](https://img.shields.io/badge/Original_code-GPL--2.0--or--later-16C6C0?style=flat-square)](LICENSE.txt)
@@ -61,7 +61,7 @@ Code and repeater definitions remain model-owned. Internal IDs are instance-scop
 
 ## Global libraries
 
-Use the dedicated backend managers below. Responsive, Variables, Colors and Classes also have editor dialogs sharing the same saved definitions.
+Responsive, Variables, Colors and Classes share saved definitions between backend managers and editor dialogs.
 
 | Manager | Purpose |
 | --- | --- |
@@ -141,13 +141,18 @@ Updates require attached `lieve-builder-VERSION.zip` and `.zip.manifest.json` as
 
 ## Release scope and licensing
 
-Cross-browser/device checks, checkout/payment flows, integrations and production-host delivery need acceptance testing. Automated checks do not certify product readiness. Motion uses locally bundled Anime.js for timelines, scroll-linked playback and Interact controls. Existing saved timelines retain their identifiers and easing choices.
+Test browsers/devices, checkout, integrations and production-host delivery before release. Automated checks do not certify readiness. Motion uses bundled Anime.js for timelines, scroll-linked playback and Interact controls, preserving saved identifiers and easings.
 
-Development tests and release tooling belong to the development source, not the installable theme. Public packaging requires explicit release acceptance.
+Development tooling is excluded from the installable theme. Public packaging requires explicit release acceptance.
 
 Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Anime.js is MIT-licensed; its [notice](assets/vendor/animejs/NOTICE.md) and [license](assets/vendor/animejs/LICENSE.md) are included. GSAP is not bundled; custom JavaScript calling its API must be rewritten.
 
 ## Changelog
+
+### 1.0.2
+
+- Hardened GitHub releases, package verification and native WordPress updates.
+- Improved bulk-update safety, caching and error handling.
 
 ### 1.0.1
 
