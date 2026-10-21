@@ -5,7 +5,6 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-export const migrationNotice='Legacy updater migration: installations expecting versioned ZIPs and an external manifest need a one-time manual theme update using lieve-builder.zip. Automatic updates resume after installing this updater. Back up first; do not rename the active theme folder.';
 const digest=bytes=>'sha256:'+crypto.createHash('sha256').update(bytes).digest('hex');
 export function attachReleaseAssets({tag,directory,repo,call}) {
   if(repo!=='redshapeagency/lieve-builder'||!/^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(tag))throw Error('Expected the official repository and a stable version tag.');
@@ -14,12 +13,11 @@ export function attachReleaseAssets({tag,directory,repo,call}) {
   try{release=json(['api',api+'/tags/'+tag]);}catch(error){
     if(!/HTTP 404/.test(String(error.stderr||'')))throw Error('Cannot read the release; nothing changed.');
     const ref=json(['api','repos/'+repo+'/git/ref/tags/'+tag]);if(!/^[a-f0-9]{40,64}$/.test(ref.object?.sha||''))throw Error('The release tag must already exist.');
-    release=json(['api',api,'--method','POST','-f','tag_name='+tag,'-f','name='+tag,'-F','draft=true','-f','body='+migrationNotice]);
+    release=json(['api',api,'--method','POST','-f','tag_name='+tag,'-f','name='+tag,'-F','draft=true']);
   }
   if(!release||!Number.isSafeInteger(release.id)||release.id<=0||release.tag_name!==tag||release.prerelease!==false||typeof release.draft!=='boolean'||!Array.isArray(release.assets))throw Error('Invalid release identity or prerelease. Nothing uploaded.');
   // GitHub's Source code archives are not custom assets; leave them untouched.
   if(release.assets.length>1||release.assets.some(asset=>!asset||asset.name!==name))throw Error('Release contains other custom assets. Exactly lieve-builder.zip is allowed. Existing assets were not removed; prepare a new release.');
-  if(typeof release.body!=='string'||!release.body.includes(migrationNotice))throw Error('Release notes must explicitly include the documented legacy updater migration notice before publishing this asset.');
   if(release.assets.length){
     const asset=release.assets[0];
     if(!Number.isSafeInteger(asset.id)||asset.id<=0||asset.state!=='uploaded'||asset.browser_download_url!==downloadUrl||asset.size!==bytes.length||asset.digest!==expected)throw Error('Existing asset has a missing/invalid digest or differs from this build. Nothing overwritten.');
@@ -48,7 +46,6 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     const directory=process.env.LIEVE_PACKAGE_DIR,tag=process.env.RELEASE_TAG;if(!directory||!tag)throw Error('Missing release directory or tag.');
     execFileSync(process.execPath,['scripts/package.mjs','--verify',path.join(directory,'lieve-builder.zip'),'--tag',tag],{stdio:'pipe'});
     const call=args=>execFileSync('gh',args,{encoding:null,maxBuffer:110*1024*1024,stdio:['ignore','pipe','pipe'],timeout:120000});
-    console.warn('::warning::'+migrationNotice);
     console.log(attachReleaseAssets({tag,directory,repo:process.env.GITHUB_REPOSITORY,call}));
   }catch(error){console.error(error instanceof Error&&!error.message.startsWith('Command failed:')?error.message:'Release preparation failed. Check configuration and retry.');process.exitCode=1;}
 }

@@ -48,9 +48,6 @@ jobs:
           NODE
       - name: Validate identity, tag and package inventory
         run: node scripts/package.mjs --check --tag "$RELEASE_TAG"
-      - name: Explain legacy updater migration
-        run: |
-          echo '::warning::Legacy updaters expecting versioned ZIPs and sidecars require a one-time manual installation. No legacy assets will be published. Add the documented migration notice to existing release notes.'
       - name: Build the single installable asset
         run: node scripts/package.mjs --tag "$RELEASE_TAG"
       - name: Independently verify the single archive before upload
