@@ -203,13 +203,18 @@ function lieve_render_registered_element( $node, $attributes ) {
 		case 'wordpress':
 			$wrap(); $mode = $p['mode'] ?? 'calendar'; if ( 'calendar' === $mode ) { get_calendar(); } elseif ( 'archives' === $mode ) { echo '<ul>'; wp_get_archives(); echo '</ul>'; } elseif ( 'categories' === $mode ) { echo '<ul>'; wp_list_categories( array( 'title_li' => '' ) ); echo '</ul>'; } else { echo '<ul>'; wp_list_pages( array( 'title_li' => '' ) ); echo '</ul>'; } echo '</div>'; break;
 		case 'template':
-			static $stack = array(); $template_id = absint( $p['templateId'] ?? 0 ); $template = get_post( $template_id );
-			if ( ! $template || LIEVE_TEMPLATE_POST_TYPE !== $template->post_type || 'publish' !== $template->post_status || in_array( $template_id, $stack, true ) || count( $stack ) >= 4 ) { break; }
-			$document = lieve_get_document( $template_id ); if ( empty( $document['children'] ) ) { break; }
-			$stack[] = $template_id; $wrap();
+			if ( ! isset( $node['_lieveTemplateDocument'] ) ) {
+				$plan = lieve_prepare_template_document( array( 'children' => array( $node ) ) );
+				if ( ! empty( $plan['_lieveTemplateFailed'] ) ) { lieve_template_expansion_fallback(); break; }
+				$node = $plan['children'][0] ?? $node;
+			}
+			$document = $node['_lieveTemplateDocument'] ?? array();
+			if ( ! empty( $node['_lieveTemplateIssue'] ) ) { lieve_template_expansion_fallback( $node['_lieveTemplateIssue'] ); break; }
+			if ( empty( $document['children'] ) ) { break; }
+			$wrap();
 			$listing_scope = $GLOBALS['lieve_listing_instance_scope'] ?? null;
 			if ( null !== $listing_scope ) { $GLOBALS['lieve_listing_instance_scope'] = $listing_scope . ':template:' . $node['id']; }
-			try { lieve_render_document( $document ); } finally { if ( null !== $listing_scope ) { $GLOBALS['lieve_listing_instance_scope'] = $listing_scope; } echo '</div>'; array_pop( $stack ); }
+			try { lieve_render_document( $document ); } finally { if ( null !== $listing_scope ) { $GLOBALS['lieve_listing_instance_scope'] = $listing_scope; } echo '</div>'; }
 			break;
 		case 'breadcrumbs':
 			$wrap( 'nav', ' aria-label="Breadcrumbs"' ); echo '<ol><li><a href="' . esc_url( home_url( '/' ) ) . '">' . esc_html__( 'Home', 'lieve-builder' ) . '</a></li>'; foreach ( array_reverse( get_post_ancestors( get_the_ID() ) ) as $ancestor ) { echo '<li><a href="' . esc_url( get_permalink( $ancestor ) ) . '">' . esc_html( get_the_title( $ancestor ) ) . '</a></li>'; } echo '<li aria-current="page">' . esc_html( get_the_title() ) . '</li></ol></nav>'; break;

@@ -1,6 +1,7 @@
 <?php
 /** Read-only frontend template composition for the editor. @package LieveBuilder */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+require_once __DIR__ . '/../templates/expansion.php';
 
 /** Evaluate the existing frontend resolver against the edited post, not WP Admin. */
 function lieve_with_editor_page_context( $post, $callback ) {
@@ -32,23 +33,16 @@ function lieve_with_editor_page_context( $post, $callback ) {
 /** Include styles of nested reusable templates, without executing arbitrary hooks. */
 function lieve_editor_template_style_nodes( $document, $seen = array() ) {
 	$nodes = array();
-	$walk = function( $children ) use ( &$walk, &$nodes, $seen ) {
-		foreach ( $children as $node ) {
+	$document = lieve_prepare_template_document( $document, $seen );
+	lieve_visit_template_document( $document, static function( $node ) use ( &$nodes ) {
 			$nodes[] = array( 'id' => $node['id'], 'type' => $node['type'], 'props' => $node['props'] ?? array() );
-			if ( ! empty( $node['children'] ) ) { $walk( $node['children'] ); }
-			$id = 'template' === $node['type'] ? absint( $node['props']['templateId'] ?? 0 ) : 0;
-			if ( $id && ! in_array( $id, $seen, true ) && count( $seen ) <= 4 && 'publish' === get_post_status( $id ) && LIEVE_TEMPLATE_POST_TYPE === get_post_type( $id ) ) {
-				$nodes = array_merge( $nodes, lieve_editor_template_style_nodes( lieve_get_document( $id ), array_merge( $seen, array( $id ) ) ) );
-			}
-		}
-	};
-	$walk( $document['children'] ?? array() );
+	} );
 	return $nodes;
 }
 
 function lieve_editor_template_placement( $id, $position, $source ) {
-	$document = lieve_get_document( $id );
-	if ( empty( $document['children'] ) ) { return null; }
+	$document = lieve_prepare_template_document( lieve_get_document( $id ) );
+	if ( empty( $document['children'] ) && empty( $document['_lieveTemplateFailed'] ) ) { return null; }
 	ob_start();
 	try { lieve_render_document( $document ); $html = ob_get_clean(); }
 	finally { if ( ! isset( $html ) ) { ob_end_clean(); } }

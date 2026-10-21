@@ -25,7 +25,7 @@ function lieve_render_editor_preview( $node, $post, $execute_custom_code = false
 		$GLOBALS['lieve_runtime_document'] = array('children'=>array($node));
 		$GLOBALS['lieve_custom_code_preview'] = true === $execute_custom_code && function_exists( 'lieve_can_author_custom_code' ) && lieve_can_author_custom_code() && current_user_can( 'edit_post', $post->ID );
 		try {
-			ob_start(); lieve_render_node( $node ); return ob_get_clean();
+			ob_start(); lieve_render_document( array( 'children' => array( $node ) ) ); return ob_get_clean();
 		} finally {
 			while ( ob_get_level() > $level ) { ob_end_clean(); }
 			if ( null === $previous_source ) { unset( $GLOBALS['lieve_document_source_id'] ); } else { $GLOBALS['lieve_document_source_id'] = $previous_source; }

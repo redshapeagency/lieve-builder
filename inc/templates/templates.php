@@ -6,6 +6,7 @@ define( 'LIEVE_TEMPLATE_POST_TYPE', 'lieve_template' );
 define( 'LIEVE_TEMPLATE_TYPE_META', '_lieve_template_type' );
 define( 'LIEVE_TEMPLATE_CONDITION_META', '_lieve_template_condition' );
 define( 'LIEVE_TEMPLATE_CONDITIONS_META', '_lieve_template_conditions' );
+require_once __DIR__ . '/expansion.php';
 require_once __DIR__ . '/popups.php';
 
 require_once __DIR__ . '/types.php';

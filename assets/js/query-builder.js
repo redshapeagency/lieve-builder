@@ -5,6 +5,14 @@
 	if(!root||!config||!model)return;
 	const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 	const icon=name=>config.icons[name]||config.icons.query;
+	function blockLibrary(error){
+		let notice=root.querySelector('[data-library-error]');
+		if(!notice){notice=document.createElement('div');notice.className='lieve-ds-guide';notice.setAttribute('data-library-error','');notice.setAttribute('role','alert');notice.innerHTML='<h3>Library unavailable</h3><p></p>';root.prepend(notice);}
+		notice.querySelector('p').textContent=error.message;
+		Array.from(root.children).forEach(child=>{if(child!==notice){child.hidden=true;child.inert=true;}});
+	}
+	if(config.storageError){blockLibrary(config.storageError);return;}
+	let storageBlocked=false;
 	const list=root.querySelector('[data-query-list]'),editor=root.querySelector('[data-query-editor]'),status=root.querySelector('[data-query-status]'),save=root.querySelector('[data-query-save]'),cancel=root.querySelector('[data-query-cancel]');
 	const metaModes=new WeakMap(),editedKeys=new Set();
 	let draft=model.clone(config.data),saved=model.clone(config.data),revision=config.revision,selected=null,tab='general',filterTab='core',saving=false,filter='all',search='',pickers=[];
@@ -284,11 +292,12 @@
 		try{
 			const response=await ( window.LieveTransport?.fetch || fetch )( config.url+path,{method,signal:controller.signal,credentials:'same-origin',headers:{'Content-Type':'application/json','X-WP-Nonce':config.nonce},body:JSON.stringify(payload)});
 			let data;try{data=await response.json();}catch(error){throw new Error('The server returned an unreadable response. Your draft is preserved.');}
-			if(!response.ok){const detail=data.data?.params;throw new Error(detail?Object.values(detail).join(' '):(data.message||'The request failed. Your draft is preserved.'));}
+			if(!response.ok){const detail=data.data?.params,error=new Error(detail?Object.values(detail).join(' '):(data.message||'The request failed. Your draft is preserved.'));error.code=data.code;throw error;}
 			return data;
 		}catch(error){if(error.name==='AbortError')throw new Error('The request was cancelled or timed out. Your draft is preserved.');throw error;}finally{clearTimeout(timeout);}
 	}
 	async function saveDraft(){
+		if(storageBlocked)return;
 		if(saving||!dirty())return;const error=model.validate(draft,config);if(error){message(error,true);return;}
 		saving=true;const fields=[...root.querySelectorAll('button,input,textarea,select')].map(field=>[field,field.disabled]);fields.forEach(([field])=>field.disabled=true);message('Saving queries…');
 		try{
@@ -296,7 +305,7 @@
 			if(model.validate(result.data,config)||typeof result.revision!=='string'||!/^[a-f0-9]{64}$/.test(result.revision))throw new Error('The save response could not be verified. Your draft is preserved.');
 			const next=model.clone(result.data);next.queries.forEach(query=>{const previous=draft.queries.find(item=>item.id===query.id);if(previous)copyMetaModes(previous,query);});
 			draft=next;saved=model.clone(result.data);revision=result.revision;editedKeys.clear();message('All changes saved');
-		}catch(error){message(error.message,true);}finally{
+		}catch(error){if(error.code==='lieve_library_unavailable'){storageBlocked=true;blockLibrary(error);}message(error.message,true);}finally{
 			saving=false;fields.forEach(([field,disabled])=>field.disabled=disabled);pickers.forEach(controller=>controller.refresh());save.disabled=!dirty();cancel.hidden=!dirty();renderList();
 			const marker=editor.querySelector('[data-q-draft]');if(marker&&current())marker.hidden=!isNew(current());
 		}

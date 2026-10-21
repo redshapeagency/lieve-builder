@@ -3,9 +3,9 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 function lieve_design_config( $post_id = 0 ) {
-	$data = lieve_design_system(); $condition = lieve_condition_editor_config();
+	$snapshot = lieve_design_snapshot(); $data = $snapshot['data']; $condition = lieve_condition_editor_config();
 	$condition['emptyLabel'] = 'No conditions: available across the entire website.';
-	return array( 'data' => $data, 'revision' => lieve_design_revision( $data ), 'activeIds' => $post_id ? lieve_design_context_ids( $data, $post_id ) : array(), 'url' => esc_url_raw( rest_url( 'lieve/v1/design-system' ) ), 'previewUrl' => $post_id ? esc_url_raw( rest_url( 'lieve/v1/design-system/preview/' . $post_id ) ) : '', 'postId' => $post_id, 'nonce' => wp_create_nonce( 'wp_rest' ), 'canManage' => current_user_can( 'manage_options' ), 'conditions' => $condition, 'breakpoints' => lieve_breakpoint_definitions(), 'breakpointIcons' => lieve_breakpoint_icon_config(), 'variablePageSize' => LIEVE_VARIABLE_PAGE_SIZE );
+	return array( 'data' => $data, 'revision' => $snapshot['revision'], 'storageError' => lieve_library_error_config( $snapshot ), 'activeIds' => $data && $post_id ? lieve_design_context_ids( $data, $post_id ) : array(), 'url' => esc_url_raw( rest_url( 'lieve/v1/design-system' ) ), 'previewUrl' => $post_id ? esc_url_raw( rest_url( 'lieve/v1/design-system/preview/' . $post_id ) ) : '', 'postId' => $post_id, 'nonce' => wp_create_nonce( 'wp_rest' ), 'canManage' => current_user_can( 'manage_options' ), 'conditions' => $condition, 'breakpoints' => lieve_breakpoint_definitions(), 'breakpointIcons' => lieve_breakpoint_icon_config(), 'variablePageSize' => LIEVE_VARIABLE_PAGE_SIZE );
 }
 
 function lieve_design_response( $data, $post_id = 0 ) {
@@ -23,7 +23,8 @@ function lieve_register_design_routes() {
 function lieve_rest_get_design( $request ) {
 	$post_id = absint( $request->get_param( 'postId' ) );
 	if ( $post_id && ! current_user_can( 'edit_post', $post_id ) ) { return new WP_Error( 'lieve_forbidden_context', 'You cannot preview this content.', array( 'status' => 403 ) ); }
-	return lieve_design_response( lieve_design_system(), $post_id );
+	$snapshot = lieve_design_snapshot();
+	return $snapshot['error'] ?: lieve_design_response( $snapshot['data'], $post_id );
 }
 
 function lieve_rest_save_design( $request ) {
@@ -41,7 +42,9 @@ function lieve_rest_save_design( $request ) {
 	}
 	if ( ! add_option( $lock, time(), '', false ) ) { return new WP_Error( 'lieve_design_busy', 'Another save is in progress. Try again in a moment.', array( 'status' => 409 ) ); }
 	try {
-		if ( ! is_string( $revision ) || ! hash_equals( lieve_design_revision(), $revision ) ) { return new WP_Error( 'lieve_design_conflict', 'The design system changed in another tab. Export your draft, then reload before saving.', array( 'status' => 409 ) ); }
+		$snapshot = lieve_design_snapshot( true );
+		if ( $snapshot['error'] ) { return $snapshot['error']; }
+		if ( ! is_string( $revision ) || ! hash_equals( $snapshot['revision'], $revision ) ) { return new WP_Error( 'lieve_design_conflict', 'The design system changed in another tab. Export your draft, then reload before saving.', array( 'status' => 409 ) ); }
 		if ( false === update_option( LIEVE_DESIGN_OPTION, $data, false ) && lieve_design_revision() !== lieve_design_revision( $data ) ) { return new WP_Error( 'lieve_design_save_failed', 'The design system could not be saved. Your draft is still available.', array( 'status' => 500 ) ); }
 		return lieve_design_response( $data, $post_id );
 	} finally { delete_option( $lock ); }

@@ -1,6 +1,7 @@
 <?php
 /** Linked components: template-owned models, explicit instance properties and slots. */
 defined( 'ABSPATH' ) || exit;
+require_once __DIR__ . '/expansion.php';
 
 function lieve_is_component( $id ) {
 	return LIEVE_TEMPLATE_POST_TYPE === get_post_type( $id ) && 'component' === lieve_get_template_type( $id );
@@ -39,18 +40,22 @@ function lieve_component_slots( $document ) {
 }
 
 /** Runtime provenance is generated here and never accepted from stored/client nodes. */
-function lieve_component_expand( $instance, $seen = array(), &$budget = null ) {
+function lieve_component_expand( $instance, $seen = array(), &$budget = null, &$expansion = null ) {
 	if ( null === $budget ) { $budget = 2000; }
-	if ( --$budget < 0 ) { return null; }
+	if ( null !== $expansion && $expansion['failed'] ) { return null; }
+	if ( --$budget < 0 ) { if ( null !== $expansion ) { $expansion['failed'] = true; lieve_template_expansion_issue( $expansion, 'work' ); } return null; }
 	if ( 'component' !== ( $instance['type'] ?? '' ) ) {
-		$children = array(); foreach ( $instance['children'] ?? array() as $child ) { $resolved = lieve_component_expand( $child, $seen, $budget ); if ( $resolved ) { $children[] = $resolved; } } $instance['children'] = $children; return $instance;
+		$children = array(); foreach ( $instance['children'] ?? array() as $child ) { if ( null !== $expansion && $expansion['failed'] ) { break; } $resolved = lieve_component_expand( $child, $seen, $budget, $expansion ); if ( $resolved ) { $children[] = $resolved; } } $instance['children'] = $children; return $instance;
 	}
+	if ( null !== $expansion && ! lieve_template_expansion_reference( $expansion ) ) { return null; }
 	$id = absint( $instance['props']['componentId'] ?? 0 ); $post = $id ? get_post( $id ) : null;
 	$available = $post && lieve_is_component( $id ) && ( 'publish' === $post->post_status || ! empty( $GLOBALS['lieve_element_preview'] ) && current_user_can( 'edit_post', $id ) );
-	if ( ! $available || in_array( $id, $seen, true ) || count( $seen ) >= 8 ) {
-		return array( 'id' => $instance['id'], 'type' => 'div', 'props' => array( 'editorLabel' => 'Unavailable component' ), 'children' => array() );
+	if ( ! $available || in_array( $id, $seen, true ) || count( $seen ) >= 8 + ( $expansion['ownerDepth'] ?? 0 ) ) {
+		$placeholder = array( 'id' => $instance['id'], 'type' => 'div', 'props' => array( 'editorLabel' => 'Unavailable component' ), 'children' => array() );
+		if ( null !== $expansion ) { $reason = ! $available ? 'unavailable' : ( in_array( $id, $seen, true ) ? 'cycle' : 'depth' ); lieve_template_expansion_issue( $expansion, $reason ); $placeholder['_lieveTemplateComponentIssue'] = $reason; }
+		return $placeholder;
 	}
-	$document = lieve_get_document( $id ); $model = $document['children'][0] ?? null;
+	$document = null !== $expansion ? lieve_template_model_document( $id, $expansion ) : lieve_get_document( $id ); $model = $document['children'][0] ?? null;
 	if ( ! $model ) { return array( 'id' => $instance['id'], 'type' => 'div', 'props' => array(), 'children' => array() ); }
 	$bindings = array(); foreach ( lieve_component_properties( $document ) as $property ) { if ( array_key_exists( $property['id'], $instance['props']['componentValues'] ?? array() ) ) { $bindings[$property['nodeId']][$property['field']] = $instance['props']['componentValues'][$property['id']]; } }
 	$overrides = array(); foreach ( $instance['children'] ?? array() as $slot ) { if ( 'slot' === ( $slot['type'] ?? '' ) ) { $overrides[( $slot['props']['slotKey'] ?? '' ) ?: $slot['id']] = $slot; } }
@@ -80,8 +85,9 @@ function lieve_component_expand( $instance, $seen = array(), &$budget = null ) {
 		}
 		$node['children'] = array_map( $prepare, $node['children'] ?? array() ); return $node;
 	};
-	$resolved = $prepare( $model ); $timelines = array(); $interaction_ids = array();
+	$resolved = $prepare( $model ); $prepare = null; $timelines = array(); $interaction_ids = array();
 	$index_motion = static function( $node ) use ( &$index_motion, &$timelines, &$interaction_ids, $instance, $locals ) { foreach ( $node['props']['motion'] ?? array() as $row ) { $timelines[$row['id']] = 'lm_' . substr( hash( 'sha256', $instance['id'] . ':' . $row['id'] ), 0, 20 ); } foreach ( $node['props']['interactions'] ?? array() as $row ) { $interaction_ids[$row['id']] = 'li_' . substr( hash( 'sha256', $instance['id'] . ':' . $row['id'] ), 0, 20 ); } if ( ! isset( $locals[$node['id']] ) ) { foreach ( $node['children'] as $child ) { $index_motion( $child ); } } }; $index_motion( $resolved );
+	$index_motion = null;
 	$references = static function( $node ) use ( &$references, $aliases, $internal_ids, $timelines, $interaction_ids, $locals ) {
 		$node['_lieveComponentAliases'] = $aliases;
 		if ( isset($aliases[$node['props']['targetId']??'']) ) { $node['props']['targetId']=$aliases[$node['props']['targetId']]; }
@@ -90,16 +96,17 @@ function lieve_component_expand( $instance, $seen = array(), &$budget = null ) {
 		foreach ( $node['props']['interactions'] ?? array() as $i => $rule ) { $node['props']['interactions'][$i]['id'] = $interaction_ids[$rule['id']]; if ( isset($interaction_ids[$rule['afterId']??'']) ) { $node['props']['interactions'][$i]['afterId'] = $interaction_ids[$rule['afterId']]; } }
 		foreach ( $node['props']['motion'] ?? array() as $i => $row ) { $node['props']['motion'][$i]['id'] = $timelines[$row['id']]; foreach ( $row['steps'] as $j => $step ) { if ( 'element' === $step['target'] && isset( $aliases[$step['selector']] ) ) { $node['props']['motion'][$i]['steps'][$j]['selector'] = $aliases[$step['selector']]; } } }
 		if ( ! isset( $locals[$node['id']] ) ) { $node['children'] = array_map( $references, $node['children'] ); } return $node;
-	}; $resolved = $references( $resolved );
+	}; $resolved = $references( $resolved ); $references = null;
 	if ( function_exists( 'lieve_listing_remap_references' ) ) {
 		// Local slot subtrees belong to the page, not the component model's ID namespace.
 		$remap = static function( $node ) use ( &$remap, $aliases, $locals ) { $children = $node['children']; $node['children'] = array(); $node = lieve_listing_remap_references( array( $node ), $aliases )[0]; $node['children'] = isset( $locals[$node['id']] ) ? $children : array_map( $remap, $children ); return $node; };
-		$resolved = $remap( $resolved );
+		$resolved = $remap( $resolved ); $remap = null;
 	}
-	return lieve_component_expand( $resolved, array_merge( $seen, array( $id ) ), $budget );
+	return lieve_component_expand( $resolved, array_merge( $seen, array( $id ) ), $budget, $expansion );
 }
 
 function lieve_components_runtime_document( $document ) {
+	if ( ! empty( $document['_lieveTemplatePrepared'] ) ) { return $document; }
 	$budget = 2000; $children = array(); foreach ( $document['children'] ?? array() as $node ) { $resolved = lieve_component_expand( $node, array(), $budget ); if ( $resolved ) { $children[] = $resolved; } } $document['children'] = $children; return $document;
 }
 

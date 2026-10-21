@@ -130,6 +130,7 @@ function lieve_rest_save_document( $request ) {
 		return new WP_Error( 'lieve_invalid_document', __( 'Invalid builder document.', 'lieve-builder' ), array( 'status' => 400 ) );
 	}
 	$valid = lieve_validate_document( $document ); if ( is_wp_error( $valid ) ) { return $valid; }
+	if ( function_exists( 'lieve_validate_template_expansion' ) ) { $valid = lieve_validate_template_expansion( $document, $post_id ); if ( is_wp_error( $valid ) ) { return $valid; } }
 	if ( function_exists( 'lieve_validate_component_document' ) ) { $valid = lieve_validate_component_document( $document, $post_id ); if ( is_wp_error( $valid ) ) { return $valid; } }
 	if ( function_exists( 'lieve_validate_document_interactions' ) ) { $valid = lieve_validate_document_interactions( $document ); if ( is_wp_error( $valid ) ) { return $valid; } }
 	if ( function_exists( 'lieve_validate_document_motion' ) ) { $valid = lieve_validate_document_motion( $document ); if ( is_wp_error( $valid ) ) { return $valid; } }

@@ -67,6 +67,7 @@ function lieve_duplicate_template_document( $document ) {
 function lieve_create_inactive_template( $title, $type, $conditions, $document, $request_id, $source = 0, $popup_opening = 'automatic' ) {
 	if ( 'component' === $type ) { $conditions = array(); }
 	if ( function_exists( 'lieve_validate_document' ) ) { $valid = lieve_validate_document( $document ); if ( is_wp_error( $valid ) ) { return $valid; } }
+	if ( function_exists( 'lieve_validate_template_expansion' ) ) { $valid = lieve_validate_template_expansion( $document ); if ( is_wp_error( $valid ) ) { return $valid; } }
 	if ( ! is_string( $popup_opening ) || ! array_key_exists( $popup_opening, lieve_popup_opening_modes() ) ) { return new WP_Error( 'lieve_invalid_popup_opening', __( 'Choose a valid popup opening mode.', 'lieve-builder' ), array( 'status' => 400 ) ); }
 	if ( ! is_string( $title ) || '' === trim( $title ) || preg_match_all( '/./us', $title ) > 200 || ! is_string( $type ) || ! array_key_exists( $type, lieve_template_types() ) ) { return new WP_Error( 'lieve_invalid_template', __( 'Enter a template name of up to 200 characters and a valid type.', 'lieve-builder' ), array( 'status' => 400 ) ); }
 	$error = lieve_validate_template_conditions( $conditions );

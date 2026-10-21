@@ -3,6 +3,7 @@
  * @package LieveBuilder
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+require_once __DIR__ . '/../templates/expansion.php';
 
 function lieve_css_frontend_context() {
 	return ! is_admin() && ! is_preview()
@@ -52,20 +53,13 @@ function lieve_print_generated_css( $css, $attribute, $value ) {
 
 /** Include nested reusable templates, with the renderer's depth and publication rules. */
 function lieve_collect_document_css( $document, &$rules, $visited = array(), $depth = 0 ) {
-	if ( function_exists( 'lieve_components_runtime_document' ) ) { $document = lieve_components_runtime_document( $document ); }
+	$document = lieve_prepare_template_document( $document, $visited, $depth );
 	if ( lieve_css_frontend_context() && function_exists( 'lieve_dynamic_mark_request_bound' ) ) { lieve_dynamic_mark_request_bound( $document ); }
-	foreach ( $document['children'] ?? array() as $node ) {
+	lieve_visit_template_document( $document, static function( $node ) use ( &$rules ) {
 		$css = lieve_node_style_css( $node, true, 'inline' === lieve_css_loading_method() );
 		if ( $css ) { $rules[ hash( 'sha256', $css ) ] = $css; }
-		if ( function_exists( 'lieve_listing_enabled' ) && lieve_listing_enabled( $node ) ) { continue; } // Item styles resolve in each result's context, not the page's.
-		if ( 'template' === $node['type'] && $depth < 4 ) {
-			$id = absint( $node['props']['templateId'] ?? 0 ); $post = $id ? get_post( $id ) : null;
-			if ( $post && LIEVE_TEMPLATE_POST_TYPE === $post->post_type && 'publish' === $post->post_status && ! in_array( $id, $visited, true ) ) {
-				lieve_collect_document_css( lieve_get_document( $id ), $rules, array_merge( $visited, array( $id ) ), $depth + 1 );
-			}
-		}
-		if ( ! empty( $node['children'] ) ) { lieve_collect_document_css( array( 'children' => $node['children'] ), $rules, $visited, $depth ); }
-	}
+		if ( function_exists( 'lieve_listing_enabled' ) && lieve_listing_enabled( $node ) ) { return false; } // Item styles resolve in each result's context, not the page's.
+	} );
 }
 
 /** Discover styles before wp_head prints assets, including condition-matched landmarks. */

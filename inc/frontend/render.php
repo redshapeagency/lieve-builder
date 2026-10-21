@@ -12,6 +12,7 @@ require_once __DIR__ . '/../builder/element-identity.php';
 require_once __DIR__ . '/../builder/interactions.php';
 require_once __DIR__ . '/../builder/motion.php';
 require_once __DIR__ . '/../builder/element-conditions.php';
+require_once __DIR__ . '/../templates/expansion.php';
 
 /** Class settings are optional for isolated renderers and early integrations. */
 function lieve_markup_classes( $target, $defaults ) {
@@ -27,8 +28,8 @@ function lieve_html_has_wrapper( $props ) {
 /** Resolve internal references to real HTML IDs, including reusable templates. */
 function lieve_document_element_ids( $document, $seen = array() ) {
 	$ids = array(); $html_ids = array(); $data_ids = array();
-	$walk = static function( $nodes, $seen ) use ( &$walk, &$ids, &$html_ids, &$data_ids ) {
-		foreach ( $nodes as $node ) {
+	$document = lieve_prepare_template_document( $document, $seen );
+	lieve_visit_template_document( $document, static function( $node ) use ( &$ids, &$html_ids, &$data_ids ) {
 			$props = $node['props'] ?? array();
 			if ( 'html' !== $node['type'] || lieve_html_has_wrapper( $props ) ) {
 				$html_id = lieve_element_html_id( $node );
@@ -40,17 +41,7 @@ function lieve_document_element_ids( $document, $seen = array() ) {
 				$data_ids[ lieve_element_data_id( $node ) ] = $target;
 				$html_ids[ $html_id ] = $target;
 			}
-			$walk( $node['children'] ?? array(), $seen );
-			$template_id = 'template' === $node['type'] ? (int) ( $props['templateId'] ?? 0 ) : 0;
-			if ( $template_id && count( $seen ) < 4 && ! in_array( $template_id, $seen, true ) ) {
-				$template = get_post( $template_id );
-				if ( $template && LIEVE_TEMPLATE_POST_TYPE === $template->post_type && 'publish' === $template->post_status ) {
-					$walk( lieve_get_document( $template_id )['children'], array_merge( $seen, array( $template_id ) ) );
-				}
-			}
-		}
-	};
-	$walk( $document['children'] ?? array(), $seen );
+	} );
 	// Explicit HTML IDs win over coincidentally identical internal aliases.
 	return array_replace( $ids, $data_ids, $html_ids );
 }
@@ -58,21 +49,13 @@ function lieve_document_element_ids( $document, $seen = array() ) {
 /** Only referenced roots need an interactive hook when both public IDs are off. */
 function lieve_document_target_references( $document, $seen = array() ) {
 	$references = array();
-	$walk = static function( $nodes, $seen ) use ( &$walk, &$references ) {
-		foreach ( $nodes as $node ) {
+	$document = lieve_prepare_template_document( $document, $seen );
+	lieve_visit_template_document( $document, static function( $node ) use ( &$references ) {
 			$props = $node['props'] ?? array();
 			if ( in_array( $node['type'] ?? '', array( 'toggle', 'map-connector' ), true ) && ! empty( $props['targetId'] ) && is_string( $props['targetId'] ) ) { $references[ $props['targetId'] ] = true; }
 			foreach ( $props['interactions'] ?? array() as $rule ) { if ( ! empty( $rule['enabled'] ) && empty( lieve_interaction_catalog()['actions'][ $rule['action'] ?? '' ]['noTarget'] ) && 'element' === ( $rule['targetMode'] ?? '' ) && ! empty( $rule['targetValue'] ) ) { $references[ $rule['targetValue'] ] = true; } }
 			foreach ( $props['motion'] ?? array() as $timeline ) { if ( ! empty( $timeline['enabled'] ) ) { foreach ( $timeline['steps'] ?? array() as $step ) { if ( 'element' === ( $step['target'] ?? '' ) && ! empty( $step['selector'] ) ) { $references[ $step['selector'] ] = true; } } } }
-			$walk( $node['children'] ?? array(), $seen );
-			$template_id = 'template' === ( $node['type'] ?? '' ) ? (int) ( $props['templateId'] ?? 0 ) : 0;
-			if ( $template_id && count( $seen ) < 4 && ! in_array( $template_id, $seen, true ) ) {
-				$template = get_post( $template_id );
-				if ( $template && LIEVE_TEMPLATE_POST_TYPE === $template->post_type && 'publish' === $template->post_status ) { $walk( lieve_get_document( $template_id )['children'], array_merge( $seen, array( $template_id ) ) ); }
-			}
-		}
-	};
-	$walk( $document['children'] ?? array(), $seen );
+	} );
 	return $references;
 }
 
@@ -120,7 +103,8 @@ function lieve_element_target_id( $target ) {
  * @return bool Whether the document contains elements.
  */
 function lieve_render_document( $document, $wrap = false ) {
-	if ( function_exists( 'lieve_components_runtime_document' ) ) { $document = lieve_components_runtime_document( $document ); }
+	$document = lieve_prepare_template_document( $document );
+	if ( ! empty( $document['_lieveTemplateFailed'] ) ) { lieve_template_expansion_fallback(); return false; }
 	$children = isset( $document['children'] ) && is_array( $document['children'] ) ? $document['children'] : array();
 	if ( ! $children ) { return false; }
 	$listing_aliases = array();
@@ -164,6 +148,11 @@ function lieve_render_template_area( $template_id, $area ) {
 
 /** Add structural line breaks without inserting spaces between inline elements. */
 function lieve_render_nodes( $nodes ) {
+	if ( $nodes && empty( $nodes[0]['_lieveTemplateNodePrepared'] ) ) {
+		$plan = lieve_prepare_template_document( array( 'children' => $nodes ) );
+		if ( ! empty( $plan['_lieveTemplateFailed'] ) ) { lieve_template_expansion_fallback(); return; }
+		$nodes = $plan['children'];
+	}
 	$inline = array( 'button', 'text-link', 'file', 'icon', 'logo', 'svg', 'video', 'audio', 'toggle', 'toggle-mode', 'map-connector', 'animated-typing', 'counter', 'rating', 'back-to-top', 'post-reading-time', 'post-reading-progress-bar', 'form-checkbox', 'progress-bar' );
 	$previous_inline = null;
 	foreach ( $nodes as $node ) {
@@ -269,6 +258,11 @@ function lieve_node_class_attributes( $node, $base ) {
  * @param array $node Sanitized node.
  */
 function lieve_render_node( $node ) {
+	if ( empty( $node['_lieveTemplateNodePrepared'] ) ) {
+		$plan = lieve_prepare_template_document( array( 'children' => array( $node ) ) );
+		if ( ! empty( $plan['_lieveTemplateFailed'] ) ) { lieve_template_expansion_fallback(); return; }
+		$node = $plan['children'][0] ?? null; if ( ! $node ) { return; }
+	}
 	if ( 'component' === ( $node['type'] ?? '' ) && function_exists( 'lieve_component_expand' ) ) { $node = lieve_component_expand( $node ); if ( ! $node ) { return; } }
 	if ( isset( $GLOBALS['lieve_listing_remaining'] ) && --$GLOBALS['lieve_listing_remaining'] < 0 ) { return; }
 	if ( array_key_exists( 'conditions', $node['props'] ?? array() ) && empty( $GLOBALS['lieve_element_preview'] ) ) {
@@ -331,6 +325,7 @@ function lieve_render_node_markup( $node ) {
 		$css = lieve_node_style_css( $node );
 		if ( $css ) { if ( isset( $GLOBALS['lieve_listing_css_rules'] ) ) { $GLOBALS['lieve_listing_css_rules'][] = $css; } else { echo '<style data-lieve-styles="' . esc_attr( $node['id'] ) . '">' . $css . '</style>'; } }
 	}
+	if ( ! empty( $node['_lieveTemplateComponentIssue'] ) ) { echo '<div' . lieve_node_class_attributes( $node, 'lieve-div' ) . $id_at . $style_at . '>'; lieve_template_expansion_fallback( $node['_lieveTemplateComponentIssue'] ); echo '</div>'; return; }
 	if ( function_exists( 'lieve_listing_enabled' ) && lieve_listing_enabled( $node ) ) { lieve_render_listing( $node, $id_at . $style_at ); return; }
 
 	switch ( $type ) {

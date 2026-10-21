@@ -33,6 +33,7 @@
 		closeTokenPicker();
 		lieveContext.liveEdit = null; lieveContext.hideEditorTooltip(); lieveContext.inspectorSelects.forEach( select => select.close() );
 		if ( ! lieveContext.designSystem ) { lieveContext.showToast( 'The design system is unavailable. Reload the editor.', true ); return; }
+		if ( lieveContext.designSystem.storageError?.() ) { lieveContext.showToast( lieveContext.designSystem.storageError().message, true ); return; }
 		const nodeId = lieveContext.styleInspectionNode()?.id; const colorsOnly = Boolean( button.dataset.styleLibrary ); const kind = colorsOnly ? 'colors' : 'variables'; const label = colorsOnly ? 'Colors' : 'Variables'; const property = button.dataset.styleLibrary || button.dataset.styleToken;
 		const field = lieveContext.inspector.querySelector( '[data-style-prop="' + property + '"]' );
 		if ( ! field || field.disabled || field.readOnly || button.disabled || lieveContext.state.saving || lieveContext.classWorkspace?.isSaving() ) { return; }

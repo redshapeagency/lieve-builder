@@ -53,8 +53,8 @@
 		const service = window.LieveDesignSystem.createService( { ...config, model: window.LieveClassModel }, onChange, onError );
 		const modal = document.getElementById( 'lieve-classes-modal' );
 		const manager = window.LieveDesignSystem.createManager( { root: modal.querySelector( '[data-design-manager]' ), service, modal, embedded: true, openButton: document.getElementById( 'lieve-classes-open' ) } );
-		return { css: service.css, current: manager.data, isActive: service.isActive, refresh: manager.refresh, breakpoints: service.breakpoints, open: manager.open, isOpen: manager.isOpen, submit: manager.submit,
-			canManage: Boolean( config.canManage ), isDirty: manager.isDirty, isSaving: manager.isSaving, save: async () => { await manager.saveDraft(); onChange?.(); }, undo: manager.undo, redo: manager.redo, canUndo: manager.canUndo, canRedo: manager.canRedo, breakGroup: manager.breakGroup,
+		return { storageError: service.storageError, css: service.css, current: manager.data, isActive: service.isActive, refresh: manager.refresh, breakpoints: service.breakpoints, open: manager.open, isOpen: manager.isOpen, submit: manager.submit,
+			get canManage() { return Boolean( config.canManage ) && ! service.storageError(); }, isDirty: manager.isDirty, isSaving: manager.isSaving, save: async () => { await manager.saveDraft(); onChange?.(); }, undo: manager.undo, redo: manager.redo, canUndo: manager.canUndo, canRedo: manager.canRedo, breakGroup: manager.breakGroup,
 			edit: ( change, group ) => manager.edit( change, group ),
 			names: ids => names( ids, manager.data().classes ),
 		};
@@ -72,6 +72,7 @@
 		function close( focus = false ) { cleanup?.(); cleanup = null; popup?.remove(); popup = null; trigger.setAttribute( 'aria-expanded', 'false' ); if ( focus && trigger.isConnected ) { trigger.focus( { preventScroll: true } ); } }
 		function refresh() {
 			if ( disposed || globalOrder?.dragging() || manualOrder?.dragging() ) { return; }
+			trigger.disabled = Boolean( workspace.storageError?.() );
 			const items = workspace.current().classes; const ids = read();
 			const next = JSON.stringify( [ ids, items.map( item => [ item.id, item.name, item.trashed, item.enabled ] ), editing(), workspace.canManage ] );
 			if ( next !== chipsSnapshot ) { globalOrder?.reset(); chipsSnapshot = next;
@@ -81,6 +82,7 @@
 			if ( manual && nextManual !== manualSnapshot ) { manualOrder?.reset(); manualSnapshot = nextManual; manual.innerHTML = manualValues.map( name => '<span class="lieve-class-chip" role="listitem" data-class-order="' + esc( name ) + '">' + reorderGrip( name, name, manualValues.length < 2 ) + '<span>' + esc( name ) + '</span></span>' ).join( '' ); manualOrder?.mount(); }
 			const current = items.find( item => ! item.trashed && item.id === editing() && ids.includes( item.id ) );
 			host.querySelector( '[data-class-edit-context]' ).innerHTML = current ? '<div><strong>Editing .' + esc( current.name ) + '</strong><span>' + ( ! current.enabled ? 'Disabled class · CSS is not applied' : ! workspace.isActive( current.id ) ? 'Not active on this page · display conditions' : 'Shared CSS · all assigned elements' ) + '</span></div><button type="button" class="lieve-button-secondary" data-class-exit>Element</button>' : '<p class="lieve-element-id-help">' + ( workspace.canManage ? 'Click an assigned class to edit its shared CSS.' : 'Element styles · shared classes are read only.' ) + '</p>';
+			if ( workspace.storageError?.() ) { host.querySelector( '[data-class-edit-context]' ).textContent = workspace.storageError().message; }
 		}
 		function toggle( id ) { const ids = read(); if ( ids.includes( id ) ) { change( ids.filter( item => item !== id ) ); } else if ( ids.length < 30 ) { change( [ ...ids, id ] ); } refresh(); }
 		function open() {

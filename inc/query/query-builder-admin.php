@@ -27,6 +27,15 @@ function lieve_query_admin_assets( $hook ) {
 add_action( 'admin_enqueue_scripts', 'lieve_query_admin_assets', 30 );
 function lieve_render_query_builder_page() {
 	if ( ! lieve_queries_can_manage() ) { wp_die( esc_html__( 'You cannot manage queries.', 'lieve-builder' ) ); }
+	$storage = lieve_queries_snapshot();
+	if ( $storage['error'] ) {
+		echo '<div class="wrap lieve-admin-page lieve-design-page lieve-query-page">';
+		lieve_render_admin_header( __( 'Query Builder', 'lieve-builder' ), __( 'Build once. Reuse across your website. Native queries, clear results.', 'lieve-builder' ) );
+		echo '<section class="lieve-settings-card"><div class="lieve-ds" id="lieve-query-builder">';
+		lieve_render_library_error( $storage['error']->get_error_message() );
+		echo '</div></section></div>';
+		return;
+	}
 	$queries = array_filter( lieve_queries_data()['queries'], static function( $q ) { return ! $q['trashed']; } );
 	?>
 	<div class="wrap lieve-admin-page lieve-design-page lieve-token-page lieve-query-page">

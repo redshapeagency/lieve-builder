@@ -52,16 +52,18 @@
 	function createService( config, onChange = () => {}, onError = () => {} ) {
 		const model = config.model || window.LieveDesignModel;
 		config = { ...config, postId: Number( config.postId ) || 0, canManage: config.canManage === true || config.canManage === 1 || config.canManage === '1' };
-		let saved = model.normalize( config.data ); let revision = config.revision; let active = config.activeIds || []; let preview = null; let previewActive = null; let previewOwner = null; let timer = 0; let generation = 0; let dark = null; let refreshing = null;
+		let storageError = config.storageError || null;
+		// Empty is only an inert rendering placeholder when quarantined, never a save baseline.
+		let saved = storageError ? model.empty() : model.normalize( config.data ); let revision = config.revision; let active = config.activeIds || []; let preview = null; let previewActive = null; let previewOwner = null; let timer = 0; let generation = 0; let dark = null; let refreshing = null;
 		async function request( url, payload ) {
 			const response = await ( window.LieveTransport?.fetch || window.fetch.bind( window ) )(  url, { method: payload ? 'POST' : 'GET', credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce, ...( payload ? { 'Content-Type': 'application/json' } : {} ) }, ...( payload ? { body: JSON.stringify( payload ) } : {} ) } );
 			let result; try { result = await response.json(); } catch ( error ) { throw new Error( 'The server returned an unreadable response. Your draft has not been discarded.' ); }
-			if ( ! response.ok ) { throw new Error( result.message || 'The design system could not be loaded or saved.' ); }
+			if ( ! response.ok ) { if ( result.code === 'lieve_library_unavailable' ) { storageError = { code: result.code, message: result.message }; } throw new Error( result.message || 'The design system could not be loaded or saved.' ); }
 			if ( ! result.data || model.validate( result.data ) || typeof result.revision !== 'string' || ! Array.isArray( result.activeIds ) ) { throw new Error( 'Invalid design system response.' ); }
 			return { ...result, data: model.normalize( result.data ) };
 		}
 		return {
-			config, model,
+			config, model, storageError: () => storageError,
 			data: () => model.clone( saved ),
 			current: () => model.clone( preview || saved ),
 			variables: () => ( preview || saved ).variables.filter( item => ! item.trashed ).map( item => ( { name: item.name, aliases: [ ...( item.aliases || [] ) ] } ) ),
@@ -70,6 +72,7 @@
 			mode( value ) { dark = value === 'dark'; onChange(); },
 			breakpoints( items ) { config.breakpoints = model.clone( items ); onChange(); },
 			preview( data, owner ) {
+				if ( storageError ) { return storageError.message; }
 				const error = model.validate( data ); if ( error ) { return error; }
 				window.clearTimeout( timer ); const ticket = ++generation; previewOwner = owner; preview = model.clone( data );
 				// Do not reuse a match if its rules changed or if it is a new selective token.
@@ -85,6 +88,7 @@
 			},
 			discard( owner ) { if ( previewOwner && previewOwner !== owner ) { return; } ++generation; window.clearTimeout( timer ); preview = previewActive = previewOwner = null; dark = null; onChange(); },
 			async save( data ) {
+				if ( storageError ) { throw new Error( storageError.message ); }
 				const error = model.validate( data ); if ( error ) { throw new Error( error ); }
 				const result = await request( config.url, { data, revision, postId: config.postId || 0 } ); ++generation; window.clearTimeout( timer ); saved = result.data; revision = result.revision; active = result.activeIds; preview = previewActive = previewOwner = null; onChange(); return model.clone( saved );
 			},
@@ -93,10 +97,32 @@
 				const ticket = generation;
 				if ( ! refreshing ) { refreshing = request( config.url + ( config.postId ? '?postId=' + config.postId : '' ) ).catch( error => { onError( error.message ); return null; } ).finally( () => { refreshing = null; } ); }
 				const result = await refreshing;
-				if ( result && ticket === generation && ( ! previewOwner || previewOwner === owner ) && shouldApply() ) { saved = result.data; revision = result.revision; active = result.activeIds; onChange(); return true; }
+				if ( result && ticket === generation && ( ! previewOwner || previewOwner === owner ) && shouldApply() ) { saved = result.data; revision = result.revision; active = result.activeIds; storageError = null; onChange(); return true; }
 				return false;
 			},
 		};
+	}
+
+	/** Quarantine this manager only; never offer an empty-library export or reset. */
+	function showStorageError( root, error ) {
+		let notice = root.querySelector( '[data-library-error]' );
+		if ( ! notice ) {
+			notice = document.createElement( 'div' ); notice.className = 'lieve-ds-guide'; notice.setAttribute( 'data-library-error', '' ); notice.setAttribute( 'role', 'alert' );
+			const title = document.createElement( 'h3' ); title.textContent = 'Library unavailable';
+			const message = document.createElement( 'p' ); notice.append( title, message ); root.prepend( notice );
+		}
+		notice.querySelector( 'p' ).textContent = error.message;
+		Array.from( root.children ).forEach( child => { if ( child !== notice ) { child.hidden = true; child.inert = true; } } );
+	}
+
+	function createBlockedManager( { root, service, modal, openButton } ) {
+		showStorageError( root, service.storageError() ); let opened = ! modal;
+		const dialog = modal ? window.LieveConditions.modal( modal ) : null;
+		const open = async ( trigger = openButton ) => { opened = true; dialog?.open( trigger ); openButton?.setAttribute( 'aria-expanded', 'true' ); };
+		modal?.addEventListener( 'lieve:conditions-close', () => { opened = false; openButton?.setAttribute( 'aria-expanded', 'false' ); } );
+		openButton?.addEventListener( 'click', () => { void open(); } );
+		const none = () => false;
+		return { open, isOpen: () => opened, data: service.data, isDirty: none, isSaving: none, canUndo: none, canRedo: none, undo: none, redo: none, edit: none, breakGroup() {}, submit() {}, discard() {}, refresh: none, async saveDraft() { throw new Error( service.storageError().message ); } };
 	}
 
 	/* TheOneWP's custom single-choice dropdown; the native value still owns FormData. */
@@ -287,6 +313,7 @@
 	}
 
 	function createManager( { root, service, modal = null, openButton = null, embedded = false } ) {
+		if ( service.storageError?.() ) { return createBlockedManager( { root, service, modal, openButton } ); }
 		const model = service.model || window.LieveDesignModel;
 		const kind = root.dataset.designManager; const classes = kind === 'classes'; const prefix = classes ? '.' : '--'; const singular = classes ? 'Class' : ( kind === 'colors' ? 'Color' : 'Variable' ); const plural = classes ? 'Classes' : ( kind === 'colors' ? 'Colors' : 'Variables' ); const colors = kind === 'colors'; const groupsKey = colors ? 'palettes' : 'categories'; const groupKey = colors ? 'paletteId' : 'categoryId';
 		const variablesPage = root.classList.contains( 'lieve-ds-token-page' );
@@ -1019,6 +1046,7 @@
 			const snapshot = JSON.stringify( draft ), ticket = openGeneration, wasOpen = opened;
 			const intact = () => ticket === openGeneration && opened === wasOpen && ! saving && ! categoryEditor?.isEditing() && ! variableList?.isDragging() && actionLayer.hidden && ! actionClosing && JSON.stringify( draft ) === snapshot;
 			const checked = await service.refresh( intact, opened ? api : null );
+			if ( service.storageError?.() ) { showStorageError( root, service.storageError() ); return false; }
 			const next = service.data();
 			// A focus refresh must neither repaint identical content nor erase an early edit.
 			if ( ! intact() || JSON.stringify( next ) === snapshot ) { return checked; }
@@ -1028,15 +1056,16 @@
 		};
 		api.submit = () => { if ( variableList?.isDragging() ) { messageStatus( 'Finish reordering before saving the design system.' ); return; } if ( categoryEditor?.isEditing() ) { categoryEditor.warn( 'Apply or cancel your group changes before saving the design system.' ); return; } if ( ! actionLayer.hidden ) { actionContent.querySelector( '[data-ds-action-error]' ).textContent = 'Finish or cancel this action before saving the design system.'; return; } if ( editable && ! saving && ! q( '[data-ds-save]' ).disabled ) { q( '[data-ds-save]' ).click(); } };
 		api.saveDraft = async () => {
+			if ( service.storageError?.() ) { throw new Error( service.storageError().message ); }
 			if ( saving ) { throw new Error( plural + ' are already being saved. Wait for the save to finish.' ); }
 			if ( ! dirty() ) { return; } if ( ! editable ) { throw new Error( 'Only administrators can save global definitions.' ); }
 			const error = model.validate( draft ); if ( error ) { throw new Error( error ); } saving = true; updateToolbar(); messageStatus( 'Saving design system…' );
 			try { draft = await service.save( model.clone( draft ) ); history.reset( draft ); if ( embeddedCheckpoint ) { embeddedCheckpoint = { data: model.clone( draft ), history }; } }
-			finally { saving = false; updateToolbar(); q( '[data-ds-group-add]' ).disabled = ! editable || draft[ groupsKey ].length >= 100; categoryEditor?.refresh(); }
+			finally { saving = false; updateToolbar(); q( '[data-ds-group-add]' ).disabled = ! editable || draft[ groupsKey ].length >= 100; categoryEditor?.refresh(); if ( service.storageError?.() ) { showStorageError( root, service.storageError() ); } }
 		};
 		api.data = () => model.clone( draft ); api.isSaving = () => saving;
 		api.canUndo = () => history.canUndo(); api.canRedo = () => history.canRedo(); api.undo = () => travelHistory(); api.redo = () => travelHistory( true ); api.breakGroup = () => history.breakGroup();
-		api.edit = ( change, group = '' ) => { if ( ! embedded || ! editable || saving || opened ) { return false; } const next = model.clone( draft ); change( next ); const error = model.validate( next ); if ( error ) { throw new Error( error ); } if ( JSON.stringify( next ) === JSON.stringify( draft ) ) { return false; } draft = next; history.record( draft, group ); if ( dirty() ) { service.preview( draft, api ); } else { service.discard( api ); } return true; };
+		api.edit = ( change, group = '' ) => { if ( service.storageError?.() || ! embedded || ! editable || saving || opened ) { return false; } const next = model.clone( draft ); change( next ); const error = model.validate( next ); if ( error ) { throw new Error( error ); } if ( JSON.stringify( next ) === JSON.stringify( draft ) ) { return false; } draft = next; history.record( draft, group ); if ( dirty() ) { service.preview( draft, api ); } else { service.discard( api ); } return true; };
 		if ( hydrateInitialView() ) { updateToolbar(); paintSwatches(); }
 		else { renderGroups(); renderList(); renderDetail(); updateToolbar(); }
 		if ( colors ) { policySelect = createActionSelect( q( '[data-ds-dark-policy]' ), root, root ); }
@@ -1072,7 +1101,7 @@
 		const service = createService( config, onChange, onError ); const managers = {};
 		window.matchMedia?.( '(prefers-color-scheme: dark)' ).addEventListener?.( 'change', () => onChange?.() );
 		for ( const kind of [ 'variables', 'colors' ] ) { const modal = document.getElementById( 'lieve-' + kind + '-modal' ); if ( modal ) { managers[ kind ] = createManager( { root: modal.querySelector( '[data-design-manager]' ), service, modal, openButton: document.getElementById( 'lieve-' + kind + '-open' ) } ); } }
-		return { variables: service.variables, css: service.css, refresh: service.refresh, breakpoints: service.breakpoints, open: kind => managers[ kind ]?.open(), isOpen: () => Object.values( managers ).some( manager => manager.isOpen() ), submit: () => Object.values( managers ).find( manager => manager.isOpen() )?.submit(), tokens: ( colorsOnly = false ) => editorTokenChoices( service.current(), colorsOnly ) };
+		return { storageError: service.storageError, variables: service.variables, css: service.css, refresh: service.refresh, breakpoints: service.breakpoints, open: kind => managers[ kind ]?.open(), isOpen: () => Object.values( managers ).some( manager => manager.isOpen() ), submit: () => Object.values( managers ).find( manager => manager.isOpen() )?.submit(), tokens: ( colorsOnly = false ) => editorTokenChoices( service.current(), colorsOnly ) };
 	}
 	window.LieveDesignSystem = { createService, createManager, createWorkspace, createSelect: createActionSelect };
 	if ( window.LieveDesignConfig ) { document.querySelectorAll( '.lieve-design-page [data-design-manager]' ).forEach( root => { const service = createService( root.dataset.designManager === 'classes' ? { ...window.LieveClassesConfig, model: window.LieveClassModel } : window.LieveDesignConfig ); const manager = createManager( { root, service } ); window.addEventListener( 'focus', () => { void manager.refresh(); } ); } ); }

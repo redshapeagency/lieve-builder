@@ -264,6 +264,7 @@ function lieve_rest_template_status( $request ) {
 function lieve_rest_save_template_document( $request ) {
 	$id = (int) $request['id'];
 	if ( function_exists( 'lieve_validate_document' ) ) { $valid = lieve_validate_document( $request->get_param( 'document' ) ); if ( is_wp_error( $valid ) ) { return $valid; } }
+	if ( function_exists( 'lieve_validate_template_expansion' ) ) { $valid = lieve_validate_template_expansion( $request->get_param( 'document' ), $id ); if ( is_wp_error( $valid ) ) { return $valid; } }
 	if ( function_exists( 'lieve_validate_document_interactions' ) ) { $valid = lieve_validate_document_interactions( $request->get_param( 'document' ) ); if ( is_wp_error( $valid ) ) { return $valid; } }
 	if ( function_exists( 'lieve_validate_document_motion' ) ) { $valid = lieve_validate_document_motion( $request->get_param( 'document' ) ); if ( is_wp_error( $valid ) ) { return $valid; } }
 	if ( function_exists( 'lieve_validate_document_element_conditions' ) ) { $valid = lieve_validate_document_element_conditions( $request->get_param( 'document' ) ); if ( is_wp_error( $valid ) ) { return $valid; } }

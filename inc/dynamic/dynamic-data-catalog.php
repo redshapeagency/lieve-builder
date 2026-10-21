@@ -1,6 +1,7 @@
 <?php
 /** Independently implemented WordPress/WooCommerce data catalogue. @package LieveBuilder */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+require_once __DIR__ . '/../templates/expansion.php';
 
 function lieve_dynamic_parameter( $label, $placeholder = '', $required = false, $choices = array() ) {
 	return array( 'label' => $label, 'placeholder' => $placeholder, 'required' => $required, 'choices' => $choices, 'control' => $choices ? 'select' : 'text' );
@@ -298,17 +299,11 @@ if ( function_exists( 'add_action' ) ) { add_action( 'rest_api_init', 'lieve_reg
 
 function lieve_dynamic_protect_request_data() {
 	if ( is_admin() || ! function_exists( 'lieve_frontend_asset_usage' ) ) { return; }
-	$check = static function( $document, $visited = array(), $depth = 0 ) use ( &$check ) {
-		if ( lieve_dynamic_request_bound( $document ) ) { return true; }
-		foreach ( $document['children'] ?? array() as $node ) {
-			if ( ! empty( $node['children'] ) && $check( array( 'children' => $node['children'] ), $visited, $depth ) ) { return true; }
-			$id = 'template' === ( $node['type'] ?? '' ) ? (int) ( $node['props']['templateId'] ?? 0 ) : 0;
-			if ( $id && $depth < 4 && ! in_array( $id, $visited, true ) && $check( lieve_get_document( $id ), array_merge( $visited, array( $id ) ), $depth + 1 ) ) { return true; }
-		}
-		return false;
-	};
 	foreach ( lieve_frontend_asset_usage()['documents'] ?? array() as $id ) {
-		if ( $check( lieve_get_document( $id ), array( (int) $id ) ) ) { lieve_dynamic_mark_request_bound( null, true ); break; }
+		$document = lieve_prepare_template_document( lieve_get_document( $id ), array( (int) $id ) );
+		$bound = false;
+		lieve_visit_template_document( $document, static function( $node ) use ( &$bound ) { if ( lieve_dynamic_request_bound( $node['props'] ?? array() ) ) { $bound = true; } } );
+		if ( $bound ) { lieve_dynamic_mark_request_bound( null, true ); break; }
 	}
 }
 if ( function_exists( 'add_action' ) ) { add_action( 'wp_enqueue_scripts', 'lieve_dynamic_protect_request_data', 1 ); }

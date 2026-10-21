@@ -1,6 +1,7 @@
 <?php
 /** Public-page snapshots. Only the web server can deliver these without PHP. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+require_once __DIR__ . '/../templates/expansion.php';
 
 define( 'LIEVE_STATIC_OPTION', 'lieve_static_delivery' );
 define( 'LIEVE_STATIC_META', '_lieve_static_snapshot' );
@@ -56,9 +57,10 @@ function lieve_static_config_signature() { return hash( 'sha256', wp_json_encode
 
 /** Recursive conservative compatibility check. Unknown/PHP-backed widgets stay dynamic. */
 function lieve_static_scan( $document, &$issues, &$visited, $depth = 0 ) {
-	if ( function_exists( 'lieve_components_runtime_document' ) ) { $document = lieve_components_runtime_document( $document ); }
+	$document = lieve_prepare_template_document( $document, $visited, $depth );
+	if ( ! empty( $document['_lieveTemplateIssues'] ) ) { $issues[] = 'Reusable content is unavailable, recursive or exceeds the safe expansion budget.'; }
 	$allowed = array( 'section', 'container', 'block', 'div', 'slot', 'heading', 'text-basic', 'text', 'button', 'image', 'spacer', 'divider', 'icon', 'icon-box', 'video', 'audio', 'svg', 'html', 'code', 'list', 'social-icons', 'pricing-tables', 'team-members', 'testimonials', 'image-gallery', 'accordion', 'accordion-nested', 'tabs', 'tabs-nested', 'slider', 'slider-nested', 'carousel', 'offcanvas', 'toggle', 'toggle-mode', 'alert', 'back-to-top', 'animated-typing', 'counter', 'countdown', 'nav-menu', 'nav-nested', 'dropdown', 'breadcrumbs', 'logo', 'text-link', 'file', 'progress-bar', 'pie-chart', 'rating', 'template', 'post-title', 'post-excerpt', 'post-meta', 'post-sharing', 'post-author', 'post-taxonomy', 'post-reading-time', 'post-reading-progress-bar', 'post-toc', 'map', 'map-leaflet', 'map-connector', 'facebook-page', 'instagram-feed' );
-	foreach ( $document['children'] ?? array() as $node ) {
+	lieve_visit_template_document( $document, static function( $node ) use ( &$issues, $allowed ) {
 		$type = $node['type'] ?? ''; $props = $node['props'] ?? array();
 		if ( 'html' === $type && false !== strpos( $props['content'] ?? '', '<?' ) ) { $issues[] = 'Custom Code containing PHP requires dynamic delivery.'; }
 		if ( function_exists( 'lieve_listing_enabled' ) && lieve_listing_enabled( $node ) ) { $issues[] = 'Query-backed listings require dynamic delivery so results and permissions stay current.'; }
@@ -68,14 +70,7 @@ function lieve_static_scan( $document, &$issues, &$visited, $depth = 0 ) {
 		// Inspect values, not JSON object delimiters. Unknown extensions must opt in explicitly.
 		foreach ( $props as $value ) { if ( is_string( $value ) && preg_match( '/\{\{[^}]+\}\}/', $value ) && 'code' !== $type ) { $issues[] = 'Dynamic tags need a compatibility review.'; } }
 		if ( 'html' === $type && preg_match( '/<\s*form\b|(?:wpnonce|form_nonce)/i', $props['content'] ?? '' ) ) { $issues[] = 'HTML forms and nonce-bearing markup cannot be frozen.'; }
-		if ( 'template' === $type ) {
-			$id = absint( $props['templateId'] ?? 0 ); $post = get_post( $id );
-			if ( $depth >= 4 || in_array( $id, $visited, true ) ) { $issues[] = 'A reusable template is recursive or nested too deeply.'; }
-			elseif ( ! $post || LIEVE_TEMPLATE_POST_TYPE !== $post->post_type || 'publish' !== $post->post_status || $post->post_password ) { $issues[] = 'A reusable template is not public.'; }
-			else { $visited[] = $id; lieve_static_scan( lieve_get_document( $id ), $issues, $visited, $depth + 1 ); array_pop( $visited ); }
-		}
-		if ( ! empty( $node['children'] ) ) { lieve_static_scan( array( 'children' => $node['children'] ), $issues, $visited, $depth ); }
-	}
+	} );
 }
 function lieve_static_page_issues( $id ) {
 	$post = get_post( $id ); $issues = array();

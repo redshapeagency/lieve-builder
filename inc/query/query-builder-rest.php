@@ -3,7 +3,7 @@
 defined( 'ABSPATH' ) || exit;
 function lieve_queries_can_manage() { return current_user_can( 'manage_options' ); }
 function lieve_queries_can_choose( $request ) { $id = (int) $request->get_param( 'postId' ); return lieve_queries_can_manage() || ( $id && current_user_can( 'edit_post', $id ) && lieve_builder_supports_post_type( get_post_type( $id ) ) ); }
-function lieve_queries_response() { $data = lieve_queries_data(); return array( 'data' => $data, 'revision' => lieve_queries_revision( $data ) ); }
+function lieve_queries_response() { $snapshot = lieve_queries_snapshot(); return array( 'data' => $snapshot['data'], 'revision' => $snapshot['revision'], 'storageError' => lieve_library_error_config( $snapshot ) ); }
 function lieve_queries_rest_response( $data ) { $response = rest_ensure_response( $data ); if ( $response instanceof WP_REST_Response ) { $response->header( 'Cache-Control', 'private, no-store' ); } return $response; }
 function lieve_rest_save_queries( $request ) {
 	if ( ! lieve_queries_can_manage() ) { return lieve_query_error( 'You cannot manage queries.', 403 ); }
@@ -15,8 +15,10 @@ function lieve_rest_save_queries( $request ) {
 	}
 	if ( ! add_option( $lock, $value, '', false ) ) { return lieve_query_error( 'Another query save is in progress. Your draft is preserved; try again.', 409 ); }
 	try {
+		$snapshot = lieve_queries_snapshot( true );
+		if ( $snapshot['error'] ) { return $snapshot['error']; }
 		$revision = $request->get_param( 'revision' );
-		if ( ! is_string( $revision ) || ! hash_equals( lieve_queries_revision(), $revision ) ) { return lieve_query_error( 'Queries changed in another tab. Export your draft before reloading the latest library.', 409 ); }
+		if ( ! is_string( $revision ) || ! hash_equals( $snapshot['revision'], $revision ) ) { return lieve_query_error( 'Queries changed in another tab. Export your draft before reloading the latest library.', 409 ); }
 		if ( false === update_option( LIEVE_QUERIES_OPTION, $data, false ) && lieve_queries_revision() !== lieve_queries_revision( $data ) ) { return lieve_query_error( 'Queries could not be saved. Your draft is preserved.', 500 ); }
 		lieve_query_invalidate();
 		return lieve_queries_rest_response( lieve_queries_response() );
@@ -37,7 +39,7 @@ function lieve_rest_preview_query( $request ) {
 function lieve_register_query_routes() {
 	$object = array( 'type' => 'object', 'required' => true );
 	register_rest_route( 'lieve/v1', '/queries', array(
-		array( 'methods' => WP_REST_Server::READABLE, 'permission_callback' => 'lieve_queries_can_manage', 'callback' => static function() { return lieve_queries_rest_response( lieve_queries_response() ); } ),
+		array( 'methods' => WP_REST_Server::READABLE, 'permission_callback' => 'lieve_queries_can_manage', 'callback' => static function() { $snapshot = lieve_queries_snapshot(); return $snapshot['error'] ?: lieve_queries_rest_response( lieve_queries_response() ); } ),
 		array( 'methods' => WP_REST_Server::EDITABLE, 'permission_callback' => 'lieve_queries_can_manage', 'callback' => 'lieve_rest_save_queries', 'args' => array( 'data' => $object + array( 'validate_callback' => static function( $value ) { $valid = lieve_queries_validate( $value ); return is_wp_error( $valid ) ? $valid : true; } ), 'revision' => array( 'type' => 'string', 'required' => true, 'pattern' => '^[a-f0-9]{64}$' ) ) ),
 	) );
 	register_rest_route( 'lieve/v1', '/queries/preview', array( 'methods' => WP_REST_Server::CREATABLE, 'permission_callback' => 'lieve_queries_can_manage', 'callback' => 'lieve_rest_preview_query', 'args' => array( 'query' => $object, 'postId' => array( 'type' => 'integer', 'default' => 0, 'minimum' => 0 ), 'page' => array( 'type' => 'integer', 'default' => 1, 'minimum' => 1, 'maximum' => 10000 ), 'bypassCache' => array( 'type' => 'boolean', 'default' => false ) ) ) );

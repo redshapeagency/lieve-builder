@@ -1,6 +1,7 @@
 <?php
 /** Saved, bounded native WordPress queries. No SQL, PHP or public execution endpoint. */
 defined( 'ABSPATH' ) || exit;
+require_once __DIR__ . '/../core/library-storage.php';
 define( 'LIEVE_QUERIES_OPTION', 'lieve_saved_queries' );
 require_once __DIR__ . '/query-builder-fields.php';
 
@@ -77,13 +78,9 @@ function lieve_queries_validate( $raw ) {
 		$ids[ $q['id'] ] = true; $slugs[ $q['slug'] ] = true; $data['queries'][] = $q;
 	} return $data;
 }
-function lieve_queries_data() {
-	static $last = null, $clean = null;
-	$raw = get_option( LIEVE_QUERIES_OPTION, array( 'version' => 1, 'queries' => array() ) );
-	if ( null === $clean || $last !== $raw ) { $last = $raw; $clean = lieve_queries_validate( $raw ); if ( is_wp_error( $clean ) ) { $clean = array( 'version' => 1, 'queries' => array() ); } }
-	return $clean;
-}
-function lieve_queries_revision( $data = null ) { return hash( 'sha256', wp_json_encode( $data ?? lieve_queries_data() ) ); }
+function lieve_queries_snapshot( $fresh = false ) { return lieve_library_snapshot( LIEVE_QUERIES_OPTION, array( 'version' => 1, 'queries' => array() ), 'lieve_queries_validate', $fresh, true ); }
+function lieve_queries_data() { return lieve_queries_snapshot()['data'] ?? array( 'version' => 1, 'queries' => array() ); }
+function lieve_queries_revision( $data = null ) { return null === $data ? lieve_queries_snapshot()['revision'] : hash( 'sha256', wp_json_encode( $data ) ); }
 function lieve_query_find( $key ) { foreach ( lieve_queries_data()['queries'] as $q ) { if ( $q['id'] === $key || $q['slug'] === $key ) { return $q; } } return null; }
 function lieve_query_choices( $posts_only = false ) {
 	$out = array( '' => 'Use element settings' );
@@ -191,6 +188,15 @@ function lieve_query_run( $key, $context = array(), $bypass_cache = false ) {
 	}
 	$args = apply_filters( 'lieve_saved_query_args', $args, $q, $context );
 	$where = lieve_query_core_where( $q, $context ); if ( is_wp_error( $where ) ) { return $where; }
+	if ( 'comments' === $q['type'] ) {
+		// Apply the hydration policy before LIMIT and COUNT, including protected/non-viewable posts.
+		$public_types = array_values( array_filter( get_post_types( array( 'public' => true ), 'names' ), 'is_post_type_viewable' ) );
+		$placeholders = implode( ', ', array_fill( 0, max( 1, count( $public_types ) ), '%s' ) );
+		$where .= $wpdb->prepare( " AND EXISTS (SELECT 1 FROM {$wpdb->posts} AS lieve_comment_post WHERE lieve_comment_post.ID = {$wpdb->comments}.comment_post_ID AND lieve_comment_post.post_status = %s AND lieve_comment_post.post_password = %s AND lieve_comment_post.post_type IN ($placeholders))", array_merge( array( 'publish', '' ), $public_types ?: array( '' ) ) );
+		// WP_Comment_Query keys only native query vars, not SQL or lieve_query_scope.
+		// Post changes must also invalidate core's comment results (which otherwise use only the comment generation).
+		$args['cache_domain'] = 'lieve-comments-' . hash( 'sha256', wp_json_encode( array( $args['cache_domain'] ?? 'core', $where, wp_cache_get_last_changed( 'posts' ) ) ) );
+	}
 	if ( $where ) { $args['lieve_query_scope'] = hash( 'sha256', $where ); $args['suppress_filters'] = false; }
 	$cache_key = hash( 'sha256', wp_json_encode( array( $q, $args, get_current_blog_id(), get_current_user_id(), determine_locale(), wp_cache_get_last_changed( 'posts' ), wp_cache_get_last_changed( 'terms' ), wp_cache_get_last_changed( 'lieve_queries' ) ) ) );
 	$hit = false; $result = $q['cache'] && ! $bypass_cache ? wp_cache_get( $cache_key, 'lieve_query_results', false, $hit ) : false;
@@ -201,7 +207,14 @@ function lieve_query_run( $key, $context = array(), $bypass_cache = false ) {
 		if ( in_array( $q['type'], array( 'posts', 'current' ), true ) ) { $query = new WP_Query( $args ); $ids = $query->posts; if ( $q['calculateTotal'] ) { $total = max( 0, (int) $query->found_posts - $q['offset'] ); } }
 		elseif ( 'terms' === $q['type'] ) { $query = new WP_Term_Query( $args ); $ids = $query->terms; if ( is_wp_error( $ids ) ) { return $ids; } if ( $q['calculateTotal'] ) { $count_args = array_replace( $args, array( 'fields' => 'count', 'number' => 0, 'offset' => 0 ) ); $count = get_terms( $count_args ); if ( is_wp_error( $count ) ) { return $count; } $total = max( 0, (int) $count - $q['offset'] ); } }
 		elseif ( 'users' === $q['type'] ) { $query = new WP_User_Query( $args ); $ids = $query->get_results(); if ( $q['calculateTotal'] ) { $total = max( 0, (int) $query->get_total() - $q['offset'] ); } }
-		else { $query = new WP_Comment_Query( $args ); $ids = $query->comments; }
+		else {
+			$query = new WP_Comment_Query( $args ); $ids = $query->comments;
+			if ( $q['calculateTotal'] ) {
+				// A native COUNT also works beyond the last page; found_comments does not on an empty page.
+				$count_args = array_replace( $args, array( 'count' => true, 'number' => 0, 'offset' => 0, 'paged' => 1, 'no_found_rows' => true ) );
+				$total = max( 0, (int) get_comments( $count_args ) - $q['offset'] );
+			}
+		}
 		$result = array( 'ids' => array_values( array_map( 'intval', $ids ?: array() ) ), 'total' => $total );
 		} finally { foreach ( $field_filters as $filter ) { remove_filter( $filter[0], $filter[1], 10 ); } }
 		if ( $q['cache'] && ! $bypass_cache ) { wp_cache_set( $cache_key, $result, 'lieve_query_results', $q['ttl'] ); }

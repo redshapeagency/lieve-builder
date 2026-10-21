@@ -84,6 +84,13 @@ function lieve_render_design_controls( $kind, $backend = false ) {
 	$manager_page = $backend;
 	$singular = $classes ? 'Class' : ( $colors ? 'Color' : 'Variable' );
 	$plural = $classes ? 'Classes' : ( $colors ? 'Colors' : 'Variables' );
+	$storage = $classes ? lieve_classes_snapshot() : lieve_design_snapshot();
+	if ( $storage['error'] ) {
+		echo '<div class="lieve-ds" data-design-manager="' . esc_attr( $kind ) . '">';
+		lieve_render_library_error( $storage['error']->get_error_message() );
+		echo '</div>';
+		return;
+	}
 	$initial_data = $manager_page ? ( $classes ? lieve_classes() : lieve_design_system() ) : null;
 	$initial_live_count = $manager_page ? count( array_filter( $initial_data[ $kind ], static function( $item ) { return empty( $item['trashed'] ); } ) ) : 0;
 	$editable = current_user_can( 'manage_options' );

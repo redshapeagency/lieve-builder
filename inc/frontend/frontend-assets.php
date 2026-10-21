@@ -6,6 +6,7 @@
  * @package LieveBuilder
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+require_once __DIR__ . '/../templates/expansion.php';
 
 function lieve_interactive_element_types() {
 	return array( 'tabs', 'tabs-nested', 'slider', 'carousel', 'slider-nested', 'offcanvas', 'toggle', 'toggle-mode', 'alert', 'back-to-top', 'animated-typing', 'countdown', 'counter', 'post-toc', 'post-reading-progress-bar', 'form', 'map', 'map-leaflet', 'facebook-page', 'instagram-feed', 'map-connector', 'woocommerce-dynamic-fragment', 'woocommerce-checkout-step', 'woocommerce-checkout-steps-nav', 'woocommerce-checkout-step-nav-item' );
@@ -13,8 +14,8 @@ function lieve_interactive_element_types() {
 
 /** Inspect reusable documents recursively, bounded exactly like template rendering. */
 function lieve_scan_frontend_document( $document, &$usage, &$visited, $depth = 0 ) {
-	if ( function_exists( 'lieve_components_runtime_document' ) ) { $document = lieve_components_runtime_document( $document ); }
-	foreach ( $document['children'] ?? array() as $node ) {
+	$document = lieve_prepare_template_document( $document, $visited, $depth );
+	lieve_visit_template_document( $document, static function( $node ) use ( &$usage ) {
 		$type = $node['type']; $props = $node['props'] ?? array();
 		if ( in_array( $type, array( 'slider', 'slider-nested', 'carousel' ), true ) || 'lightbox' === ( $props['imageLink'] ?? '' ) || 'lightbox' === ( $props['galleryLink'] ?? '' ) || ! empty( $props['menuMobile'] ) || ! empty( $props['menuSubmenus'] ) ) { $usage['widgets'] = true; }
 		if ( function_exists( 'lieve_listing_enabled' ) && lieve_listing_enabled( $node ) && 'slider' === ( $props['listing']['mode'] ?? '' ) ) { $usage['listings'] = true; }
@@ -40,17 +41,7 @@ function lieve_scan_frontend_document( $document, &$usage, &$visited, $depth = 0
 		}
 		if ( 'html' === $type && false !== strpos( $props['content'] ?? '', 'wp-block-' ) ) { $usage['blocks'] = true; }
 		if ( 'html' === $type && false !== strpos( $props['content'] ?? '', '<?' ) ) { $usage['opaque'] = true; $usage['blocks'] = true; }
-		if ( 'template' === $type && $depth < 4 ) {
-			$id = absint( $props['templateId'] ?? 0 );
-			$template = $id ? get_post( $id ) : null;
-			if ( $template && LIEVE_TEMPLATE_POST_TYPE === $template->post_type && 'publish' === $template->post_status && ! in_array( $id, $visited, true ) ) {
-				$visited[] = $id;
-				lieve_scan_frontend_document( lieve_get_document( $id ), $usage, $visited, $depth + 1 );
-				array_pop( $visited );
-			}
-		}
-		if ( ! empty( $node['children'] ) ) { lieve_scan_frontend_document( array( 'children' => $node['children'] ), $usage, $visited, $depth ); }
-	}
+	} );
 }
 
 /** Cached only for this request. The reset argument is useful for read-only smoke tests. */

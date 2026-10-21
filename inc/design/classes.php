@@ -1,6 +1,7 @@
 <?php
 /** Reusable classes. Stored independently from variables and colors. */
 defined( 'ABSPATH' ) || exit;
+require_once __DIR__ . '/../core/library-storage.php';
 define( 'LIEVE_CLASSES_OPTION', 'lieve_global_classes' );
 
 function lieve_classes_empty() {
@@ -59,8 +60,9 @@ function lieve_normalize_classes( $raw ) {
 	}
 	return $data;
 }
-function lieve_classes() { $data = lieve_normalize_classes( get_option( LIEVE_CLASSES_OPTION, lieve_classes_empty() ) ); return is_wp_error( $data ) ? lieve_classes_empty() : $data; }
-function lieve_classes_revision( $data = null ) { return hash( 'sha256', wp_json_encode( $data ?? lieve_classes() ) ); }
+function lieve_classes_snapshot( $fresh = false ) { return lieve_library_snapshot( LIEVE_CLASSES_OPTION, lieve_classes_empty(), 'lieve_normalize_classes', $fresh ); }
+function lieve_classes() { return lieve_classes_snapshot()['data'] ?? lieve_classes_empty(); }
+function lieve_classes_revision( $data = null ) { return null === $data ? lieve_classes_snapshot()['revision'] : hash( 'sha256', wp_json_encode( $data ) ); }
 function lieve_classes_active_ids( $data, $post_id = 0 ) {
 	return array_values( array_column( array_filter( $data['classes'], function( $item ) use ( $post_id ) { return empty( $item['trashed'] ) && $item['enabled'] && lieve_design_matches( $item['conditions'], $post_id ); } ), 'id' ) );
 }
@@ -104,12 +106,13 @@ function lieve_print_classes_css() { lieve_print_generated_css( lieve_classes_cs
 add_action( 'wp_head', 'lieve_print_classes_css', 31 );
 function lieve_classes_response( $data, $post_id = 0 ) { return rest_ensure_response( array( 'data' => $data, 'revision' => lieve_classes_revision( $data ), 'activeIds' => $post_id ? lieve_classes_context_ids( $data, $post_id ) : array() ) ); }
 function lieve_classes_config( $post_id = 0 ) {
-	$config = lieve_design_config( $post_id ); $data = lieve_classes();
-	return array_merge( $config, array( 'data' => $data, 'revision' => lieve_classes_revision( $data ), 'activeIds' => $post_id ? lieve_classes_context_ids( $data, $post_id ) : array(), 'url' => esc_url_raw( rest_url( 'lieve/v1/classes' ) ), 'previewUrl' => $post_id ? esc_url_raw( rest_url( 'lieve/v1/classes/preview/' . $post_id ) ) : '' ) );
+	$config = lieve_design_config( $post_id ); $snapshot = lieve_classes_snapshot(); $data = $snapshot['data'];
+	return array_merge( $config, array( 'data' => $data, 'revision' => $snapshot['revision'], 'storageError' => lieve_library_error_config( $snapshot ), 'activeIds' => $data && $post_id ? lieve_classes_context_ids( $data, $post_id ) : array(), 'url' => esc_url_raw( rest_url( 'lieve/v1/classes' ) ), 'previewUrl' => $post_id ? esc_url_raw( rest_url( 'lieve/v1/classes/preview/' . $post_id ) ) : '' ) );
 }
 function lieve_rest_get_classes( $request ) {
 	$post_id = absint( $request->get_param( 'postId' ) ); if ( $post_id && ! current_user_can( 'edit_post', $post_id ) ) { return new WP_Error( 'lieve_forbidden_context', 'You cannot preview this content.', array( 'status' => 403 ) ); }
-	return lieve_classes_response( lieve_classes(), $post_id );
+	$snapshot = lieve_classes_snapshot();
+	return $snapshot['error'] ?: lieve_classes_response( $snapshot['data'], $post_id );
 }
 function lieve_rest_save_classes( $request ) {
 	$raw = $request->get_json_params(); $data = lieve_normalize_classes( $raw['data'] ?? null ); if ( is_wp_error( $data ) ) { return $data; }
@@ -118,7 +121,9 @@ function lieve_rest_save_classes( $request ) {
 	if ( $locked_at && time() - (int) $locked_at > 30 ) { global $wpdb; $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s AND option_value = %s", $lock, (string) $locked_at ) ); wp_cache_delete( $lock, 'options' ); wp_cache_delete( 'notoptions', 'options' ); }
 	if ( ! add_option( $lock, time(), '', false ) ) { return new WP_Error( 'lieve_classes_busy', 'Another save is in progress. Try again.', array( 'status' => 409 ) ); }
 	try {
-		if ( ! is_string( $raw['revision'] ?? null ) || ! hash_equals( lieve_classes_revision(), $raw['revision'] ) ) { return new WP_Error( 'lieve_classes_conflict', 'Classes changed in another tab. Export your draft and reload before saving.', array( 'status' => 409 ) ); }
+		$snapshot = lieve_classes_snapshot( true );
+		if ( $snapshot['error'] ) { return $snapshot['error']; }
+		if ( ! is_string( $raw['revision'] ?? null ) || ! hash_equals( $snapshot['revision'], $raw['revision'] ) ) { return new WP_Error( 'lieve_classes_conflict', 'Classes changed in another tab. Export your draft and reload before saving.', array( 'status' => 409 ) ); }
 		if ( false === update_option( LIEVE_CLASSES_OPTION, $data, false ) && lieve_classes_revision() !== lieve_classes_revision( $data ) ) { return new WP_Error( 'lieve_classes_save_failed', 'Classes could not be saved. Your draft is still available.', array( 'status' => 500 ) ); }
 		return lieve_classes_response( $data, $post_id );
 	} finally { delete_option( $lock ); }
