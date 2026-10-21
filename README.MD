@@ -20,9 +20,9 @@ A lightweight WordPress theme by TheOneWP with an integrated visual builder for 
 3. Add elements, configure content and styles, then **Save**. Use **Preview** to test the complete page.
 4. Enable other content types in **LieveBuilder → Settings → Builder**. Only Pages is enabled by default; templates remain available independently.
 
-Activating the theme changes the site's presentation. Builder pages have no automatic header or footer unless matching templates or explicit assignments provide them.
+Activation changes presentation. Builder headers/footers require matching templates or explicit assignments.
 
-**LieveBuilder → Overview** reopens recently updated builder content and links to content lists, design libraries and current configuration. Content and tools follow your editing permissions.
+**LieveBuilder → Overview** reopens recent builder content and links to libraries and configuration, respecting editing permissions.
 
 ## The builder
 
@@ -32,7 +32,7 @@ Activating the theme changes the site's presentation. Builder pages have no auto
 
 Structure supports inline renaming, nested drag-and-drop and context menus. Copy/paste transfers elements, styles, classes or interactions; pasting classes adds assignments without duplicates.
 
-Authored elements start without decorative styling. Heading sizes retain their hierarchy; spacing, typography, backgrounds and layout are yours to define. Native WordPress content and integration plugins may retain their own styles.
+Authored elements start without decorative styling, apart from heading-size hierarchy. Define spacing, typography, backgrounds and layout yourself. WordPress and integrations may retain their own styles.
 
 Responsive values inherit from the selected base breakpoint: smaller contexts cascade downward and larger contexts upward. Blank fields show inherited values; clearing an override resumes inheritance.
 
@@ -55,7 +55,7 @@ Pop Ups have responsive Style, Behavior and Motion settings. Their close button 
 3. On the model's single root, expose supported content properties. Add named Slot containers for instance-specific content.
 4. Insert linked instances through the Library or Component widget. Pages edit exposed properties and slot contents, not model internals.
 
-Saving a published model updates linked instances while preserving their overrides. **Reset to model** restores a property's default; **Use model content** restores a slot's fallback. Explicitly empty overrides stay empty. Missing or inactive models render nothing without deleting instance data.
+Saving a published model updates instances, preserving overrides. **Reset to model** restores a property; **Use model content** restores a slot. Empty overrides stay empty. Missing or inactive models render nothing but preserve instance data.
 
 Code and repeater definitions remain model-owned. Internal IDs are instance-scoped; use reusable class/data selectors in custom JavaScript. Expansion has cycle, depth and node limits.
 
@@ -81,7 +81,7 @@ Assign a global class in an element's **Markup** tab. Click its chip or heading 
 
 Enable **Content → Listing Builder** on a supported layout container and select a saved query. Its children define one repeated result. Bind child fields through the dynamic-data picker, then choose a responsive grid or slider. Grids support previous/next links or progressive Load more; enable query totals for exact final-page detection.
 
-References such as `{{lieve:post.title}}` resolve in the current page or listing context. Sources depend on WordPress, active plugins and registered adapters. Missing context uses an empty value or configured fallback. TheOneWP needs an explicit adapter; custom-field integrations do not guarantee every provider schema.
+References such as `{{lieve:post.title}}` resolve in the page or listing context, using an empty value or configured fallback when unavailable. Sources depend on WordPress, plugins and adapters. TheOneWP requires an explicit adapter; provider schemas vary.
 
 ## Settings
 
@@ -95,7 +95,7 @@ Open **LieveBuilder → Settings**:
 | Markup | Element identifiers, default/custom classes and Body/Main IDs. |
 | Head | Allow or suppress existing head tags, with explicit discovery scans. |
 | Performance | CSS loading method and font preloading. |
-| System | Trusted PHP execution, installation details and Site Health. |
+| System | Trusted PHP execution, GitHub updates, installation details and Site Health. |
 
 Save Settings applies all tabs without reloading. Cancel restores the saved configuration. Resets change the draft until saved.
 
@@ -107,11 +107,11 @@ Save Settings applies all tabs without reloading. Cancel restores the saved conf
 
 Custom Code separates HTML/PHP, CSS and JavaScript, with syntax highlighting and an expanded editor. Raw HTML has no automatic wrapper; enable one explicitly for builder styling. Dynamic-data substitution is opt-in.
 
-PHP execution is off by default in **Settings → System**. It requires trusted code-administrator permissions, host-policy approval and an authorized save of the exact code. **PHP is not sandboxed and has full server access.** Live PHP preview is a separate, default-off switch and may execute code repeatedly while editing. Suppress PHP errors hides rendered diagnostics, not permission or validation errors.
+PHP execution is off in **Settings → System**. It requires code-administrator permissions, host approval and authorized saving of the exact code. **PHP is not sandboxed and has full server access.** The separate, default-off Live PHP preview may execute repeatedly. Suppress PHP errors hides rendered diagnostics, not permission or validation errors.
 
 JavaScript previews are isolated; full-page draft Preview never executes PHP. Test visitor interactions in the frontend context. Call-function interactions accept only explicitly registered site functions with JSON arguments, not arbitrary code.
 
-WooCommerce elements require WooCommerce and the correct page context. Embeds and advanced integrations may require provider configuration or plugins. The built-in contact form emails the WordPress administrator; configure reliable mail delivery. Uploads, CAPTCHA, CRM actions, submissions storage and payments require an integration. Catalogue coverage does not imply full parity with other builders or document-import compatibility.
+WooCommerce requires its plugin and correct page context. Other integrations may require configuration or plugins. The contact form emails the administrator; configure reliable mail. Uploads, CAPTCHA, CRM, submissions storage and payments need integrations. Catalogue coverage does not imply builder parity or import compatibility.
 
 ## Saving, preview and recovery
 
@@ -133,9 +133,15 @@ Support is limited to single-site root installations with standard local `wp-con
 
 Changes invalidate snapshots; regeneration uses WP-Cron. Configure real scheduled cron when most requests bypass PHP, coordinate external caches and verify delivery on the actual host.
 
+## GitHub updates
+
+Install the updater-enabled version manually once. While Lieve or a child theme is active, WordPress checks stable releases from [redshapeagency/lieve-builder](https://github.com/redshapeagency/lieve-builder). **Settings → System → Check for updates** refreshes the check without installing anything.
+
+Updates require attached `lieve-builder-VERSION.zip` and `.zip.manifest.json` assets, compatible WordPress/PHP versions and a matching SHA-256. Source-code archives and prereleases are excluded. The included GitHub workflow prepares assets only after distribution authorization and release acceptance. Back up before updating; theme-file customizations are replaced.
+
 ## Release scope and licensing
 
-Cross-browser/device testing, real checkout/payment flows, provider combinations and production-host delivery need acceptance testing. Automated checks do not certify whole-product readiness. Motion provides timelines and ScrollTrigger-based playback, not the complete GSAP plugin suite.
+Cross-browser/device checks, checkout/payment flows, integrations and production-host delivery need acceptance testing. Automated checks do not certify product readiness. Motion provides timelines and ScrollTrigger playback, not the complete GSAP plugin suite.
 
 Development tests and release tooling belong to the development source, not the installable theme. Public distribution remains blocked until the GSAP authorization review and release checks are completed.
 
@@ -148,6 +154,7 @@ Lieve's original code is licensed under [GPLv2 or later](LICENSE.txt). Bundled G
 - Fixed Custom Code preview initialization and dynamic data context after PHP queries.
 - Improved draft recovery startup and consistent widget card sizing.
 - Replaced the initial Overview with a permission-aware operational dashboard.
+- Added verified GitHub release updates through WordPress.
 
 ### 1.0.0
 

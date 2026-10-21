@@ -1,6 +1,7 @@
 # Lieve Builder: release-only repository.
-# Development originals are maintained separately. Allow only theme files here.
-# This excludes tests/, scripts/, release/, .github/, .impeccable/, npm/Playwright
+# Development originals are maintained separately. Allow theme files and the
+# minimal release automation below. This excludes tests/, other tooling,
+# .impeccable/, npm/Playwright
 # configuration, local environments, generated archives and all other root items.
 # Add any new required root-level theme file explicitly to this allowlist.
 /*
@@ -33,6 +34,19 @@
 !/README.MD
 !/readme.txt
 !/LICENSE.txt
+
+# Minimal release automation is versioned, but never included in the theme ZIP.
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/release.yml
+!/scripts/
+/scripts/*
+!/scripts/package.mjs
+!/release/
+/release/*
+!/release/manifest.json
 
 # Exclude workstation metadata and scratch files even inside allowed directories.
 .DS_Store

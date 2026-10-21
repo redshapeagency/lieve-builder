@@ -1,0 +1,6 @@
+{
+  "theme": "lieve-builder",
+  "files": ["404.php", "archive.php", "footer-canvas.php", "footer.php", "front-page.php", "functions.php", "header-canvas.php", "header.php", "index.php", "page.php", "search.php", "single.php", "style.css", "screenshot.webp", "README.MD", "readme.txt", "LICENSE.txt"],
+  "directories": ["inc", "assets", "template-parts"],
+  "extensions": [".php", ".js", ".css", ".json", ".svg", ".webp", ".png", ".jpg", ".jpeg", ".gif", ".woff", ".woff2", ".ttf", ".otf", ".md", ".txt"]
+}

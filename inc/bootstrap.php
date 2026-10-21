@@ -11,6 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Preserve initialization order: domain folders do not imply independent modules.
 require_once __DIR__ . '/core/setup.php';
+require_once __DIR__ . '/core/theme-updates.php';
 require_once __DIR__ . '/builder/elements.php';
 require_once __DIR__ . '/design/styles.php';
 require_once __DIR__ . '/dynamic/dynamic-data.php';

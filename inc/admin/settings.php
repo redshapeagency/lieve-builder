@@ -217,7 +217,8 @@ function lieve_settings_admin_assets( $hook ) {
 	wp_enqueue_script( 'lieve-head-controls', LIEVE_URL . 'assets/js/head-controls.js', array(), lieve_asset_version( 'assets/js/head-controls.js' ), true );
 	wp_enqueue_script( 'lieve-settings', LIEVE_URL . 'assets/js/settings.js', array( 'lieve-colour-picker', 'lieve-settings-classes', 'lieve-head-controls' ), lieve_asset_version( 'assets/js/settings.js' ), true );
 	wp_localize_script( 'lieve-head-controls', 'LieveHeadSettings', lieve_head_control_config() );
-	wp_localize_script( 'lieve-settings', 'LieveSettingsConfig', array( 'url' => esc_url_raw( rest_url( 'lieve/v1/settings' ) ), 'nonce' => wp_create_nonce( 'wp_rest' ), 'revision' => lieve_settings_revision(), 'data' => lieve_theme_settings() ) );
+	wp_localize_script( 'lieve-settings', 'LieveSettingsConfig', array( 'url' => esc_url_raw( rest_url( 'lieve/v1/settings' ) ), 'updatesUrl' => esc_url_raw( rest_url( 'lieve/v1/theme-updates/check' ) ), 'nonce' => wp_create_nonce( 'wp_rest' ), 'revision' => lieve_settings_revision(), 'data' => lieve_theme_settings() ) );
+	wp_enqueue_script( 'lieve-theme-updates', LIEVE_URL . 'assets/js/theme-updates.js', array( 'lieve-settings' ), lieve_asset_version( 'assets/js/theme-updates.js' ), true );
 }
 add_action( 'admin_enqueue_scripts', 'lieve_settings_admin_assets', 30 );
 
@@ -327,6 +328,7 @@ function lieve_render_settings_page() {
 					<dl class="lieve-settings-system"><?php foreach ( array( __( 'LieveBuilder', 'lieve-builder' ) => LIEVE_VERSION, __( 'WordPress', 'lieve-builder' ) => get_bloginfo( 'version' ), 'PHP' => PHP_VERSION, __( 'Environment', 'lieve-builder' ) => wp_get_environment_type() ) as $label => $value ) : ?><div><dt><?php echo esc_html( $label ); ?></dt><dd><?php echo esc_html( $value ); ?></dd></div><?php endforeach; ?></dl>
 					<a class="lieve-conditions-cancel" href="<?php echo esc_url( admin_url( 'site-health.php' ) ); ?>"><?php esc_html_e( 'Open Site Health', 'lieve-builder' ); ?></a>
 				</section>
+					<?php if ( function_exists( 'lieve_render_theme_updates_settings' ) ) { lieve_render_theme_updates_settings(); } ?>
 				</section>
 				<footer class="lieve-ds-footer"><span role="status" aria-live="polite" data-settings-status><?php esc_html_e( 'All changes saved.', 'lieve-builder' ); ?></span><button type="button" class="lieve-conditions-cancel" data-settings-cancel hidden><?php esc_html_e( 'Cancel', 'lieve-builder' ); ?></button><div class="lieve-save-control"><button class="lieve-conditions-save" type="submit" data-settings-save aria-keyshortcuts="Control+s Meta+s" aria-describedby="lieve-settings-shortcut"><?php esc_html_e( 'Save Settings', 'lieve-builder' ); ?></button><span class="lieve-save-shortcut" id="lieve-settings-shortcut"><kbd>⌘S</kbd><span aria-hidden="true"> / </span><kbd>Ctrl+S</kbd></span></div></footer>
 			</div>

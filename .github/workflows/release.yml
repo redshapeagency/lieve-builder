@@ -1,0 +1,67 @@
+name: Prepare WordPress update
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (prepare a draft before publishing immutable releases)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lieve-release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      LIEVE_RELEASE_ACCEPTED: ${{ vars.LIEVE_RELEASE_ACCEPTED }}
+      LIEVE_GSAP_AUTHORIZATION_JSON: ${{ secrets.LIEVE_GSAP_AUTHORIZATION_JSON }}
+      LIEVE_GSAP_AUTHORIZATION: ${{ runner.temp }}/lieve-gsap-authorization.json
+      LIEVE_PACKAGE_DIR: ${{ runner.temp }}/lieve-release
+    steps:
+      - name: Validate stable tag
+        run: node -e 'if (!/^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(process.env.RELEASE_TAG)) throw Error("A stable numeric tag is required");'
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Require release acceptance and reviewed distribution authorization
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          if (process.env.LIEVE_RELEASE_ACCEPTED !== 'true') throw Error('Release acceptance is not confirmed. Complete the documented tests and browser acceptance first.');
+          if (!process.env.LIEVE_GSAP_AUTHORIZATION_JSON) throw Error('DISTRIBUTION BLOCKED: reviewed GSAP authorization is missing.');
+          JSON.parse(process.env.LIEVE_GSAP_AUTHORIZATION_JSON);
+          fs.writeFileSync(process.env.LIEVE_GSAP_AUTHORIZATION, process.env.LIEVE_GSAP_AUTHORIZATION_JSON, {mode: 0o600});
+          fs.mkdirSync(process.env.LIEVE_PACKAGE_DIR, {recursive: true});
+          NODE
+      - name: Validate identity, tag and package inventory
+        run: node scripts/package.mjs --check --tag "$RELEASE_TAG"
+      - name: Build installable ZIP and SHA-256 manifest
+        run: node scripts/package.mjs --tag "$RELEASE_TAG"
+      - name: Attach assets (never overwrite published assets)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$RELEASE_TAG" --notes 'WordPress update package. Review and publish when ready.'
+          fi
+          gh release upload "$RELEASE_TAG" "$LIEVE_PACKAGE_DIR/lieve-builder-$VERSION.zip" "$LIEVE_PACKAGE_DIR/lieve-builder-$VERSION.zip.manifest.json" --repo "$GITHUB_REPOSITORY"
+      - name: Remove runner-only authorization evidence
+        if: always()
+        run: node -e 'require("node:fs").rmSync(process.env.LIEVE_GSAP_AUTHORIZATION,{force:true})'

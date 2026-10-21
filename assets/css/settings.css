@@ -46,6 +46,7 @@
 .lieve-settings-color input { flex: 1; min-width: 0; }
 .lieve-settings-gradient { height: 40px; border-radius: var(--lieve-radius-sm); }
 .lieve-settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lieve-settings-update-actions { margin-top: 16px; }
 .lieve-settings-page a.lieve-conditions-cancel { text-decoration: none; white-space: normal; }
 .lieve-settings-system { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 48px; margin: 8px 0 24px; }
 .lieve-settings-system > div { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--ds-border); }

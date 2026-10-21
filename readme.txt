@@ -64,6 +64,10 @@ No. Your host must install the supplied Nginx/Apache rules and Verify Server mus
 
 No. Output page metadata starts off. Lieve defers output to recognized active SEO plugins by default. Rendering conditions are not access control.
 
+= How do GitHub updates work? =
+
+Install the updater-enabled version manually once. WordPress then checks stable GitHub releases with attached installable ZIP and verification manifest. Settings > System offers Check for updates. Back up before updating.
+
 == License and Third-Party Assets ==
 
 Lieve's original code is GPLv2 or later; see LICENSE.txt. Bundled GSAP assets have a separate license and distribution gate; see assets/vendor/gsap/NOTICE.md. The theme license does not authorize their redistribution in this product.
@@ -74,6 +78,7 @@ Lieve's original code is GPLv2 or later; see LICENSE.txt. Bundled GSAP assets ha
 * Fixed Custom Code preview initialization and dynamic data context after PHP queries.
 * Improved draft recovery startup and consistent widget card sizing.
 * Replaced the initial Overview with a permission-aware operational dashboard.
+* Added verified GitHub release updates through WordPress.
 
 = 1.0.0 =
 * Initial commit.
