@@ -33,7 +33,7 @@
 			return canInlineCss( css ) ? css : null;
 		} catch ( error ) { return null; } // Unloaded or cross-origin sheets use the normal link fallback.
 	}
-	/* Passive opt-in service. The normal create()/stylesReady path below is unchanged.
+	/* Explicit CSS proof for a trusted caller's configured sources.
 	 * Only a trusted adapter supplies this immutable URL allowlist, never canvas HTML.
 	 * HTTP proof + isolated sandbox parsing precede child application; inline CSS is
 	 * inspected in the sandbox only. No child load/error callback is involved. */
@@ -239,10 +239,13 @@
 			},
 		} );
 	}
-	function create( { canvas, app, styles = [], styleTexts = {}, inlineCss = '', initialWidth = 1279, onResize = () => {}, onReady = () => {} } ) {
+	function create( { canvas, app, styles = [], styleTexts = {}, inlineCss = '', verifiedCss = false, initialWidth = 1279, onResize = () => {}, onReady = () => {}, onError = () => {} } ) {
 		const stage = canvas.closest( '.lieve-stage-scroll' );
 		const zoomSelect = app.querySelector( '[data-editor-zoom]' ); const zoomListeners = new Set();
 		let stylesReady = false; let contentReady = false; let revealed = false;
+		let destroyed = false, suspended = false, generation = 0, cssService = null, cssAbort = null, failureCode = null;
+		const listeners = [], returnTimers = new Set();
+		const listen = ( target, type, callback, options ) => { if ( target?.addEventListener ) { target.addEventListener( type, callback, options ); listeners.push( () => target.removeEventListener( type, callback, options ) ); } };
 		const host = document.createElement( 'div' ); host.className = 'lieve-viewport-host';
 		const frame = document.createElement( 'iframe' ); frame.className = 'lieve-viewport-frame';
 		frame.title = 'Responsive composition viewport';
@@ -255,6 +258,7 @@
 		canvas.classList.add( 'lieve-builder-content' ); doc.body.appendChild( canvas );
 		const base = doc.createElement( 'base' ); base.href = window.location.href; doc.head.appendChild( base );
 		const syncAppearance = () => {
+			if ( destroyed || suspended ) { return; }
 			doc.body.dataset.colorMode = app.dataset.colorMode || 'light';
 			const chrome = window.getComputedStyle( app );
 			for ( const key of [ '--lv-teal', '--lv-violet', '--lv-gradient' ] ) { const value = chrome.getPropertyValue?.( key ); if ( value ) { doc.body.style.setProperty( key, value ); } }
@@ -262,7 +266,9 @@
 		syncAppearance();
 		const appearance = typeof MutationObserver !== 'undefined' ? new MutationObserver( syncAppearance ) : null;
 		appearance?.observe( app, { attributes: true, attributeFilter: [ 'data-color-mode' ] } );
-		const loaded = styles.map( url => {
+		// The ordinary builder opts into source/parse/application proof. Legacy callers
+		// retain their old barrier; the experimental fixture owns its separate proof.
+		const loaded = ( verifiedCss ? [] : styles ).map( url => {
 			const css = Object.prototype.hasOwnProperty.call( styleTexts, url ) ? styleTexts[ url ] : loadedCss( url );
 			if ( typeof css === 'string' && canInlineCss( css ) ) { const inline = doc.createElement( 'style' ); inline.textContent = css; doc.head.appendChild( inline ); return null; }
 			return new Promise( resolve => {
@@ -270,20 +276,20 @@
 			link.onload = resolve; link.onerror = resolve; doc.head.appendChild( link );
 			} );
 		} ).filter( Boolean );
-		if ( inlineCss ) { const inline = doc.createElement( 'style' ); inline.textContent = inlineCss; doc.head.appendChild( inline ); }
-		if ( loaded.length ) { Promise.all( loaded ).then( () => { stylesReady = true; reveal(); } ); }
-		else { stylesReady = true; }
+		if ( ! verifiedCss && inlineCss ) { const inline = doc.createElement( 'style' ); inline.textContent = inlineCss; doc.head.appendChild( inline ); }
+		if ( loaded.length ) { Promise.all( loaded ).then( () => { if ( ! destroyed ) { stylesReady = true; reveal(); } } ); }
+		else { stylesReady = ! verifiedCss; }
 		// Moving focus between the inspector and the frame is not returning to
 		// the editor. Refresh global settings only after a real window/tab absence.
 		const returnListeners = new Set(); let wasAway = false;
-		const away = () => window.setTimeout( () => { if ( document.visibilityState === 'hidden' || ! document.hasFocus() ) { wasAway = true; } }, 0 );
-		const returned = () => { if ( wasAway && document.visibilityState !== 'hidden' && document.hasFocus() ) { wasAway = false; returnListeners.forEach( listener => listener() ); } };
-		window.addEventListener( 'blur', away ); window.addEventListener( 'focus', returned );
-		frame.contentWindow?.addEventListener( 'blur', away ); frame.contentWindow?.addEventListener( 'focus', returned );
-		document.addEventListener?.( 'visibilitychange', () => { if ( document.visibilityState === 'hidden' ) { wasAway = true; } else { returned(); } } );
+		const away = () => { let timer; timer = window.setTimeout( () => { returnTimers.delete( timer ); if ( ! destroyed && ( document.visibilityState === 'hidden' || ! document.hasFocus() ) ) { wasAway = true; } }, 0 ); if ( timer != null ) { returnTimers.add( timer ); } };
+		const returned = () => { if ( ! destroyed && ! suspended && wasAway && document.visibilityState !== 'hidden' && document.hasFocus() ) { wasAway = false; returnListeners.forEach( listener => listener() ); } };
+		listen( window, 'blur', away ); listen( window, 'focus', returned );
+		listen( frame.contentWindow, 'blur', away ); listen( frame.contentWindow, 'focus', returned );
+		listen( document, 'visibilitychange', () => { if ( document.visibilityState === 'hidden' ) { wasAway = true; } else { returned(); } } );
 		let width = Number.isInteger( initialWidth ) && initialWidth >= 240 && initialWidth <= 7680 ? initialWidth : 1279; let scale = 1; let zoom = 'fit';
 		function scroll( input, target = canvas ) {
-			if ( ! input || input.defaultPrevented || input.ctrlKey || input.metaKey ) { return false; }
+			if ( destroyed || suspended || ! input || input.defaultPrevented || input.ctrlKey || input.metaKey ) { return false; }
 			const mode = input.deltaMode ?? 0, x = input.deltaX ?? 0, y = input.deltaY ?? 0;
 			if ( ! [ 0, 1, 2 ].includes( mode ) || ! Number.isFinite( x ) || ! Number.isFinite( y ) ) { return false; }
 			const unit = mode === 1 ? 16 : mode === 2 ? stage.clientHeight : 1;
@@ -307,8 +313,9 @@
 			return dx !== initialX || dy !== initialY;
 		}
 		scrollers.set( doc, scroll );
-		doc.addEventListener?.( 'wheel', event => { if ( event.cancelable !== false && scroll( event, event.target ) ) { event.preventDefault(); } }, { passive: false } );
+		listen( doc, 'wheel', event => { if ( event.cancelable !== false && scroll( event, event.target ) ) { event.preventDefault(); } }, { passive: false } );
 		function layout() {
+			if ( destroyed || suspended ) { return; }
 			const padding = window.getComputedStyle( stage );
 			const available = Math.max( 1, stage.clientWidth - parseFloat( padding.paddingLeft || 0 ) - parseFloat( padding.paddingRight || 0 ) );
 			const height = Math.max( 240, stage.clientHeight - parseFloat( padding.paddingTop || 0 ) - parseFloat( padding.paddingBottom || 0 ) );
@@ -325,27 +332,83 @@
 			frame.dataset.zoomMode = zoom; frame.dataset.viewportWidth = String( width ); frame.dataset.previewScale = String( scale ); zoomListeners.forEach( listener => listener() ); onResize();
 		}
 		function setZoom( next ) {
+			if ( destroyed || suspended ) { return false; }
 			if ( next !== 'fit' && ( typeof next !== 'string' && typeof next !== 'number' || ! /^\d+(?:\.\d+)?$/.test( String( next ) ) || ! Number.isFinite( Number( next ) ) || Number( next ) < 10 || Number( next ) > 200 ) ) { return false; }
 			zoom = next === 'fit' ? 'fit' : String( Number( next ) ); layout(); return true;
 		}
 		function reveal() {
-			if ( revealed || ! stylesReady || ! contentReady ) { return; }
+			if ( destroyed || suspended || failureCode || revealed || ! stylesReady || ! contentReady ) { return; }
 			// A single first paint: final scale, styled document and enhanced zoom.
 			layout(); revealed = true; frame.classList.add( 'is-ready' );
 			stage.removeAttribute( 'data-viewport-pending' ); stage.setAttribute( 'aria-busy', 'false' );
 			zoomSelect?.closest( '.lieve-editor-zoom-control' )?.removeAttribute( 'data-viewport-pending' );
 			onReady();
 		}
-		zoomSelect?.addEventListener( 'change', () => { if ( ! setZoom( zoomSelect.value ) ) { zoomSelect.value = zoom; } } );
+		listen( zoomSelect, 'change', () => { if ( ! setZoom( zoomSelect.value ) ) { zoomSelect.value = zoom; } } );
 		const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver( layout ) : null;
-		observer?.observe( stage ); window.addEventListener( 'resize', layout );
+		observer?.observe( stage ); listen( window, 'resize', layout );
+		function current() {
+			try { return frame.isConnected && host.isConnected && stage.isConnected && stage.contains( host ) && frame.parentElement === host && frame.contentDocument === doc && doc.body.contains( canvas ) && canvas.ownerDocument === doc && frame.getAttribute( 'sandbox' ) === 'allow-same-origin allow-popups allow-popups-to-escape-sandbox'; }
+			catch ( failure ) { return false; }
+		}
+		function fail( failure ) {
+			if ( destroyed || failureCode ) { return; }
+			failureCode = failure?.code || 'CANVAS_UNAVAILABLE'; generation++; cssAbort?.abort();
+			stylesReady = false; frame.classList.remove( 'is-ready' );
+			// A detached old viewport must not hide a replacement that owns the stage.
+			if ( frame.parentElement === host && stage.contains( host ) ) { stage.setAttribute( 'data-viewport-pending', '' ); stage.setAttribute( 'aria-busy', 'true' ); }
+			try { onError( Object.freeze( { code: failureCode } ) ); } catch ( ignored ) { /* A diagnostic callback cannot defeat containment/cleanup. */ }
+		}
+		function prepareCss() {
+			const epoch = ++generation;
+			cssAbort?.abort(); cssAbort = new AbortController();
+			try {
+				if ( ! current() ) { throw { code: 'CANVAS_UNAVAILABLE' }; }
+				cssService ||= createCssReadiness( { document: doc, styles } );
+				cssService.prepare( { inlineCss, signal: cssAbort.signal } ).then( () => {
+					if ( destroyed || suspended || epoch !== generation ) { return; }
+					if ( ! current() ) { fail( { code: 'CANVAS_UNAVAILABLE' } ); return; }
+					stylesReady = true; reveal();
+				}, failure => { if ( ! destroyed && ! suspended && epoch === generation ) { fail( failure ); } } );
+			} catch ( failure ) { fail( failure ); }
+		}
+		function destroy() {
+			if ( destroyed ) { return; } destroyed = true; generation++;
+			cssAbort?.abort(); cssAbort = null; cssService?.destroy();
+			listeners.splice( 0 ).forEach( remove => remove() ); returnTimers.forEach( timer => window.clearTimeout( timer ) ); returnTimers.clear();
+			observer?.disconnect(); appearance?.disconnect(); ownership?.disconnect(); scrollers.delete( doc );
+			returnListeners.clear(); zoomListeners.clear(); onReady = onError = onResize = () => {};
+		}
+		// Only the verified ordinary path owns this coordination. An outer iframe
+		// event is a currentness check, never CSS readiness or permission to execute.
+		const ownership = verifiedCss && typeof MutationObserver !== 'undefined' ? new MutationObserver( () => { if ( ! current() ) { fail( { code: 'CANVAS_UNAVAILABLE' } ); destroy(); } } ) : null;
+		if ( verifiedCss ) {
+			ownership?.observe( stage, { childList: true, subtree: true, attributes: true, attributeFilter: [ 'sandbox' ] } );
+			if ( stage.parentElement ) { ownership?.observe( stage.parentElement, { childList: true } ); }
+			listen( frame, 'load', () => { if ( ! current() ) { fail( { code: 'CANVAS_UNAVAILABLE' } ); destroy(); } } );
+			listen( window, 'pagehide', event => {
+				if ( ! event.persisted ) { destroy(); return; }
+				suspended = true; generation++; if ( ! stylesReady ) { cssAbort?.abort(); }
+				returnTimers.forEach( timer => window.clearTimeout( timer ) ); returnTimers.clear();
+			} );
+			listen( window, 'pageshow', event => {
+				if ( ! event.persisted || ! suspended || destroyed ) { return; }
+				suspended = false;
+				if ( ! current() ) { fail( { code: 'CANVAS_UNAVAILABLE' } ); destroy(); return; }
+				syncAppearance();
+				if ( ! failureCode && ! stylesReady ) { prepareCss(); } else { layout(); reveal(); }
+			} );
+			prepareCss();
+		}
 		layout();
 		return {
 			canvas, document: doc, frame, stage,
+			destroy,
+			readiness() { return { verifiedCss, destroyed, suspended, generation, stylesReady, contentReady, revealed, error: failureCode, listeners: listeners.length, observers: destroyed ? 0 : Number( Boolean( observer ) ) + Number( Boolean( appearance ) ) + Number( Boolean( ownership ) ), timers: returnTimers.size, css: cssService?.stats() || null }; },
 			refresh: layout,
-			markContentReady() { contentReady = true; reveal(); },
-			onReturn( listener ) { returnListeners.add( listener ); },
-			setZoom, onZoomChange( listener ) { zoomListeners.add( listener ); },
+			markContentReady() { if ( ! destroyed ) { contentReady = true; reveal(); } },
+			onReturn( listener ) { if ( ! destroyed ) { returnListeners.add( listener ); } },
+			setZoom, onZoomChange( listener ) { if ( ! destroyed ) { zoomListeners.add( listener ); } },
 			resize( next ) { if ( Number.isInteger( next ) && next >= 240 && next <= 7680 ) { width = next; layout(); } },
 			toParent( rect ) {
 				const origin = frame.getBoundingClientRect();
