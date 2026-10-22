@@ -453,6 +453,7 @@
 				if ( ! button ) { button = document.createElement( 'button' ); button.type = 'button'; button.className = 'lieve-button-secondary'; button.textContent = entry.label; button.style.cssText = 'flex:none;outline-offset:3px;'; buttons.set( entry.ticket, button ); bar.appendChild( button ); }
 				if ( entry.expanded !== null ) { button.setAttribute( 'aria-expanded', String( entry.expanded ) ); }
 				if ( entry.selected !== null ) { button.setAttribute( 'aria-pressed', String( entry.selected ) ); }
+				if ( entry.kind === 'preview-slide-index' ) { if ( entry.selected ) { button.setAttribute( 'aria-current', 'true' ); } else { button.removeAttribute( 'aria-current' ); } }
 				if ( entry.disabled && document.activeElement === button ) { focus(); }
 				button.disabled = entry.disabled;
 			}

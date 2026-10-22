@@ -55,8 +55,8 @@
 	function canvasControls() {
 		if ( controlRegistry ) { return controlRegistry.api; }
 		let records = new Map(), tickets = new WeakMap(), destroyed = false, scheduled = false;
-		const subscribers = new Set(), allowed = new Set( [ 'empty-add', 'popup-backdrop', 'popup-close-settings', 'preview-details', 'preview-tab', 'preview-accordion' ] );
-		const builds = [];
+		const subscribers = new Set(), allowed = new Set( [ 'empty-add', 'popup-backdrop', 'popup-close-settings', 'preview-details', 'preview-tab', 'preview-accordion', 'preview-slide-previous', 'preview-slide-next', 'preview-slide-index' ] );
+		const builds = [], navigations = [];
 		function valid( record, checks = null ) {
 			if ( destroyed || ! record || record.model !== lieveContext.state.document || record.generation !== canvasIdentity().stats().generation ||
 				! record.element.isConnected || ! lieveContext.canvas.contains( record.element ) ) { return false; }
@@ -65,6 +65,10 @@
 			if ( checks && ! checks.has( record.guard ) ) { checks.set( record.guard, record.guard() ); }
 			if ( ! ( checks ? checks.get( record.guard ) : record.guard() ) ) { return false; }
 			const item = record.detail;
+			if ( item?.widget === 'slider' ) {
+				return item.controls[ item.index ] === record.element && record.element.parentElement === item.parent &&
+					( item.parent === item.root || item.parent.parentElement === item.root );
+			}
 			return ! item?.widget || item.controls[ item.index ] === record.element && record.element.parentElement === ( item.widget === 'tabs' ? item.tablist : item.details ) &&
 				( item.widget === 'tabs' ? item.tablist.parentElement === item.root && item.panels[ item.index ].parentElement === item.root : item.details.parentElement === item.root && item.panel.parentElement === item.details );
 		}
@@ -94,7 +98,7 @@
 				for ( const [ element, record ] of records ) {
 					if ( valid( record, checks ) ) { const item = record.detail; result.push( Object.freeze( { ticket: record.ticket, kind: record.kind, label: item?.widget ? item.label : labels[ record.kind ], element,
 						expanded: record.kind === 'preview-details' ? Boolean( item.open ) : record.kind === 'preview-accordion' ? Boolean( item.details.open ) : null,
-						selected: record.kind === 'preview-tab' ? item.controls[ item.index ].getAttribute( 'aria-selected' ) === 'true' : null,
+						selected: record.kind === 'preview-tab' ? item.controls[ item.index ].getAttribute( 'aria-selected' ) === 'true' : record.kind === 'preview-slide-index' ? item.slides.findIndex( slide => ! slide.hidden ) === item.slideIndex : null,
 						disabled: Boolean( element.disabled ), group: item?.widget === 'tabs' ? item.group : null } ) ); }
 					else { records.delete( element ); tickets.delete( record.ticket ); }
 				}
@@ -107,6 +111,16 @@
 					case 'empty-add': lieveContext.addBlock( 'section' ); break;
 					case 'popup-backdrop': lieveContext.openPopupSettings(); break;
 					case 'popup-close-settings': lieveContext.openPopupSettings( 'style', 'close' ); break;
+					case 'preview-slide-previous': case 'preview-slide-next': case 'preview-slide-index': {
+						const item = record.detail, previous = item.slides.findIndex( slide => ! slide.hidden );
+						selectElement( canvasIdentity().resolve( record.anchor ).identity.selectId );
+						if ( ! valid( record ) || record.element.disabled ) { return false; }
+						const index = record.kind === 'preview-slide-index' ? item.slideIndex : previous + ( record.kind === 'preview-slide-next' ? 1 : -1 ), start = performance.now();
+						activatePreviewSlide( item.slides, index, item.loop, item.status, item.dots );
+						if ( navigations.length < 2000 ) { navigations.push( { items: item.slides.length, ms: performance.now() - start } ); }
+						// Instant legacy preview: no transition/timer or late child callback.
+						updateSelectionOutline(); break;
+					}
 					case 'preview-details': { const previous = record.detail.open; selectElement( canvasIdentity().resolve( record.anchor ).identity.selectId ); if ( ! valid( record ) ) { return false; } togglePreviewDetails( record.detail, previous ); window.requestAnimationFrame( updateSelectionOutline ); break; }
 					case 'preview-tab': case 'preview-accordion': {
 						const item = record.detail, previous = item.details?.open;
@@ -122,7 +136,7 @@
 			},
 			subscribe( callback ) { if ( destroyed ) { return () => {}; } subscribers.add( callback ); return () => subscribers.delete( callback ); },
 			destroy() { destroyed = true; scheduled = false; records.clear(); tickets = new WeakMap(); subscribers.clear(); },
-			stats() { return { destroyed, controls: records.size, subscribers: subscribers.size, scheduled, widgetBuilds: builds.slice() }; },
+			stats() { return { destroyed, controls: records.size, subscribers: subscribers.size, scheduled, widgetBuilds: builds.slice(), sliderNavigations: navigations.slice() }; },
 		} );
 		controlRegistry = { api, register, changed, active: () => ! destroyed,
 			forget( anchor ) { for ( const [ element, record ] of records ) { if ( record.anchor === anchor ) { records.delete( element ); tickets.delete( record.ticket ); } } changed(); },
@@ -136,10 +150,18 @@
 		controls.forEach( button => { const active = button === tab; button.setAttribute( 'aria-selected', String( active ) ); button.tabIndex = active ? 0 : -1; } );
 		panels.forEach( panel => { panel.hidden = panel !== target; } );
 	}
+	function activatePreviewSlide( slides, index, loop, status, dots ) {
+		if ( ! slides.length ) { return; }
+		const next = loop ? ( index + slides.length ) % slides.length : Math.min( slides.length - 1, Math.max( 0, index ) );
+		slides.forEach( ( slide, position ) => { slide.hidden = position !== next; } );
+		if ( status ) { status.textContent = ( next + 1 ) + ' / ' + slides.length; }
+		dots.forEach( ( { element, index: position } ) => { if ( position === next ) { element.setAttribute( 'aria-current', 'true' ); } else { element.removeAttribute( 'aria-current' ); } } );
+	}
 	function registerPreviewControls( node, visual ) {
-		if ( ! controlRegistry?.active() || ! [ 'dropdown', 'tabs', 'accordion', 'tabs-nested', 'accordion-nested' ].includes( node.type ) || ! canvasIdentity().active( visual ) || lieveContext.listingEditor?.enabled( node ) ) { return; }
+		if ( ! controlRegistry?.active() || ! [ 'dropdown', 'tabs', 'accordion', 'tabs-nested', 'accordion-nested', 'slider' ].includes( node.type ) || ! canvasIdentity().active( visual ) || lieveContext.listingEditor?.enabled( node ) ) { return; }
 		if ( ! visual.isConnected ) { queueMicrotask( () => { if ( visual.isConnected ) { registerPreviewControls( node, visual ); } } ); return; }
 		if ( lieveContext.findNode( lieveContext.state.document.children, node.id ) !== node ) { return; }
+		if ( node.type === 'slider' ) { registerPreviewSlider( node, visual ); return; }
 		if ( node.type !== 'dropdown' ) { registerPreviewItems( node, visual ); return; }
 		// Replace only the built-in top-level summary. Authored descendants stay opaque.
 		const details = visual.firstElementChild, old = details?.firstElementChild;
@@ -186,6 +208,46 @@
 		} );
 		if ( tabs ) { oldList.replaceWith( tablist ); activatePreviewTab( controls, panels, controls[0], panels[0] ); }
 		controlRegistry.built( controls.length, start );
+	}
+	function registerPreviewSlider( node, visual ) {
+		const start = performance.now(), root = visual.firstElementChild, props = node.props || {}, source = props.items || '';
+		if ( visual.children.length !== 1 || root?.nodeName !== 'DIV' ) { return; }
+		// Only canonical rows define the control set. Server attributes/DOM indices
+		// are compatibility checks at most, never authority for an action or owner.
+		try { const rows = JSON.parse( source ); if ( rows && typeof rows === 'object' && ( ! Array.isArray( rows ) || rows.some( row => ! Array.isArray( row ) || row.some( value => typeof value !== 'string' ) ) ) ) { return; } } catch ( error ) { if ( /^[\s]*[\[{]/.test( source ) ) { return; } }
+		const count = lieveContext.parseItems( source ).length, multiple = count > 1, arrows = multiple && props.sliderArrows !== false, indicators = multiple && Boolean( props.sliderDots ), autoplay = multiple && Boolean( props.sliderAutoplay );
+		const old = Array.from( root.children ), expected = [ ...Array( count ).fill( 'DIV' ), ...( arrows ? [ 'BUTTON', 'BUTTON' ] : [] ), ...( indicators ? [ 'DIV' ] : [] ), ...( autoplay ? [ 'BUTTON' ] : [] ), ...( multiple ? [ 'SPAN' ] : [] ) ];
+		if ( old.length !== expected.length || old.some( ( element, index ) => element.nodeName !== expected[index] ) ) { return; }
+		const oldDots = indicators ? old[ count + ( arrows ? 2 : 0 ) ] : null;
+		if ( oldDots && ( oldDots.children.length !== count || Array.from( oldDots.children ).some( element => element.nodeName !== 'BUTTON' ) ) ) { return; }
+		const definition = previewKey( node ), slides = [], controls = [], dots = [], topology = [], doc = visual.ownerDocument;
+		const current = () => root.parentElement === visual && lieveContext.findNode( lieveContext.state.document.children, node.id ) === node && previewKey( node ) === definition &&
+			root.children.length === topology.length && topology.every( ( element, index ) => root.children[index] === element );
+		// Identical direct-child topology: no extra slide/body wrapper. Opaque body
+		// nodes keep their original URLs, styles and owner-only selection policy.
+		for ( let index = 0; index < count; index++ ) {
+			const slide = doc.createElement( 'div' ); slide.setAttribute( 'data-lieve-slide', '' ); slide.setAttribute( 'role', 'group' ); slide.setAttribute( 'aria-roledescription', 'slide' ); slide.setAttribute( 'aria-label', ( index + 1 ) + ' / ' + count ); slide.hidden = index !== 0;
+			Array.from( old[index].childNodes ).forEach( child => slide.appendChild( child ) ); old[index].replaceWith( slide ); slides.push( slide );
+		}
+		const status = multiple ? doc.createElement( 'span' ) : null;
+		if ( status ) { status.setAttribute( 'data-lieve-slide-status', '' ); status.setAttribute( 'role', 'status' ); status.setAttribute( 'aria-live', 'polite' ); old.at( -1 ).replaceWith( status ); }
+		const bind = ( element, kind, parent, slideIndex = null ) => {
+			const index = controls.length; controls.push( element );
+			controlRegistry.register( element, kind, visual, current, { widget: 'slider', index, slideIndex, controls, slides, dots, status, root, parent, loop: props.sliderLoop !== false,
+				label: ( props.editorLabel || 'Slider' ) + ' — ' + ( kind === 'preview-slide-index' ? 'Slide ' + ( slideIndex + 1 ) : kind === 'preview-slide-next' ? 'Next slide' : 'Previous slide' ),
+			} );
+		};
+		if ( arrows ) { [ 'previous', 'next' ].forEach( ( direction, index ) => {
+			const button = doc.createElement( 'button' ); button.type = 'button'; button.setAttribute( 'data-lieve-slide-' + ( index ? 'next' : 'prev' ), '' ); button.setAttribute( 'aria-label', index ? 'Next slide' : 'Previous slide' );
+			button.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + ( index ? 'm9 6 6 6-6 6' : 'm15 6-6 6 6 6' ) + '"/></svg>';
+			old[ count + index ].replaceWith( button ); bind( button, 'preview-slide-' + direction, root );
+		} ); }
+		if ( indicators ) {
+			const group = doc.createElement( 'div' ); group.setAttribute( 'data-lieve-slide-dots', '' ); group.setAttribute( 'role', 'group' ); group.setAttribute( 'aria-label', 'Choose a slide' );
+			for ( let index = 0; index < count; index++ ) { const button = doc.createElement( 'button' ); button.type = 'button'; button.setAttribute( 'data-lieve-slide-index', String( index ) ); button.setAttribute( 'aria-label', 'Go to slide ' + ( index + 1 ) ); button.textContent = String( index + 1 ); group.appendChild( button ); dots.push( { element: button, index } ); bind( button, 'preview-slide-index', group, index ); }
+			oldDots.replaceWith( group );
+		}
+		topology.push( ...root.children ); activatePreviewSlide( slides, 0, props.sliderLoop !== false, status, dots ); controlRegistry.built( count, start );
 	}
 	function canvasIdentity() {
 		identityRegistry ||= createCanvasIdentity( { root: lieveContext.canvas, readDocument: () => lieveContext.state.document } );
@@ -414,9 +476,7 @@
 		if ( slider ) {
 			const slides = Array.from( slider.querySelectorAll( ':scope > [data-lieve-slide]' ) ); const current = slides.findIndex( ( slide ) => ! slide.hidden );
 			if ( !slides.length ) { return; } const index = control.hasAttribute('data-lieve-slide-index') ? Number(control.dataset.lieveSlideIndex) : current + ( control.hasAttribute( 'data-lieve-slide-next' ) ? 1 : -1 );
-			const next = slider.dataset.sliderLoop === 'false' ? Math.min(slides.length-1,Math.max(0,index)) : (index+slides.length)%slides.length;
-			slides.forEach( ( slide, index ) => { slide.hidden = index !== next; } ); const status = slider.querySelector( '[data-lieve-slide-status]' ); if ( status ) { status.textContent = ( next + 1 ) + ' / ' + slides.length; }
-			slider.querySelectorAll('[data-lieve-slide-index]').forEach(dot=>{if(Number(dot.dataset.lieveSlideIndex)===next)dot.setAttribute('aria-current','true');else dot.removeAttribute('aria-current');});
+			activatePreviewSlide( slides, index, slider.dataset.sliderLoop !== 'false', slider.querySelector( '[data-lieve-slide-status]' ), Array.from( slider.querySelectorAll( '[data-lieve-slide-index]' ), element => ( { element, index: Number( element.dataset.lieveSlideIndex ) } ) ) );
 		}
 		const opener = event.target.closest( '[data-lieve-open]' ); if ( opener ) { lieveContext.canvas.querySelector( '#' + window.CSS.escape( opener.dataset.lieveOpen ) )?.setAttribute( 'open', '' ); }
 		const closer = event.target.closest( '[data-lieve-dialog-close]' ); if ( closer ) { closer.closest( 'dialog' )?.removeAttribute( 'open' ); }
