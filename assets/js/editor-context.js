@@ -37,7 +37,7 @@
 			} catch ( error ) { if ( ! job.signal.aborted && next === key ) { onError( error.message || 'Template previews could not be refreshed.' ); } }
 			finally { if ( pending === job ) { pending = null; } }
 		}
-		function append( side, canvas ) {
+		function append( side, canvas, registerIdentity = () => {} ) {
 			if ( config.isTemplate ) { return; }
 			if ( side === 'before' ) { resize?.disconnect(); observedCanvas = canvas; }
 			for ( const position of side === 'before' ? before : after ) {
@@ -54,7 +54,7 @@
 						const link = document.createElement( 'a' ); link.href = item.editUrl; link.target = '_blank'; link.rel = 'noopener noreferrer';
 						link.textContent = 'Edit template'; link.setAttribute( 'aria-label', 'Edit ' + item.title + ' template in a new tab' ); tools.appendChild( link );
 					}
-					preview.append( content, tools ); canvas.appendChild( preview ); resize?.observe( preview );
+					preview.append( content, tools ); registerIdentity( preview, { key: item.key, position } ); canvas.appendChild( preview ); resize?.observe( preview );
 				} );
 			}
 		}

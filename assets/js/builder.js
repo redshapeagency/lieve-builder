@@ -33,6 +33,7 @@
 		get bindStyleControls() { return bindStyleControls; },
 		get canNest() { return canNest; },
 		get canvas() { return canvas; },
+		get canvasIdentity() { return canvasIdentity; },
 		get canvasDrag() { return canvasDrag; }, set canvasDrag( value ) { canvasDrag = value; },
 		get canvasInitializing() { return canvasInitializing; }, set canvasInitializing( value ) { canvasInitializing = value; },
 		get catalogueInsertion() { return catalogueInsertion; }, set catalogueInsertion( value ) { catalogueInsertion = value; },
@@ -216,7 +217,7 @@
 	const { refreshPopupChoices, renderTemplateSettings, closeConditions, applyConditions, openConditions, closeTemplateLibrary, loadTemplates, renderTemplateLibrary, renderTemplateAssignments, applyTemplate, openTemplateLibrary } = window.LieveEditorControllers[ 'library' ]( controllerContext );
 	const { canNest, clone, normalizeDocument, uid, escapeHtml, makeBlock, findNode, findParent, containsId, nodeDepth, subtreeDepth, nodeCount, canDrop, removeNode, insertRelative, cloneWithNewIds, documentWithNewIds, serializeSnapshot, snapshot, restoreSnapshot, commit, liveChange, undo, redo, addBlock, deleteSelected, pasteAllContent, clearAllContent, duplicateSelected, moveSelected, moveRelative, moveInside, moveToRoot, pasteElement, wrapSelected, walkNodes } = window.LieveEditorControllers[ 'document' ]( controllerContext );
 	const { closeContextMenu, copyElementStyles, elementClassAssignments, elementClassSummary, syncElementClassSummary, canTransferElementClasses, copyElementClasses, pasteElementClasses, canTransferElementInteractions, copyElementInteractions, pasteElementInteractions, contextTransferRow, runContextAction, openContextMenu } = window.LieveEditorControllers[ 'context-menu' ]( controllerContext );
-	const { styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas } = window.LieveEditorControllers[ 'canvas' ]( controllerContext );
+	const { canvasIdentity, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas } = window.LieveEditorControllers[ 'canvas' ]( controllerContext );
 	const { renameElement, beginTreeRename, clearTreeDragPreview, setTreeDragPreview, clearTreeDropPlaceholder, treeDropDestination, validTreeDrop, treeDropChangesPosition, treeDropPosition, treeRowDropPosition, resolveTreeDrop, showTreeDropPlaceholder, clearTreeDragMotion, updateTreeHover, treeScrollVelocity, scrollTreeDrag, moveTreeElement, applyTreeDrop, handleTreeDragOver, handleTreeDrop, cancelTreeDrag, handleTreeKeyDown, renderTreeBranch, renderStructure } = window.LieveEditorControllers[ 'structure' ]( controllerContext );
 	const { control, selectControl, richTextControl, dynamicDataButton, styleCategoryIcon, group, parseItems, repeaterControl } = window.LieveEditorControllers[ 'controls' ]( controllerContext );
 	const { editingClass, inspectorStyleValues, writeClassStyles, changeClassTarget, refreshClassStyleFields, dimensionControlParts, spacingLinkKey, toggleSpacingLink, spacingLinkProperties, spacingLinkStatus, spacingLinkIcon, renderSpacingLinks, fontFamilyOptions, styleControl, gradientRepeater, editGradientRows, renderStylePanel, bindStyleControls } = window.LieveEditorControllers[ 'inspector-style' ]( controllerContext );
@@ -228,6 +229,7 @@
 
 
 	const canvas = document.getElementById( 'lieve-canvas' );
+	window.addEventListener( 'pagehide', event => { if ( ! event.persisted ) { canvasIdentity().destroy(); } } );
 	window.LieveWorkspace?.createPanelResize( { app, storageKey: config.layoutStorageKey } );
 	const viewport = window.LieveViewport?.create( { canvas, app, styles: config.viewportStyles || [], styleTexts: config.viewportStyleTexts || {}, inlineCss: config.viewportInlineCss || '', initialWidth: config.breakpoints?.find( item => item.base )?.width, onResize: () => window.requestAnimationFrame( updateSelectionOutline ), onReady: () => window.LieveEditorStartup?.ready() } ) || null;
 	function onEditorDocuments( type, listener, options ) {

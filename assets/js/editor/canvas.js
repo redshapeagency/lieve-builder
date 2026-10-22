@@ -1,7 +1,64 @@
 ( function () {
 	'use strict';
+	/** Trusted renderer registrations only. Never infer identity from authored attributes. */
+	function createCanvasIdentity( { root, readDocument } ) {
+		let records = new WeakMap(), owners = new WeakMap(), model = readDocument();
+		let generation = 0, sequence = 0, registrations = 0, destroyed = false;
+		const validOwner = owner => {
+			if ( destroyed || ! owner || ! owners.has( owner ) || owners.get( owner ).generation !== generation || model !== readDocument() ) { return false; }
+			for ( let item = owner; item; item = owners.get( item ).parent ) { if ( ! owners.get( item ).active ) { return false; } }
+			return true;
+		};
+		const result = ( status, reason, identity = null, via = null ) => Object.freeze( { status, reason, identity, via } );
+		function owner( identity, parent = null ) {
+			if ( destroyed || parent && ! validOwner( parent ) ) { throw new Error( 'Inactive canvas identity owner.' ); }
+			const token = Object.freeze( {} );
+			owners.set( token, { generation, active: true, parent, identity: Object.freeze( { ...identity, context: Object.freeze( { ...identity.context } ), instance: ++sequence } ) } ); return token;
+		}
+		function register( element, token, policy = 'self' ) {
+			if ( ! validOwner( token ) || element?.nodeType !== 1 || ! [ 'self', 'descendants', 'opaque' ].includes( policy ) ) { throw new Error( 'Invalid canvas identity registration.' ); }
+			records.set( element, { token, policy } ); registrations++; return element;
+		}
+		function resolve( node ) {
+			if ( destroyed ) { return result( 'destroyed', 'canvas-destroyed' ); }
+			if ( model !== readDocument() ) { return result( 'stale', 'document-changed' ); }
+			if ( ! node || node.ownerDocument !== root.ownerDocument ) { return result( 'unmanaged', 'foreign-document' ); }
+			if ( ! root.isConnected || ! root.contains( node ) ) { return result( 'unmanaged', 'outside-canvas' ); }
+			if ( node === root ) { return result( 'canvas', 'canvas-background' ); }
+			if ( [ 'IFRAME', 'OBJECT', 'EMBED' ].includes( node.nodeName ) ) { return result( 'unmanaged', 'browsing-context' ); }
+			for ( let current = node; current && current !== root; current = current.parentNode ) {
+				const record = records.get( current ); if ( ! record ) { continue; }
+				if ( ! validOwner( record.token ) ) { return result( 'stale', 'replaced-render-owner' ); }
+				const { identity } = owners.get( record.token );
+				if ( current !== node && record.policy === 'self' ) { continue; }
+				if ( ! identity.selectId ) { return result( 'unmanaged', identity.kind, identity, 'boundary' ); }
+				return result( current !== node && record.policy === 'opaque' ? 'opaque' : 'resolved', record.policy === 'opaque' ? 'preview-contents-unmapped' : null, identity, current === node ? 'direct' : record.policy );
+			}
+			return result( 'unmanaged', 'unregistered-node' );
+		}
+		return Object.freeze( {
+			owner, register, resolve,
+			active( element ) { return validOwner( records.get( element )?.token ); },
+			parent( element ) { return owners.get( records.get( element )?.token )?.parent || null; },
+			invalidate( element ) { const token = owners.get( records.get( element )?.token ); if ( token ) { token.active = false; } },
+			reset() { if ( destroyed ) { return; } generation++; model = readDocument(); },
+			destroy() { destroyed = true; records = new WeakMap(); owners = new WeakMap(); root = model = readDocument = null; },
+			stats() { return Object.freeze( { generation, registrations, instances: sequence, destroyed } ); },
+		} );
+	}
+	window.LieveCanvasIdentity = Object.freeze( { create: createCanvasIdentity } );
 	window.LieveEditorControllers ||= {};
 	window.LieveEditorControllers[ 'canvas' ] = function create( lieveContext ) {
+	let identityRegistry = null;
+	function canvasIdentity() {
+		identityRegistry ||= createCanvasIdentity( { root: lieveContext.canvas, readDocument: () => lieveContext.state.document } );
+		return identityRegistry;
+	}
+	const previewVisual = ( node, owner, visual = document.createElement( 'div' ) ) => {
+		visual.className = 'lieve-element-preview';
+		canvasIdentity().register( visual, owner, 'opaque' );
+		loadElementPreview( node, visual, lieveContext.canvasInitializing ); return visual;
+	};
 	function styleString( props, type ) {
 		const styles = [];
 		const map = {
@@ -46,32 +103,43 @@
 		return styles.join( ';' );
 	}
 
-	function createChildren( node ) {
+	function createChildren( node, owner = null ) {
 		const children = document.createElement( 'div' );
 		children.className = 'lieve-editor-children';
 		children.dataset.parentId = node.id;
-		( node.children || [] ).forEach( ( child ) => children.appendChild( createNodeElement( child ) ) );
+		( node.children || [] ).forEach( ( child ) => children.appendChild( createNodeElement( child, owner ) ) );
 
 		return children;
 	}
 
-	function createNodeElement( node ) {
+	function createNodeElement( node, parentOwner = null ) {
 		const wrapper = document.createElement( 'div' );
 		wrapper.className = 'lieve-editor-frame';
 		wrapper.dataset.id = node.id;
+		const registry = canvasIdentity(), listing = Boolean( lieveContext.listingEditor?.enabled( node ) );
+		const config = lieveContext.config;
+		const context = { scope: config.componentMode ? 'component-document' : config.isTemplate ? 'template-document' : 'document', postId: config.postId };
+		if ( node.type === 'component' ) { context.componentId = node.props?.componentId || null; }
+		if ( node.type === 'template' ) { context.templateId = node.props?.templateId || null; }
+		if ( listing || node.props?.savedQuery ) { context.queryId = listing ? node.props.listing.query || null : node.props.savedQuery; }
+		if ( node.type === 'slot' ) { context.slotKey = node.props?.slotKey || node.id; }
+		if ( listing || ! [ 'section', 'container', 'block', 'div', 'slot', 'heading', 'button', 'image', 'spacer' ].includes( node.type ) ) { context.contents = 'unmapped'; }
+		const owner = registry.owner( { id: node.id, selectId: node.id, type: node.type, kind: listing ? 'listing' : node.type,
+			context }, parentOwner );
+		registry.register( wrapper, owner );
 
 		let visual;
 		const props = lieveContext.dynamicData?.resolveNode( node ).props || node.props || {};
 
-		if ( lieveContext.listingEditor?.enabled( node ) ) { visual = document.createElement( 'div' ); visual.className = 'lieve-element-preview'; loadElementPreview( node, visual, lieveContext.canvasInitializing ); }
+		if ( listing ) { visual = previewVisual( node, owner ); }
 		else switch ( node.type ) {
 			case 'section':
 				visual = document.createElement( 'section' );
 				visual.className = 'lieve-editor-section';
-				visual.appendChild( createChildren( node ) );
+				visual.appendChild( createChildren( node, owner ) );
 				break;
 			case 'container':
-				visual = createChildren( node );
+				visual = createChildren( node, owner );
 				visual.classList.add( 'lieve-editor-container' );
 				break;
 			case 'heading':
@@ -88,7 +156,7 @@
 			case 'image':
 				visual = document.createElement( 'figure' );
 				visual.className = 'lieve-editor-image';
-				if ( props.attachmentId && props.imageSource !== 'url' || props.caption || props.imageLink || props.imageSizes || props.imageDecoding ) { visual.className = 'lieve-element-preview'; loadElementPreview( node, visual, lieveContext.canvasInitializing ); break; }
+				if ( props.attachmentId && props.imageSource !== 'url' || props.caption || props.imageLink || props.imageSizes || props.imageDecoding ) { visual = previewVisual( node, owner, visual ); break; }
 				if ( props.url ) {
 					const image = document.createElement( 'img' );
 					image.src = props.url;
@@ -108,16 +176,15 @@
 				break;
 			default:
 				if ( [ 'block', 'div', 'slot' ].includes( node.type ) ) {
-					visual = createChildren( node );
+					visual = createChildren( node, owner );
 					visual.classList.add( 'lieve-editor-container' );
 				} else {
-					visual = document.createElement( 'div' );
-					visual.className = 'lieve-element-preview';
-					loadElementPreview( node, visual, lieveContext.canvasInitializing );
+					visual = previewVisual( node, owner );
 				}
 		}
 
 		visual.classList.add( 'lieve-editor-visual' );
+		if ( ! visual.classList.contains( 'lieve-element-preview' ) ) { registry.register( visual, owner, lieveContext.canNest( node.type ) ? 'self' : 'descendants' ); }
 		if ( ! visual.classList.contains( 'lieve-element-preview' ) ) { prepareEditorRoot( visual, node ); }
 		// Explicit styles are compiled locally; no CSS presets are added to the node.
 		if ( ! visual.classList.contains( 'lieve-element-preview' ) ) {
@@ -394,17 +461,21 @@
 	}
 
 	function renderCanvasElement( key ) {
+		if ( identityRegistry?.stats().destroyed ) { return false; }
 		const node = lieveContext.findNode( lieveContext.state.document.children, lieveContext.state.selectedId );
 		if ( ! node || ! key.startsWith( node.id + ':prop:' ) || lieveContext.listingEditor?.enabled( node ) || lieveContext.listingAncestor( node ) || lieveContext.dynamicData?.parse( node.props?.url ) ) { return false; }
 		const frames = lieveContext.canvas.querySelectorAll( '.lieve-editor-frame[data-id="' + window.CSS.escape( node.id ) + '"]' );
 		if ( frames.length !== 1 ) { return false; }
 		lieveContext.motionEditor?.stop(); window.LieveListings?.destroy( frames[0] );
-		frames[0].replaceWith( createNodeElement( node ) );
+		const parentOwner = canvasIdentity().parent( frames[0] ); canvasIdentity().invalidate( frames[0] );
+		frames[0].replaceWith( createNodeElement( node, parentOwner ) );
 		lieveContext.dynamicData?.hydrate( lieveContext.state.document, lieveContext.config.nonce, () => { renderCanvas(); renderCanvasStyles(); } );
 		revealSelectedPreview(); renderCanvasStyles(); window.LieveCodePreview?.refresh?.( lieveContext.canvas ); lieveContext.canvasDrag?.invalidate(); return true;
 	}
 
 	function renderCanvas() {
+		if ( identityRegistry?.stats().destroyed ) { return; }
+		canvasIdentity().reset();
 		lieveContext.motionEditor?.stop();
 		window.LieveListings?.destroy( lieveContext.canvas );
 		lieveContext.dynamicData?.hydrate( lieveContext.state.document, lieveContext.config.nonce, () => { renderCanvas(); renderCanvasStyles(); } );
@@ -415,10 +486,15 @@
 		lieveContext.previewJobs.forEach( ( job, id ) => { if ( ! activeIds.has( id ) ) { job.controller.abort(); window.clearTimeout( job.timer ); lieveContext.previewJobs.delete( id ); } } );
 		lieveContext.canvas.innerHTML = '';
 		void lieveContext.templateContext?.refresh( lieveContext.state.headerTemplateId, lieveContext.state.footerTemplateId );
-		lieveContext.templateContext?.append( 'before', lieveContext.canvas );
+		const inheritedIdentity = ( preview, placement ) => {
+			const owner = canvasIdentity().owner( { id: null, selectId: null, type: 'template', kind: 'inherited-template', context: { key: placement.key, position: placement.position, contents: 'unmapped' } } );
+			canvasIdentity().register( preview, owner, 'opaque' );
+		};
+		lieveContext.templateContext?.append( 'before', lieveContext.canvas, inheritedIdentity );
 		let contentCanvas = lieveContext.canvas;
 		if ( lieveContext.isPopupTemplate() ) {
 			const shell = lieveContext.canvas.ownerDocument.createElement( 'div' ); shell.dataset.editorPopupShell = ''; shell.dataset.editorRoot = lieveContext.popupStyleId; shell.dataset.lieveUi = 'popup';
+			canvasIdentity().register( shell, canvasIdentity().owner( { id: lieveContext.popupStyleId, selectId: null, type: 'popup-shell', kind: 'popup-shell', context: { contents: 'unmapped' } } ), 'opaque' );
 			shell.innerHTML = '<div data-lieve-ui="popup-backdrop" aria-hidden="true"></div><div data-lieve-ui="popup-dialog" class="lieve-builder-content"></div>';
 			shell.querySelector( '[data-lieve-ui="popup-backdrop"]' ).addEventListener( 'click', () => lieveContext.openPopupSettings() );
 			lieveContext.canvas.appendChild( shell ); contentCanvas = shell.querySelector( '[data-lieve-ui="popup-dialog"]' );
@@ -432,16 +508,16 @@
 			empty.querySelector( 'button' ).addEventListener( 'click', () => lieveContext.addBlock( 'section' ) );
 			if ( lieveContext.isPopupTemplate() ) { empty.innerHTML = '<strong>Your pop up. Your ideas.</strong><span>Add content, then style the dialog in Pop Up Settings.</span><button type="button" class="lieve-button-secondary">+ Add Something</button>'; empty.querySelector( 'button' ).addEventListener( 'click', () => lieveContext.addBlock( 'section' ) ); }
 			contentCanvas.appendChild( empty );
-			lieveContext.templateContext?.append( 'after', lieveContext.canvas );
+			lieveContext.templateContext?.append( 'after', lieveContext.canvas, inheritedIdentity );
 			renderCanvasStyles();
 			return;
 		}
 
 		lieveContext.state.document.children.forEach( ( node ) => contentCanvas.appendChild( createNodeElement( node ) ) );
-		lieveContext.templateContext?.append( 'after', lieveContext.canvas );
+		lieveContext.templateContext?.append( 'after', lieveContext.canvas, inheritedIdentity );
 		revealSelectedPreview();
 		renderCanvasStyles();
 	}
-	return { styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
+	return { canvasIdentity, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
 	};
 } )();
