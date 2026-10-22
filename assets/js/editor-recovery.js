@@ -3,28 +3,86 @@
 	'use strict';
 	window.LieveRecovery = { create( { app, config, read, restore, dirty, saving, notify, onLayout = () => {} } ) {
 		if ( ! config.recoveryUrl ) { return null; }
-		const session = 'lr_' + ( window.crypto?.randomUUID ? window.crypto.randomUUID().replaceAll( '-', '' ) : Date.now().toString( 36 ) + Math.random().toString( 36 ).slice( 2 ) + Math.random().toString( 36 ).slice( 2 ) );
-		let previous = '', running = null, stopped = false, restoredSession = null, noticeEpoch = 0, dismissNotice = () => {};
+		const newSession = () => 'lr_' + ( window.crypto?.randomUUID ? window.crypto.randomUUID().replaceAll( '-', '' ) : Date.now().toString( 36 ) + Math.random().toString( 36 ).slice( 2 ) + Math.random().toString( 36 ).slice( 2 ) );
+		let session = newSession(), previous = '', running = null, clearing = null, phase = 'active', interval = null, authBlocked = false;
+		let writeEpoch = 0, restoredSession = null, noticeEpoch = 0, dismissNotice = () => {}, resumeNotice = () => {};
+		const requests = new Map();
 		const base = () => config.isTemplate ? config.templateRevision : config.documentRevision;
 		async function request( method, payload = {} ) {
-			const controller = new AbortController(); const timer = setTimeout( () => controller.abort(), 20000 );
-			try { const response = await ( window.LieveTransport?.fetch || fetch )(  config.recoveryUrl, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce }, ...( method === 'GET' ? {} : { body: JSON.stringify( payload ) } ), signal: controller.signal } );
-				const result = await response.json(); if ( ! response.ok ) { throw new Error( result.message || 'Recovery copy could not be stored.' ); } return result;
-			} finally { clearTimeout( timer ); }
+			if ( phase === 'stopped' ) { throw new Error( 'Recovery controller has stopped.' ); }
+			const controller = new AbortController(); const timer = setTimeout( () => controller.abort(), 20000 ); requests.set( controller, method );
+			let cancelled;
+			const aborted = new Promise( ( resolve, reject ) => { cancelled = () => { const error = new Error( 'Recovery request interrupted. Your draft is retained.' ); error.name = 'AbortError'; reject( error ); }; controller.signal.addEventListener( 'abort', cancelled, { once: true } ); } );
+			try { return await Promise.race( [ aborted, ( async () => {
+				const response = await ( window.LieveTransport?.fetch || fetch )( config.recoveryUrl, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce }, ...( method === 'GET' ? {} : { body: JSON.stringify( payload ) } ), signal: controller.signal } );
+				const result = await response.json();
+				if ( ! response.ok ) { const error = new Error( result.message || 'Recovery copy could not be stored.' ); error.status = response.status; throw error; }
+				if ( method !== 'GET' && result.success !== true ) { throw new Error( 'Recovery copy could not be confirmed. Your draft is retained.' ); }
+				return result;
+			} )() ] ); } finally { clearTimeout( timer ); controller.signal.removeEventListener( 'abort', cancelled ); requests.delete( controller ); }
 		}
 		async function flush( force = false ) {
-			if ( stopped || ! dirty() || ( saving() && ! force ) ) { return; }
+			if ( phase !== 'active' || authBlocked && ! force || ! dirty() || ( saving() && ! force ) ) { return; }
+			if ( clearing ) { await clearing; return flush( force ); }
 			if ( running ) { await running; return flush( force ); }
 			const snapshot = read(); if ( snapshot === previous ) { return; }
-			running = request( 'POST', { session, snapshot: JSON.parse( snapshot ), baseRevision: base() } ).then( () => { previous = snapshot; } );
-			try { await running; } finally { running = null; }
+			const owner = session, epoch = writeEpoch;
+			const job = request( 'POST', { session: owner, snapshot: JSON.parse( snapshot ), baseRevision: base() } ).then( () => {
+				if ( phase !== 'stopped' && epoch === writeEpoch ) { previous = snapshot; authBlocked = false; }
+			} ).catch( error => {
+				if ( phase !== 'stopped' ) {
+					if ( error.status === 401 || error.status === 403 ) { authBlocked = true; }
+					// An interrupted POST may still commit server-side. Preserve it under its old key;
+					// a later checkpoint uses a new existing session slot, never blindly overwrites it.
+					else if ( session === owner ) { session = newSession(); previous = ''; }
+				}
+				throw error;
+			} ).finally( () => { if ( running === job ) { running = null; } } );
+			running = job; await job;
 		}
-		async function clear() { noticeEpoch++; dismissNotice( false ); if ( running ) { try { await running; } catch ( error ) {} } await request( 'DELETE', { session } ); if ( restoredSession ) { await request( 'DELETE', { session: restoredSession } ); restoredSession = null; } previous = ''; }
-		const interval = setInterval( () => flush().catch( error => notify( error.message, true ) ), 15000 );
-		document.addEventListener( 'visibilitychange', () => { if ( document.hidden ) { flush().catch( () => {} ); } } );
+		function background() { flush().catch( error => { if ( phase === 'active' ) notify( error.message, true ); } ); }
+		function clear() {
+			if ( phase === 'stopped' ) { return Promise.resolve(); }
+			if ( clearing ) { return clearing; }
+			noticeEpoch++; writeEpoch++; dismissNotice( false );
+			const snapshot = read(), owner = session, restored = restoredSession;
+			const job = ( async () => {
+				if ( running ) { try { await running; } catch ( error ) {} }
+				if ( phase !== 'active' || read() !== snapshot ) { return; }
+				await request( 'DELETE', { session: owner } );
+				previous = '';
+				if ( phase !== 'active' || read() !== snapshot ) { return; }
+				if ( restored ) { await request( 'DELETE', { session: restored } ); if ( restoredSession === restored ) restoredSession = null; }
+			} )().catch( error => {
+				if ( phase !== 'stopped' ) {
+					if ( error.status === 401 || error.status === 403 ) authBlocked = true;
+					// A timed-out DELETE may still execute. A new checkpoint must not use
+					// the key that this unconfirmed cleanup could subsequently remove.
+					else if ( session === owner ) { session = newSession(); previous = ''; }
+				}
+				throw error;
+			} ).finally( () => { if ( clearing === job ) clearing = null; if ( phase === 'active' && read() !== snapshot ) background(); } );
+			clearing = job; return job;
+		}
+		function startTimer() { if ( phase === 'active' && interval === null ) interval = setInterval( background, 15000 ); }
+		function suspend() { if ( phase !== 'active' ) return; phase = 'suspended'; noticeEpoch++; clearInterval( interval ); interval = null; }
+		function resume() { if ( phase !== 'suspended' ) return; phase = 'active'; authBlocked = false; startTimer(); resumeNotice(); background(); }
+		function destroy() {
+			if ( phase === 'stopped' ) return; phase = 'stopped'; noticeEpoch++; writeEpoch++; clearInterval( interval ); interval = null;
+			window.removeEventListener?.( 'pagehide', onPageHide ); window.removeEventListener?.( 'pageshow', onPageShow ); window.removeEventListener?.( 'online', onOnline );
+			document.removeEventListener?.( 'visibilitychange', onVisibility ); document.removeEventListener?.( 'freeze', suspend ); document.removeEventListener?.( 'resume', resume );
+			requests.forEach( ( method, controller ) => controller.abort() ); dismissNotice( false );
+		}
+		function onPageHide( event ) { if ( event.persisted ) suspend(); else destroy(); }
+		function onPageShow() { resume(); }
+		function onOnline() { if ( phase === 'active' ) { authBlocked = false; background(); } }
+		function onVisibility() { if ( phase !== 'active' ) return; if ( ! document.hidden ) authBlocked = false; background(); }
+		startTimer();
+		window.addEventListener( 'pagehide', onPageHide ); window.addEventListener( 'pageshow', onPageShow ); window.addEventListener( 'online', onOnline );
+		document.addEventListener( 'visibilitychange', onVisibility ); document.addEventListener( 'freeze', suspend ); document.addEventListener( 'resume', resume );
 		const requestedEpoch = noticeEpoch;
 		function showDrafts( result ) {
-			if ( stopped || requestedEpoch !== noticeEpoch ) return;
+			if ( phase !== 'active' || requestedEpoch !== noticeEpoch ) return;
 			const drafts = ( result.drafts || [] ).filter( entry => entry.session !== session ).reverse(); if ( ! drafts.length ) { return; }
 			const notice = document.createElement( 'div' ); notice.className = 'lieve-recovery-notice'; notice.setAttribute( 'role', 'region' ); notice.setAttribute( 'aria-label', 'Draft recovery' );
 			const summary = document.createElement( 'span' ); summary.textContent = 'Unsaved recovery copy available';
@@ -58,7 +116,7 @@
 			modalRoot.addEventListener( 'lieve:conditions-close', () => picker?.close() );
 			function remove( restoreFocus = true ) {
 				busy = false; modal.close(); picker?.destroy(); modalRoot.remove(); notice.remove();
-				dismissNotice = () => {}; onLayout();
+				dismissNotice = resumeNotice = () => {}; onLayout();
 				if ( ! restoreFocus ) return;
 				const target = app.querySelector( '[data-toggle-drawer="elements"]' );
 				( target?.getClientRects().length ? target : app.querySelector( '#lieve-elements-tab' ) )?.focus( { preventScroll: true } );
@@ -68,24 +126,26 @@
 			function update() { text.textContent = drafts[ Number( select.value ) ]?.baseRevision === base() ? 'A private recovery copy is available. Restoring does not publish it.' : 'The saved page has changed since this copy. Restore only to review and merge your unsaved work before saving.'; }
 			select.addEventListener( 'change', update ); update();
 			function setBusy( value ) { busy = value; apply.disabled = discard.disabled = cancel.disabled = close.disabled = value; picker?.setDisabled( value ); select.disabled = value; dialog.setAttribute( 'aria-busy', String( value ) ); }
+			resumeNotice = () => { if ( ! busy ) setBusy( false ); };
 			apply.addEventListener( 'click', async () => {
-				if ( busy || dirty() && ! window.confirm( 'Replace the current unsaved page draft with this recovery copy?' ) ) { return; }
-				let draft = drafts[ Number( select.value ) ]; const restoreEpoch = noticeEpoch;
+				if ( phase !== 'active' || busy || dirty() && ! window.confirm( 'Replace the current unsaved page draft with this recovery copy?' ) ) { return; }
+				let draft = drafts[ Number( select.value ) ]; const restoreEpoch = noticeEpoch, restoreSnapshot = read();
 				setBusy( true );
 				try {
 					// Bootstrap contains summaries, not up to 8 MB of private snapshots.
 					// Retrieve the selected current copy only after an explicit Restore.
-					if ( ! draft.snapshot ) { const result = await request( 'GET' ); if ( stopped || restoreEpoch !== noticeEpoch ) return; draft = ( result.drafts || [] ).find( entry => entry.session === draft.session ); }
+					if ( ! draft.snapshot ) { const result = await request( 'GET' ); if ( phase !== 'active' || restoreEpoch !== noticeEpoch ) return; draft = ( result.drafts || [] ).find( entry => entry.session === draft.session ); }
+					if ( read() !== restoreSnapshot ) { throw new Error( 'The local draft changed while recovery was loading. Your newer edits are retained; review the copy again.' ); }
 					if ( ! draft?.snapshot?.document ) { throw new Error( 'This recovery copy is no longer available. Close this dialog and reload the editor to refresh the available copies.' ); }
 					restore( JSON.stringify( draft.snapshot ) ); restoredSession = draft.session; remove(); notify( 'Draft restored for review. Save when ready.' );
-				} catch ( error ) { if ( ! stopped && restoreEpoch === noticeEpoch ) notify( 'Draft could not be restored: ' + error.message, true ); }
-				finally { setBusy( false ); }
+				} catch ( error ) { if ( phase === 'active' && restoreEpoch === noticeEpoch ) notify( 'Draft could not be restored: ' + error.message, true ); }
+				finally { if ( phase === 'active' && modalRoot.parentElement ) setBusy( false ); else busy = false; }
 			} );
 			discard.addEventListener( 'click', async () => {
-				if ( busy ) return; setBusy( true );
-				try { await request( 'DELETE', { session: drafts[ Number( select.value ) ].session } ); drafts.splice( Number( select.value ), 1 ); if ( ! drafts.length ) { remove(); } else { select.replaceChildren(); drafts.forEach( ( entry, index ) => { const option = document.createElement( 'option' ); option.value = index; option.textContent = new Date( entry.updated * 1000 ).toLocaleString(); select.appendChild( option ); } ); picker?.refresh(); update(); } }
-				catch ( error ) { notify( error.message, true ); }
-				finally { setBusy( false ); }
+				if ( phase !== 'active' || busy ) return; const discardEpoch = noticeEpoch; setBusy( true );
+				try { await request( 'DELETE', { session: drafts[ Number( select.value ) ].session } ); if ( phase !== 'active' || discardEpoch !== noticeEpoch ) return; drafts.splice( Number( select.value ), 1 ); if ( ! drafts.length ) { remove(); } else { select.replaceChildren(); drafts.forEach( ( entry, index ) => { const option = document.createElement( 'option' ); option.value = index; option.textContent = new Date( entry.updated * 1000 ).toLocaleString(); select.appendChild( option ); } ); picker?.refresh(); update(); } }
+				catch ( error ) { if ( phase === 'active' && discardEpoch === noticeEpoch ) notify( error.message, true ); }
+				finally { if ( phase === 'active' && modalRoot.parentElement ) setBusy( false ); else busy = false; }
 			} );
 			( app.querySelector( '.lieve-stage-wrap' ) || app ).prepend( notice );
 			onLayout();
@@ -95,8 +155,7 @@
 		// Resolve presence before the workspace's first paint. Older bootstraps
 		// retain their asynchronous fallback, without delaying the current editor.
 		if ( Array.isArray( config.recoveryDrafts ) ) { showDrafts( { drafts: config.recoveryDrafts } ); }
-		else { request( 'GET' ).then( showDrafts ).catch( error => notify( 'Recovery is unavailable: ' + error.message, true ) ); }
-		window.addEventListener( 'pagehide', () => { stopped = true; clearInterval( interval ); } );
-		return { flush, clear };
+		else { request( 'GET' ).then( showDrafts ).catch( error => { if ( phase === 'active' && requestedEpoch === noticeEpoch ) notify( 'Recovery is unavailable: ' + error.message, true ); } ); }
+		return { flush, clear, suspend, resume, destroy };
 	} };
 } )();
