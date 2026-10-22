@@ -55,16 +55,22 @@
 	function canvasControls() {
 		if ( controlRegistry ) { return controlRegistry.api; }
 		let records = new Map(), tickets = new WeakMap(), destroyed = false, scheduled = false;
-		const subscribers = new Set(), allowed = new Set( [ 'empty-add', 'popup-backdrop', 'popup-close-settings', 'preview-details' ] );
-		function valid( record ) {
+		const subscribers = new Set(), allowed = new Set( [ 'empty-add', 'popup-backdrop', 'popup-close-settings', 'preview-details', 'preview-tab', 'preview-accordion' ] );
+		const builds = [];
+		function valid( record, checks = null ) {
 			if ( destroyed || ! record || record.model !== lieveContext.state.document || record.generation !== canvasIdentity().stats().generation ||
 				! record.element.isConnected || ! lieveContext.canvas.contains( record.element ) ) { return false; }
 			const identity = canvasIdentity().resolve( record.anchor );
-			return ( record.instance === null ? identity.status === 'canvas' : identity.identity?.instance === record.instance && ! [ 'stale', 'destroyed' ].includes( identity.status ) ) && record.guard();
+			if ( ! ( record.instance === null ? identity.status === 'canvas' : identity.identity?.instance === record.instance && ! [ 'stale', 'destroyed' ].includes( identity.status ) ) ) { return false; }
+			if ( checks && ! checks.has( record.guard ) ) { checks.set( record.guard, record.guard() ); }
+			if ( ! ( checks ? checks.get( record.guard ) : record.guard() ) ) { return false; }
+			const item = record.detail;
+			return ! item?.widget || item.controls[ item.index ] === record.element && record.element.parentElement === ( item.widget === 'tabs' ? item.tablist : item.details ) &&
+				( item.widget === 'tabs' ? item.tablist.parentElement === item.root && item.panels[ item.index ].parentElement === item.root : item.details.parentElement === item.root && item.panel.parentElement === item.details );
 		}
 		function changed() {
 			if ( scheduled || destroyed ) { return; } scheduled = true;
-			queueMicrotask( () => { scheduled = false; if ( destroyed ) { return; } for ( const [ key, record ] of records ) { if ( ! valid( record ) ) { records.delete( key ); tickets.delete( record.ticket ); } } subscribers.forEach( callback => callback() ); } );
+			queueMicrotask( () => { scheduled = false; if ( destroyed ) { return; } const checks = new Map(); for ( const [ key, record ] of records ) { if ( ! valid( record, checks ) ) { records.delete( key ); tickets.delete( record.ticket ); } } subscribers.forEach( callback => callback() ); } );
 		}
 		function register( element, kind, anchor, guard = () => true, detail = null ) {
 			if ( destroyed || ! element || ! allowed.has( kind ) ) { return; }
@@ -83,35 +89,103 @@
 				}
 				return null;
 			},
-			list() { const result = []; for ( const [ element, record ] of records ) { if ( valid( record ) ) { result.push( Object.freeze( { ticket: record.ticket, kind: record.kind, label: labels[ record.kind ], element: record.element, expanded: record.kind === 'preview-details' ? Boolean( record.detail.open ) : null } ) ); } else { records.delete( element ); tickets.delete( record.ticket ); } } return result; },
-			current( ticket ) { return valid( tickets.get( ticket ) ); },
+			list() {
+				const result = [], checks = new Map();
+				for ( const [ element, record ] of records ) {
+					if ( valid( record, checks ) ) { const item = record.detail; result.push( Object.freeze( { ticket: record.ticket, kind: record.kind, label: item?.widget ? item.label : labels[ record.kind ], element,
+						expanded: record.kind === 'preview-details' ? Boolean( item.open ) : record.kind === 'preview-accordion' ? Boolean( item.details.open ) : null,
+						selected: record.kind === 'preview-tab' ? item.controls[ item.index ].getAttribute( 'aria-selected' ) === 'true' : null,
+						disabled: Boolean( element.disabled ), group: item?.widget === 'tabs' ? item.group : null } ) ); }
+					else { records.delete( element ); tickets.delete( record.ticket ); }
+				}
+				return result;
+			},
+			current( ticket ) { const record = tickets.get( ticket ); return valid( record ) && ! record.element.disabled; },
 			execute( ticket ) {
-				const record = tickets.get( ticket ); if ( ! valid( record ) ) { return false; }
+				const record = tickets.get( ticket ); if ( ! valid( record ) || record.element.disabled ) { return false; }
 				switch ( record.kind ) {
 					case 'empty-add': lieveContext.addBlock( 'section' ); break;
 					case 'popup-backdrop': lieveContext.openPopupSettings(); break;
 					case 'popup-close-settings': lieveContext.openPopupSettings( 'style', 'close' ); break;
 					case 'preview-details': { const previous = record.detail.open; selectElement( canvasIdentity().resolve( record.anchor ).identity.selectId ); if ( ! valid( record ) ) { return false; } togglePreviewDetails( record.detail, previous ); window.requestAnimationFrame( updateSelectionOutline ); break; }
+					case 'preview-tab': case 'preview-accordion': {
+						const item = record.detail, previous = item.details?.open;
+						selectElement( canvasIdentity().resolve( record.anchor ).identity.selectId );
+						if ( ! valid( record ) || record.element.disabled ) { return false; }
+						if ( record.kind === 'preview-tab' ) { activatePreviewTab( item.controls, item.panels, record.element, item.panels[ item.index ] ); }
+						else { togglePreviewDetails( item.details, previous ); record.element.setAttribute( 'aria-expanded', String( item.details.open ) ); }
+						window.requestAnimationFrame( updateSelectionOutline ); break;
+					}
 					default: return false;
 				}
 				changed(); return true;
 			},
 			subscribe( callback ) { if ( destroyed ) { return () => {}; } subscribers.add( callback ); return () => subscribers.delete( callback ); },
 			destroy() { destroyed = true; scheduled = false; records.clear(); tickets = new WeakMap(); subscribers.clear(); },
-			stats() { return { destroyed, controls: records.size, subscribers: subscribers.size, scheduled }; },
+			stats() { return { destroyed, controls: records.size, subscribers: subscribers.size, scheduled, widgetBuilds: builds.slice() }; },
 		} );
-		controlRegistry = { api, register, changed, reset() { records.clear(); tickets = new WeakMap(); changed(); } };
+		controlRegistry = { api, register, changed, active: () => ! destroyed,
+			forget( anchor ) { for ( const [ element, record ] of records ) { if ( record.anchor === anchor ) { records.delete( element ); tickets.delete( record.ticket ); } } changed(); },
+			built( items, start ) { if ( builds.length < 2000 ) { builds.push( { items, ms: performance.now() - start } ); } },
+			reset() { records.clear(); tickets = new WeakMap(); changed(); },
+		};
 		return api;
 	}
 	function togglePreviewDetails( details, previous = details.open ) { details.open = ! previous; }
+	function activatePreviewTab( controls, panels, tab, target ) {
+		controls.forEach( button => { const active = button === tab; button.setAttribute( 'aria-selected', String( active ) ); button.tabIndex = active ? 0 : -1; } );
+		panels.forEach( panel => { panel.hidden = panel !== target; } );
+	}
 	function registerPreviewControls( node, visual ) {
-		if ( ! controlRegistry || node.type !== 'dropdown' || ! canvasIdentity().active( visual ) || lieveContext.listingEditor?.enabled( node ) ) { return; }
+		if ( ! controlRegistry?.active() || ! [ 'dropdown', 'tabs', 'accordion', 'tabs-nested', 'accordion-nested' ].includes( node.type ) || ! canvasIdentity().active( visual ) || lieveContext.listingEditor?.enabled( node ) ) { return; }
 		if ( ! visual.isConnected ) { queueMicrotask( () => { if ( visual.isConnected ) { registerPreviewControls( node, visual ); } } ); return; }
+		if ( lieveContext.findNode( lieveContext.state.document.children, node.id ) !== node ) { return; }
+		if ( node.type !== 'dropdown' ) { registerPreviewItems( node, visual ); return; }
 		// Replace only the built-in top-level summary. Authored descendants stay opaque.
 		const details = visual.firstElementChild, old = details?.firstElementChild;
 		if ( details?.nodeName !== 'DETAILS' || old?.nodeName !== 'SUMMARY' ) { return; }
 		const summary = visual.ownerDocument.createElement( 'summary' ); summary.textContent = old.textContent; old.replaceWith( summary );
 		controlRegistry.register( summary, 'preview-details', visual, () => summary.parentElement === details && details.parentElement === visual && lieveContext.findNode( lieveContext.state.document.children, node.id )?.type === 'dropdown', details );
+	}
+	function registerPreviewItems( node, visual ) {
+		const start = performance.now(), nested = node.type.endsWith( '-nested' ), tabs = node.type.startsWith( 'tabs' ), root = visual.firstElementChild;
+		// This projection grants no authority to a server/authored node. All controls
+		// and panel shells below are newly created from canonical model positions.
+		// Reject ambiguous projections rather than interpreting content as controls.
+		if ( visual.children.length !== 1 || root?.nodeName !== 'DIV' ) { return; }
+		let labels;
+		if ( nested ) { labels = ( node.children || [] ).map( ( child, index ) => String( child.props?.label ?? ( tabs ? 'Tab ' : 'Item ' ) + ( index + 1 ) ) ); }
+		else {
+			const source = node.props?.items || '';
+			try { const rows = JSON.parse( source ); if ( rows && typeof rows === 'object' && ( ! Array.isArray( rows ) || rows.some( row => ! Array.isArray( row ) || row.some( value => typeof value !== 'string' ) ) ) ) { return; } } catch ( error ) { if ( /^[\s]*[\[{]/.test( source ) ) { return; } }
+			labels = lieveContext.parseItems( source ).map( row => String( row[0] || '' ).replace( /^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g, '' ) );
+		}
+		if ( ! labels.length || labels.some( label => label.includes( '{{' ) ) ) { return; }
+		const oldList = tabs ? root.firstElementChild : null, oldItems = Array.from( tabs ? oldList?.children || [] : root.children ), oldPanels = tabs ? Array.from( root.children ).slice( 1 ) : oldItems;
+		if ( oldItems.length !== labels.length || oldPanels.length !== labels.length || tabs && oldList?.nodeName !== 'DIV' ||
+			oldItems.some( ( item, index ) => tabs ? item.nodeName !== 'BUTTON' || item.textContent !== labels[index] || oldPanels[index].nodeName !== 'DIV' : item.nodeName !== 'DETAILS' || item.firstElementChild?.nodeName !== 'SUMMARY' || item.firstElementChild.textContent !== labels[index] ) ) { return; }
+		const definition = previewKey( node ), owner = canvasIdentity().resolve( visual ).identity, group = Object.freeze( {} ), controls = [], panels = [];
+		const current = () => root.parentElement === visual && lieveContext.findNode( lieveContext.state.document.children, node.id ) === node && previewKey( node ) === definition;
+		const doc = visual.ownerDocument, tablist = tabs ? doc.createElement( 'div' ) : null;
+		if ( tabs ) { tablist.setAttribute( 'role', 'tablist' ); tablist.setAttribute( 'aria-label', String( node.props.label || 'Tabs' ) ); }
+		labels.forEach( ( label, index ) => {
+			const control = doc.createElement( tabs ? 'button' : 'summary' ), panel = doc.createElement( 'div' ), details = tabs ? null : doc.createElement( 'details' );
+			const id = 'lieve-preview-' + canvasIdentity().stats().generation + '-' + owner.instance + '-' + index;
+			control.id = id + '-control'; panel.id = id + '-panel'; control.textContent = label;
+			control.setAttribute( 'aria-controls', panel.id ); panel.setAttribute( 'aria-labelledby', control.id ); panel.setAttribute( 'role', tabs ? 'tabpanel' : 'region' );
+			// Move opaque contents only. Never register their descendants or copy a
+			// server button/summary, event handler, command attribute or HTML ID.
+			Array.from( oldPanels[index].childNodes ).forEach( child => { if ( tabs || child !== oldItems[index].firstElementChild ) { panel.appendChild( child ); } } );
+			if ( tabs ) { control.type = 'button'; control.setAttribute( 'role', 'tab' ); panel.tabIndex = 0; tablist.appendChild( control ); oldPanels[index].replaceWith( panel ); }
+			else { control.setAttribute( 'aria-expanded', 'false' ); details.append( control, panel ); oldItems[index].replaceWith( details ); }
+			controls.push( control ); panels.push( panel );
+			controlRegistry.register( control, tabs ? 'preview-tab' : 'preview-accordion', visual, current, {
+				widget: tabs ? 'tabs' : 'accordion', group, index, controls, panels, root, tablist, details, panel,
+				label: ( node.props.editorLabel || node.type ) + ' — ' + ( tabs ? 'Tab: ' : 'Item: ' ) + ( label || String( index + 1 ) ),
+			} );
+		} );
+		if ( tabs ) { oldList.replaceWith( tablist ); activatePreviewTab( controls, panels, controls[0], panels[0] ); }
+		controlRegistry.built( controls.length, start );
 	}
 	function canvasIdentity() {
 		identityRegistry ||= createCanvasIdentity( { root: lieveContext.canvas, readDocument: () => lieveContext.state.document } );
@@ -333,8 +407,8 @@
 		const tab = event.target.closest( '[role="tab"][aria-controls]' );
 		const tabs = tab?.closest( '[data-lieve-tabs]' );
 		if ( tabs ) {
-			tabs.querySelectorAll( ':scope > [role="tablist"] [role="tab"]' ).forEach( ( button ) => { const active = button === tab; button.setAttribute( 'aria-selected', String( active ) ); button.tabIndex = active ? 0 : -1; } );
-			tabs.querySelectorAll( ':scope > [role="tabpanel"]' ).forEach( ( panel ) => { panel.hidden = panel.id !== tab.getAttribute( 'aria-controls' ); } );
+			const panels = Array.from( tabs.querySelectorAll( ':scope > [role="tabpanel"]' ) );
+			activatePreviewTab( Array.from( tabs.querySelectorAll( ':scope > [role="tablist"] [role="tab"]' ) ), panels, tab, panels.find( panel => panel.id === tab.getAttribute( 'aria-controls' ) ) );
 		}
 		const control = event.target.closest( '[data-lieve-slide-prev],[data-lieve-slide-next],[data-lieve-slide-index]' ); const slider = control?.closest( '[data-lieve-slider]' );
 		if ( slider ) {
@@ -376,8 +450,9 @@
 		let phpRecord = lieveContext.executeCodePreview( node ) ? lieveContext.phpPreviewSources.get( node.id ) : null;
 		if ( lieveContext.executeCodePreview( node ) && ( ! phpRecord || phpRecord.source !== lieveContext.codeSource( node ) ) ) { phpRecord = { source: lieveContext.codeSource( node ), consumed: false }; lieveContext.phpPreviewSources.set( node.id, phpRecord ); }
 		const isCurrent = () => { const current = lieveContext.findNode( lieveContext.state.document.children, node.id ); return current && previewKey( current ) === key; };
-		function display( html ) {
+		function display( html, exact = true ) {
 			window.LieveListings?.destroy( visual );
+			controlRegistry?.forget( visual );
 			const rawHtml = node.type === 'html' && ! lieveContext.styles?.htmlHasWrapper( lieveContext.findNode( lieveContext.state.document.children, node.id ) || node );
 			visual.innerHTML = rawHtml ? html || '' : html || '<div data-editor-ui class="lieve-editor-preview-message">Configure this element in the properties panel.</div>';
 			const fragments = new Map(); const comments = document.createTreeWalker( visual, 128 );
@@ -404,7 +479,7 @@
 				if ( ! sheet ) { sheet = owner.createElement('style'); sheet.dataset.componentPreview = node.id; owner.head.insertBefore(sheet, owner.getElementById('lieve-canvas-styles')); } sheet.textContent = componentStyles;
 			}
 			visual.querySelectorAll( 'style[data-lieve-styles]' ).forEach( ( item ) => item.remove() );
-			registerPreviewControls( node, visual );
+			if ( exact || node.type === 'dropdown' ) { registerPreviewControls( node, visual ); }
 			window.LieveListings?.mount( visual, true );
 			window.LieveCodePreview?.mount( visual, { select: id => { lieveContext.closeContextMenu(); if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) selectElement( id ); }, contextMenu: ( id, x, y, origin ) => { if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) { lieveContext.openContextMenu( id, x, y ); lieveContext.contextReturnFocus = origin; } }, resize: () => { updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); } } );
 			revealSelectedPreview();
@@ -419,7 +494,7 @@
 		}
 		if ( phpRecord && typeof phpRecord.html === 'string' ) { display( phpRecord.html ); return; }
 		if ( lieveContext.elementPreviews.has( key ) ) { display( lieveContext.elementPreviews.get( key ) ); return; }
-		if ( lieveContext.latestPreviews.has( node.id ) ) { display( lieveContext.latestPreviews.get( node.id ) ); }
+		if ( lieveContext.latestPreviews.has( node.id ) ) { display( lieveContext.latestPreviews.get( node.id ), false ); }
 		else if ( node.type === 'html' ) { visual.innerHTML = '<div data-editor-ui class="lieve-code-preview-loading" role="status" aria-label="Loading Custom Code preview"><span aria-hidden="true"></span></div>'; }
 		else { visual.innerHTML = '<div data-editor-ui class="lieve-editor-preview-message">Loading ' + lieveContext.escapeHtml( lieveContext.labels[ node.type ] || node.type ) + '…</div>'; }
 		if ( ! lieveContext.config.elementPreviewUrl ) { if ( ! lieveContext.latestPreviews.has( node.id ) ) { visual.innerHTML = '<div data-editor-ui class="lieve-editor-preview-message">The preview is unavailable. Reload the editor to try again.</div>'; } return; }

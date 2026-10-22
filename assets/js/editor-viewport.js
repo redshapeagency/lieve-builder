@@ -449,14 +449,19 @@
 			pending = null;
 			for ( const [ ticket, button ] of buttons ) { if ( ! keep.has( ticket ) ) { const focused = document.activeElement === button; button.remove(); buttons.delete( ticket ); if ( focused ) { focus(); } } }
 			for ( const entry of entries ) {
-				if ( buttons.has( entry.ticket ) && entry.expanded !== null ) { buttons.get( entry.ticket ).setAttribute( 'aria-expanded', String( entry.expanded ) ); }
-				if ( buttons.has( entry.ticket ) ) { continue; }
-				const button = document.createElement( 'button' ); button.type = 'button'; button.className = 'lieve-button-secondary'; button.textContent = entry.label;
+				let button = buttons.get( entry.ticket );
+				if ( ! button ) { button = document.createElement( 'button' ); button.type = 'button'; button.className = 'lieve-button-secondary'; button.textContent = entry.label; button.style.cssText = 'flex:none;outline-offset:3px;'; buttons.set( entry.ticket, button ); bar.appendChild( button ); }
 				if ( entry.expanded !== null ) { button.setAttribute( 'aria-expanded', String( entry.expanded ) ); }
-				button.style.cssText = 'flex:none;outline-offset:3px;'; buttons.set( entry.ticket, button ); bar.appendChild( button );
+				if ( entry.selected !== null ) { button.setAttribute( 'aria-pressed', String( entry.selected ) ); }
+				if ( entry.disabled && document.activeElement === button ) { focus(); }
+				button.disabled = entry.disabled;
 			}
 			bar.hidden = ! buttons.size;
 			bar.style.display = buttons.size ? 'flex' : 'none';
+			// Removing/hiding a focused native button need not deliver focusout
+			// through the old group (notably Firefox). Reconcile from actual focus.
+			bar.style.opacity = bar.contains( document.activeElement ) ? '1' : '0';
+			bar.style.pointerEvents = bar.contains( document.activeElement ) ? 'auto' : 'none';
 			// Do not leave a menu pointing at an old model or replaced owner.
 			if ( menuOwner && ! currentMenu() ) { closeMenu( context.contextMenu?.contains( document.activeElement ) ); }
 			sample( 'controls-sync', start );
@@ -483,7 +488,7 @@
 			// Local focus contract only: Safari's default Tab policy can skip native
 			// buttons. Never intercept Tab in Inspector, text editors or outside this group.
 			if ( event.type === 'keydown' && event.key === 'Tab' ) {
-				const ordered = [ ...buttons.values() ], index = ordered.indexOf( event.target );
+				const ordered = [ ...buttons.values() ].filter( button => ! button.disabled ), index = ordered.indexOf( event.target );
 				const next = event.target === surface && ! event.shiftKey ? ordered[ 0 ] : index >= 0 ? event.shiftKey ? index ? ordered[ index - 1 ] : surface : ordered[ index + 1 ] : null;
 				if ( next ) { event.preventDefault(); focus( next ); } return;
 			}
@@ -509,7 +514,17 @@
 			listen( surface, 'pointercancel', () => { pending = null; } );
 			listen( surface, 'focusin', event => { if ( bar.contains( event.target ) ) { bar.style.opacity = '1'; bar.style.pointerEvents = 'auto'; } } );
 			listen( surface, 'focusout', event => { if ( ! bar.contains( event.relatedTarget ) ) { bar.style.opacity = '0'; bar.style.pointerEvents = 'none'; } } );
-			listen( bar, 'keydown', event => { if ( event.isTrusted && event.key === 'Escape' ) { event.preventDefault(); event.stopPropagation(); pending = null; focus(); } } );
+			listen( bar, 'keydown', event => {
+				if ( ! active() || ! event.isTrusted || event.defaultPrevented ) { return; }
+				if ( event.key === 'Escape' ) { event.preventDefault(); event.stopPropagation(); pending = null; focus(); return; }
+				if ( ! [ 'ArrowLeft', 'ArrowRight', 'Home', 'End' ].includes( event.key ) ) { return; }
+				const ticket = ownedButton( event.target ), entries = controls.list(), entry = entries.find( item => item.ticket === ticket );
+				if ( ! entry?.group ) { return; }
+				const peers = entries.filter( item => item.group === entry.group && ! item.disabled ), index = peers.indexOf( entry );
+				if ( index < 0 ) { return; }
+				const next = event.key === 'Home' ? 0 : event.key === 'End' ? peers.length - 1 : ( index + ( event.key === 'ArrowLeft' ? peers.length - 1 : 1 ) ) % peers.length;
+				event.preventDefault(); if ( activate( peers[next].ticket, event ) ) { focus( buttons.get( peers[next].ticket ) ); }
+			} );
 			listen( document, 'click', () => { if ( menuOwner && context.contextReturnFocus === surface && context.contextMenu?.hidden ) { if ( document.activeElement === document.body || context.contextMenu.contains( document.activeElement ) ) { focus(); } menuOwner = null; } } );
 			listen( window, 'blur', () => { pending = null; closeMenu(); } );
 			listen( document, 'pointerdown', event => { if ( ! event.isTrusted ) { return; } if ( ! surface.contains( event.target ) ) { pending = null; } if ( ! context.contextMenu?.contains( event.target ) ) { closeMenu(); } } );
@@ -526,7 +541,7 @@
 				surface.appendChild( bar ); state = 'mounted'; attach();
 				if ( window.MutationObserver ) {
 					observer = new window.MutationObserver( () => { if ( state !== 'mounted' ) { return; } if ( ! active() ) { suspend(); return; } sync(); } );
-					observer.observe( surface.parentElement, { childList: true } ); observer.observe( context.canvas, { childList: true, subtree: true } );
+					observer.observe( surface.parentElement, { childList: true } ); observer.observe( context.canvas, { childList: true, subtree: true, attributes: true, attributeFilter: [ 'disabled' ] } );
 				}
 				return true;
 			}, pointerDown, click, owns: target => Boolean( bar?.contains( target ) ), cancel() { pending = null; }, suspend, resume, destroy,
