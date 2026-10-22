@@ -2,6 +2,7 @@
 ( function () {
 	'use strict';
 	const scrollers = new WeakMap();
+	const inputOwners = new WeakMap(); // Weak frame lease; values never retain DOM/controllers.
 	function consumeScroll( element, delta, horizontal, scale = 1 ) {
 		if ( ! element || ! delta ) { return delta; }
 		const key = horizontal ? 'scrollLeft' : 'scrollTop';
@@ -361,5 +362,144 @@
 			},
 		};
 	}
-	window.LieveViewport = { create, loadedCss, createCssReadiness, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
+	/* Inactive until explicitly mounted by a trusted caller. No CSS/startup ownership. */
+	function createInputAdapter( { viewport, controller, onOutline = () => {}, onError = () => {} } ) {
+		let frame = viewport?.frame, doc = viewport?.document, canvas = viewport?.canvas;
+		let stage = viewport?.stage, host = frame?.parentElement, surface = null, state = 'created';
+		let outlineFrame = 0, epoch = 0, resumeAfterPageShow = false;
+		const lease = Object.freeze( {} ), inputListeners = [], lifecycleListeners = [];
+		const diagnostics = { hitCount: 0, selections: 0, scrollCalls: 0, handledScrolls: 0, pointermoveWork: 0, hits: [], events: [], errors: [] };
+		const error = code => Object.assign( new Error( 'Canvas input unavailable (' + code + ').' ), { name: 'CanvasInputError', code } );
+		const sample = ( key, value ) => { if ( diagnostics[ key ].length < 2000 ) { diagnostics[ key ].push( value ); } };
+		function validViewport() {
+			try {
+				return Boolean( frame?.tagName === 'IFRAME' && frame.ownerDocument === document && frame.isConnected && host?.isConnected && stage?.isConnected &&
+					frame.parentElement === host && stage.contains( host ) && frame.contentDocument === doc && doc.defaultView?.frameElement === frame &&
+					canvas?.ownerDocument === doc && canvas.isConnected && doc.body.contains( canvas ) && viewport.frame === frame && viewport.document === doc && viewport.canvas === canvas && viewport.stage === stage &&
+					frame.getAttribute( 'sandbox' ) === 'allow-same-origin allow-popups allow-popups-to-escape-sandbox' );
+			} catch ( failure ) { return false; }
+		}
+		if ( ! validViewport() || typeof viewport.bounds !== 'function' || typeof controller?.canvasIdentity !== 'function' || typeof controller?.selectElement !== 'function' ) { throw error( 'INVALID_VIEWPORT' ); }
+		function report( code ) {
+			sample( 'errors', { code } );
+			try { onError?.( error( code ) ); } catch ( failure ) { /* Diagnostic consumers cannot prevent cleanup. */ }
+		}
+		function listen( list, target, type, handler, options ) {
+			target.addEventListener( type, handler, options ); list.push( () => target.removeEventListener( type, handler, options ) );
+		}
+		function clear( list ) { list.splice( 0 ).forEach( remove => remove() ); }
+		function queueOutline() {
+			if ( outlineFrame || state !== 'mounted' ) { return; }
+			const generation = epoch;
+			outlineFrame = window.requestAnimationFrame( () => {
+				if ( state !== 'mounted' || epoch !== generation ) { return; }
+				outlineFrame = 0; if ( ! validViewport() ) { return; }
+				try { onOutline(); } catch ( failure ) { suspend(); report( 'OUTLINE_FAILED' ); }
+			} );
+		}
+		function geometry( clientX, clientY ) {
+			if ( ! Number.isFinite( clientX ) || ! Number.isFinite( clientY ) || ! validViewport() ) { return null; }
+			// The bounding-box inverse is valid only for positive axis-aligned 2D
+			// transforms. Check ancestors too, including individual CSS transforms.
+			for ( let node = frame; node; node = node.parentElement ) {
+				const css = window.getComputedStyle( node ), matrix = new window.DOMMatrixReadOnly( css.transform === 'none' ? undefined : css.transform );
+				if ( ! matrix.is2D || matrix.b || matrix.c || ! Number.isFinite( matrix.a ) || ! Number.isFinite( matrix.d ) || matrix.a <= 0 || matrix.d <= 0 ||
+					css.perspective && css.perspective !== 'none' || css.transformStyle === 'preserve-3d' || css.rotate && css.rotate !== 'none' && css.rotate !== '0deg' ) { return null; }
+				if ( css.scale && css.scale !== 'none' ) { const scale = css.scale.split( /\s+/ ).map( Number ); if ( scale.length > 2 || scale.some( value => ! Number.isFinite( value ) || value <= 0 ) ) { return null; } }
+				if ( css.translate && css.translate !== 'none' && css.translate.split( /\s+/ ).length > 2 ) { return null; }
+				if ( node === frame && [ 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom' ].some( key => parseFloat( css[ key ] || 0 ) !== 0 ) ) { return null; }
+			}
+			const rect = frame.getBoundingClientRect(), bounds = viewport.bounds();
+			if ( ! [ rect.left, rect.top, rect.width, rect.height, frame.offsetWidth, frame.offsetHeight, bounds.left, bounds.top, bounds.right, bounds.bottom ].every( Number.isFinite ) || rect.width <= 0 || rect.height <= 0 || frame.offsetWidth <= 0 || frame.offsetHeight <= 0 ) { return null; }
+			const right = Math.min( bounds.right, document.documentElement.clientWidth || window.innerWidth ), bottom = Math.min( bounds.bottom, document.documentElement.clientHeight || window.innerHeight );
+			if ( clientX < Math.max( 0, bounds.left ) || clientX >= right || clientY < Math.max( 0, bounds.top ) || clientY >= bottom ) { return null; }
+			const parentHit = document.elementFromPoint( clientX, clientY );
+			if ( parentHit !== surface && ! surface?.contains( parentHit ) ) { return null; }
+			const x = ( clientX - rect.left ) / ( rect.width / frame.offsetWidth ) - frame.clientLeft;
+			const y = ( clientY - rect.top ) / ( rect.height / frame.offsetHeight ) - frame.clientTop;
+			return x >= 0 && y >= 0 && x < frame.clientWidth && y < frame.clientHeight ? { x, y } : null;
+		}
+		function resolveAt( clientX, clientY ) {
+			const started = performance.now(); diagnostics.hitCount++;
+			const none = ( status, reason ) => Object.freeze( { status, reason, identity: null, element: null } );
+			if ( state === 'destroyed' ) { return none( 'destroyed', 'adapter-destroyed' ); }
+			if ( state !== 'mounted' ) { return none( 'unmanaged', 'adapter-inactive' ); }
+			if ( ! validViewport() ) { return none( 'stale', 'viewport-replaced' ); }
+			try {
+				const point = geometry( clientX, clientY ), geometryMs = performance.now() - started;
+				if ( ! point ) { return none( 'unmanaged', 'geometry-uninterpretable' ); }
+				const element = doc.elementsFromPoint( point.x, point.y )[ 0 ], paintedAt = performance.now();
+				if ( ! element || /^(IFRAME|OBJECT|EMBED)$/.test( element.nodeName ) || ! canvas.contains( element ) ) { return none( 'unmanaged', 'outside-or-browsing-context' ); }
+				const resolved = controller.canvasIdentity().resolve( element ), identityMs = performance.now() - paintedAt;
+				const result = Object.freeze( { status: resolved.status, reason: resolved.reason, identity: resolved, element, ...point } );
+				sample( 'hits', { geometryMs, paintMs: paintedAt - started - geometryMs, identityMs, totalMs: performance.now() - started, status: resolved.status } ); return result;
+			} catch ( failure ) { report( 'TARGET_UNAVAILABLE' ); return none( 'unmanaged', 'target-unavailable' ); }
+		}
+		function selectable( hit ) {
+			return hit.status === 'canvas' || [ 'resolved', 'opaque' ].includes( hit.status ) && typeof hit.identity?.identity?.selectId === 'string' && hit.identity.identity.selectId.length > 0;
+		}
+		function hitTest( x, y ) { const hit = resolveAt( x, y ); return selectable( hit ) ? { ...hit, id: hit.status === 'canvas' ? null : hit.identity.identity.selectId } : null; }
+		function pointerDown( event ) {
+			if ( state !== 'mounted' || ! event.isTrusted || event.defaultPrevented || event.cancelable === false || event.button !== 0 || ! event.isPrimary || event.pointerType !== 'mouse' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { return; }
+			const started = performance.now(), hit = hitTest( event.clientX, event.clientY ); if ( ! hit ) { return; }
+			try {
+				event.preventDefault(); surface.focus( { preventScroll: true } );
+				const before = performance.now(); controller.selectElement( hit.id ); const controllerMs = performance.now() - before;
+				queueOutline(); diagnostics.selections++; sample( 'events', { trusted: true, id: hit.id, startedAt: started, controllerMs, totalMs: performance.now() - started } );
+			} catch ( failure ) { suspend(); report( 'SELECTION_FAILED' ); }
+		}
+		function wheel( event ) {
+			if ( state !== 'mounted' || ! event.isTrusted || event.defaultPrevented || event.cancelable === false || event.ctrlKey || event.metaKey || ! [ 0, 1, 2 ].includes( event.deltaMode ) || ! Number.isFinite( event.deltaX ) || ! Number.isFinite( event.deltaY ) ) { return; }
+			const hit = resolveAt( event.clientX, event.clientY );
+			if ( ! hit.element || [ 'stale', 'destroyed' ].includes( hit.status ) ) { return; }
+			try {
+				diagnostics.scrollCalls++;
+				if ( window.LieveViewport.scrollFrom( doc, event, hit.element ) ) { event.preventDefault(); diagnostics.handledScrolls++; queueOutline(); }
+			} catch ( failure ) { suspend(); report( 'SCROLL_FAILED' ); }
+		}
+		function pageHide( event ) { if ( event.persisted ) { const wasMounted = state === 'mounted'; suspend(); resumeAfterPageShow = wasMounted; } else { destroy(); } }
+		function pageShow( event ) { if ( event.persisted && resumeAfterPageShow ) { resumeAfterPageShow = false; resume(); } }
+		function attachInputs() {
+			listen( inputListeners, surface, 'pointerdown', pointerDown );
+			listen( inputListeners, surface, 'wheel', wheel, { passive: false } );
+			listen( inputListeners, surface, 'click', event => event.preventDefault() );
+			listen( inputListeners, stage, 'scroll', queueOutline, { passive: true } );
+		}
+		function mount() {
+			if ( state === 'destroyed' || state === 'suspended' ) { return false; }
+			if ( ! validViewport() ) { report( 'INVALID_VIEWPORT' ); return false; }
+			if ( state === 'mounted' ) { if ( surface?.parentElement === host && inputOwners.get( frame ) === lease ) { return true; } suspend(); report( 'INVALID_SURFACE' ); return false; }
+			if ( inputOwners.has( frame ) ) { report( 'DUPLICATE_MOUNT' ); return false; }
+			if ( window.getComputedStyle( host ).position === 'static' ) { report( 'INVALID_HOST' ); return false; }
+			try {
+				surface = document.createElement( 'div' ); surface.dataset.lieveCanvasInput = '';
+				surface.setAttribute( 'aria-label', 'Canvas selection surface' ); surface.tabIndex = 0;
+				surface.style.cssText = 'position:absolute;inset:0;z-index:10;margin:0;padding:0;border:0;background:transparent;box-sizing:border-box;user-select:none;touch-action:auto;';
+				host.appendChild( surface ); inputOwners.set( frame, lease ); state = 'mounted'; epoch++;
+				listen( lifecycleListeners, window, 'pagehide', pageHide ); listen( lifecycleListeners, window, 'pageshow', pageShow ); attachInputs(); return true;
+			} catch ( failure ) { report( 'MOUNT_FAILED' ); destroy(); return false; }
+		}
+		function suspend() {
+			resumeAfterPageShow = false;
+			if ( state !== 'mounted' ) { return false; }
+			state = 'suspended'; epoch++; clear( inputListeners ); window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; return true;
+		}
+		function resume() {
+			if ( state !== 'suspended' ) { return state === 'mounted'; }
+			if ( ! validViewport() || surface?.parentElement !== host || inputOwners.get( frame ) !== lease ) { report( 'INVALID_VIEWPORT' ); return false; }
+			state = 'mounted'; epoch++;
+			try { attachInputs(); queueOutline(); return true; }
+			catch ( failure ) { suspend(); report( 'RESUME_FAILED' ); return false; }
+		}
+		function destroy() {
+			if ( state === 'destroyed' ) { return; } state = 'destroyed'; epoch++; resumeAfterPageShow = false;
+			window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; clear( inputListeners ); clear( lifecycleListeners );
+			if ( inputOwners.get( frame ) === lease ) { inputOwners.delete( frame ); }
+			surface?.remove(); surface = frame = doc = canvas = stage = host = viewport = controller = onOutline = onError = null;
+		}
+		return Object.freeze( { mount, resolveAt, hitTest, suspend, resume, destroy,
+			stats() { return JSON.parse( JSON.stringify( { ...diagnostics, state, listeners: inputListeners.length + lifecycleListeners.length, inputListeners: inputListeners.length, lifecycleListeners: lifecycleListeners.length, framesActive: outlineFrame ? 1 : 0, surfaces: surface ? 1 : 0 } ) ); },
+		} );
+	}
+	window.LieveViewport = { create, loadedCss, createCssReadiness, createInputAdapter, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
 }() );
