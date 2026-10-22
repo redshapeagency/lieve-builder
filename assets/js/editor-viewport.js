@@ -32,6 +32,212 @@
 			return canInlineCss( css ) ? css : null;
 		} catch ( error ) { return null; } // Unloaded or cross-origin sheets use the normal link fallback.
 	}
+	/* Passive opt-in service. The normal create()/stylesReady path below is unchanged.
+	 * Only a trusted adapter supplies this immutable URL allowlist, never canvas HTML.
+	 * HTTP proof + isolated sandbox parsing precede child application; inline CSS is
+	 * inspected in the sandbox only. No child load/error callback is involved. */
+	function createCssReadiness( { document: target, styles = [], timeoutMs = 8000 } ) {
+		let doc = target, authorized = Object.freeze( [ ...styles ] ), active = null, destroyed = false, generation = 0;
+		target = null; styles = null; // The service's document reference is explicitly released by destroy.
+		const baseUrl = document.baseURI || window.location.href;
+		const timeout = Number.isFinite( timeoutMs ) && timeoutMs > 0 && timeoutMs <= 20000 ? timeoutMs : 8000;
+		let startAnchor = null, endAnchor = null, applied = [], last = { state: 'idle', generation: 0, checks: 0, framesActive: 0, listeners: 0, pending: 0, resources: [] };
+		const proofs = new Map(); // Instance-local, HTTP-fresh text only; never DOM/sheet references.
+		const error = ( code, index = null, httpStatus = null ) => Object.assign( new Error( 'Canvas CSS verification failed (' + code + ').' ), { name: 'CanvasCssError', code, index, httpStatus } );
+		function urlFor( value ) {
+			try {
+				const url = new URL( value, baseUrl ), base = new URL( baseUrl );
+				if ( typeof value !== 'string' || ! value.trim() || ! /^https?:$/.test( url.protocol ) || url.origin !== base.origin || url.username || url.password || url.hash ) { throw error( 'URL_NOT_AUTHORIZED' ); }
+				return url.href;
+			} catch ( failure ) { throw error( 'URL_NOT_AUTHORIZED' ); }
+		}
+		// A deliberately conservative lexical gate, not a substitute CSS parser.
+		// Reject imports (including escaped at-keywords), unterminated constructs and
+		// escapes outside strings; unsupported syntax must not trigger hidden imports.
+		function validateText( css, index ) {
+			let plain = '', quote = '', comment = false; const stack = [];
+			for ( let i = 0; i < css.length; i++ ) {
+				const c = css[ i ], next = css[ i + 1 ];
+				if ( comment ) { if ( c === '*' && next === '/' ) { comment = false; i++; } continue; }
+				if ( quote ) { if ( c === '\\' ) { i++; } else if ( c === quote ) { quote = ''; } continue; }
+				if ( c === '/' && next === '*' ) { comment = true; i++; continue; }
+				if ( c === '"' || c === "'" ) { quote = c; plain += ' '; continue; }
+				if ( c === '\\' ) { throw error( 'DEPENDENCY_UNVERIFIABLE', index ); }
+				plain += c;
+				if ( '{[('.includes( c ) ) { stack.push( c ); }
+				if ( '}])'.includes( c ) && stack.pop() !== { '}': '{', ']': '[', ')': '(' }[ c ] ) { throw error( 'CSS_PARSE_ERROR', index ); }
+			}
+			if ( comment || quote || stack.length ) { throw error( 'CSS_PARSE_ERROR', index ); }
+			if ( /@import\b/i.test( plain ) ) { throw error( 'IMPORT_UNVERIFIABLE', index ); }
+			return plain.trim();
+		}
+		function rulesOf( sheet, index ) {
+			try {
+				if ( ! sheet ) { throw error( 'CSSOM_UNAVAILABLE', index ); }
+				const rules = Array.from( sheet.cssRules );
+				if ( rules.some( rule => rule.type === 3 ) ) { throw error( 'IMPORT_UNVERIFIABLE', index ); }
+				return rules.map( rule => rule.cssText ).join( '\n' );
+			} catch ( failure ) { if ( failure.name === 'CanvasCssError' ) { throw failure; } throw error( 'CSSOM_INACCESSIBLE', index ); }
+		}
+		function removeApplied() { applied.splice( 0 ).forEach( node => node.remove() ); }
+		function snapshot() { return JSON.parse( JSON.stringify( { ...last, ownedNodes: applied.length + ( startAnchor ? 2 : 0 ) } ) ); }
+		function currentCanvas() {
+			const frame = doc?.defaultView?.frameElement;
+			return Boolean( doc?.head && doc.body && doc !== document && frame?.isConnected && frame.ownerDocument === document && frame.contentDocument === doc && frame.getAttribute( 'sandbox' ) === 'allow-same-origin allow-popups allow-popups-to-escape-sandbox' );
+		}
+		function prepare( { styles: requested = authorized, inlineCss = '', signal } = {} ) {
+			if ( destroyed ) { return Promise.reject( error( 'VIEWPORT_DESTROYED' ) ); }
+			active?.cancel( 'PREPARATION_OBSOLETE' );
+			removeApplied();
+			const op = { generation: ++generation, frame: 0, timer: null, settled: false, controllers: [], resources: [], probes: [], cleanups: [], started: performance.now() };
+			last = { state: 'preparing', phase: 'source', generation, checks: 0, framesActive: 0, listeners: 0, pending: 0, fetches: 0, cacheHits: 0, parentReused: 0, snapshots: 0, canvasLinks: 0, durationMs: 0, resources: op.resources };
+			return new Promise( ( resolve, reject ) => {
+				function finish( failure ) {
+					if ( op.settled ) { return; } op.settled = true;
+					window.clearTimeout( op.timer ); window.cancelAnimationFrame( op.frame );
+					op.controllers.forEach( controller => controller.abort() ); op.controllers.length = 0;
+					for ( const cleanup of [ ...op.cleanups.splice( 0 ), ...op.probes.splice( 0 ) ] ) {
+						try { cleanup(); } catch ( cleanupError ) { failure ||= error( 'CSSOM_INACCESSIBLE' ); }
+					}
+					last.framesActive = last.listeners = last.pending = 0; last.durationMs = performance.now() - op.started;
+					last.state = failure ? 'failed' : 'ready'; last.error = failure?.code || null; last.errorIndex = failure?.index ?? null;
+					if ( failure ) { removeApplied(); } active = null;
+					if ( failure ) { failure.phase = last.phase; reject( failure ); } else { resolve( Object.freeze( { status: 'ready', generation: op.generation, metrics: snapshot() } ) ); }
+				}
+				op.cancel = code => finish( error( code ) ); active = op;
+				op.timer = window.setTimeout( () => finish( error( last.phase === 'application' ? 'CSS_NOT_APPLIED' : 'CSS_TIMEOUT', last.waitingFor ?? null ) ), timeout );
+				const live = () => ! op.settled && ! destroyed && active === op;
+				try {
+					if ( ! currentCanvas() ) { throw error( 'CANVAS_UNAVAILABLE' ); }
+					const allowed = authorized.map( urlFor ); let previous = -1;
+					const urls = Array.from( requested, ( original, index ) => {
+						const href = urlFor( original ), position = allowed.indexOf( href, previous + 1 );
+						if ( position < 0 ) { throw error( 'URL_NOT_AUTHORIZED', index ); } previous = position;
+						return { original, href, index };
+					} );
+					if ( typeof inlineCss !== 'string' ) { throw error( 'CSS_PARSE_ERROR' ); }
+					validateText( inlineCss, urls.length );
+					if ( signal?.aborted ) { throw error( 'OPERATION_ABORTED' ); }
+					if ( signal ) { const abort = () => op.cancel( 'OPERATION_ABORTED' ); signal.addEventListener( 'abort', abort, { once: true } ); last.listeners++; op.cleanups.push( () => signal.removeEventListener( 'abort', abort ) ); }
+					const violation = event => {
+						if ( ! live() || ! /^(connect-src|style-src)/.test( event.effectiveDirective || '' ) ) { return; }
+						if ( urls.some( item => item.href === event.blockedURI ) ) { finish( error( 'CSP_INCOMPATIBLE' ) ); }
+					};
+					document.addEventListener( 'securitypolicyviolation', violation ); last.listeners++;
+					op.cleanups.push( () => document.removeEventListener( 'securitypolicyviolation', violation ) );
+					if ( ! startAnchor ) { startAnchor = doc.createComment( 'lieve-css-start' ); endAnchor = doc.createComment( 'lieve-css-end' ); doc.head.appendChild( startAnchor ); doc.head.appendChild( endAnchor ); }
+					const insert = node => { doc.head.insertBefore( node, endAnchor ); applied.push( node ); return node; };
+					const records = urls.map( item => ( { ...item, node: insert( doc.createElement( 'style' ) ), expected: null, loaded: false } ) );
+					let inline = null;
+					if ( inlineCss ) { inline = insert( doc.createElement( 'style' ) ); inline.textContent = inlineCss; }
+					const fetched = new Map();
+					async function source( item ) {
+						const cached = proofs.get( item.href );
+						if ( cached && cached.expires > Date.now() ) { last.cacheHits++; return cached; }
+						proofs.delete( item.href );
+						const controller = new AbortController(); op.controllers.push( controller ); last.fetches++; last.pending++;
+						let response;
+						try { response = await window.fetch( item.href, { signal: controller.signal, credentials: 'same-origin', mode: 'same-origin', redirect: 'error', cache: 'default' } ); }
+						catch ( failure ) { throw error( 'RESOURCE_BLOCKED', item.index ); }
+						if ( ! live() ) { return null; }
+						if ( ! response.ok ) { throw error( 'HTTP_ERROR', item.index, response.status ); }
+						if ( ! /^text\/css(?:\s*;|$)/i.test( response.headers.get( 'content-type' ) || '' ) ) { throw error( 'CSS_MIME_ERROR', item.index ); }
+						const text = await response.text(); if ( ! live() ) { return null; }
+						const meaningful = validateText( text, item.index );
+						// Native parsing in the target realm, isolated from authored content.
+						// Constructed sheets/cssText roundtrips lose some WebKit shorthands.
+						const host = doc.createElement( 'div' ); host.hidden = true;
+						const parser = doc.createElement( 'style' ); parser.textContent = text;
+						let css;
+						try {
+							doc.body.appendChild( host ); host.attachShadow( { mode: 'closed' } ).appendChild( parser );
+							if ( ! parser.sheet ) { throw error( 'CSP_INCOMPATIBLE', item.index ); }
+							css = rulesOf( parser.sheet, item.index );
+						} finally { host.remove(); }
+						if ( meaningful && ! css ) { throw error( 'CSS_PARSE_ERROR', item.index ); }
+						// Exact URL, exact parsed content: a stale/empty parent sheet is never proof.
+						for ( const sheet of Array.from( document.styleSheets || [] ) ) {
+							if ( sheet.href !== item.href || sheet.disabled ) { continue; }
+							try { if ( rulesOf( sheet, item.index ) === css ) { last.parentReused++; css = rulesOf( sheet, item.index ); break; } } catch ( failure ) { /* Target-realm parse remains authoritative. */ }
+						}
+						last.pending--;
+						const control = response.headers.get( 'cache-control' ) || '', age = Number( response.headers.get( 'age' ) || 0 );
+						const maxAge = /(?:^|,)\s*max-age\s*=\s*"?(\d+)/i.exec( control );
+						const date = Date.parse( response.headers.get( 'date' ) || '' ), lifetime = Number( maxAge?.[ 1 ] );
+						const apparentAge = Number.isFinite( date ) ? Math.max( 0, ( Date.now() - date ) / 1000 ) : Infinity;
+						const freshMs = ! /(?:no-store|no-cache|must-revalidate)/i.test( control ) && Number.isFinite( lifetime ) && Number.isFinite( age ) && age >= 0 && response.headers.get( 'vary' ) !== '*' ? Math.max( 0, lifetime - Math.max( age, apparentAge ) ) * 1000 : 0;
+						const proof = { css, text, expires: Date.now() + freshMs, linked: /\burl\s*\(|(?:-webkit-)?image-set\s*\(|@font-face\b/i.test( css ) };
+						if ( freshMs > 0 ) { proofs.set( item.href, proof ); } return proof;
+					}
+					const work = records.map( async record => {
+						if ( ! fetched.has( record.href ) ) { fetched.set( record.href, source( record ) ); }
+						const proof = await fetched.get( record.href ); if ( ! live() || ! proof ) { return; }
+						record.expected = proof.css; record.loaded = true;
+						if ( proof.linked ) {
+							const link = doc.createElement( 'link' ); link.rel = 'stylesheet'; link.href = record.href;
+							record.node.replaceWith( link ); applied[ applied.indexOf( record.node ) ] = link; record.node = link; last.canvasLinks++;
+						} else { record.node.textContent = proof.text; record.node.dataset.lieveCssSource = record.href; last.snapshots++; }
+						op.resources.push( { index: record.index, original: record.original, href: record.href, mode: proof.linked ? 'link' : 'snapshot', status: 'loaded' } );
+					} );
+					Promise.all( work ).then( () => { if ( live() ) { last.phase = 'canvas'; schedule(); } }, failure => { if ( live() ) { finish( failure.name === 'CanvasCssError' ? failure : error( 'RESOURCE_BLOCKED' ) ); } } );
+					function schedule() { last.framesActive = 1; op.frame = window.requestAnimationFrame( inspect ); }
+					function inspect() {
+						op.frame = 0; last.framesActive = 0; if ( ! live() ) { return; } last.checks++;
+						try {
+							if ( ! currentCanvas() ) { throw error( 'CANVAS_UNAVAILABLE' ); }
+							if ( op.witnesses ) {
+								for ( const witness of op.witnesses ) {
+									last.waitingFor = witness.index;
+									if ( witness.node.sheet !== witness.sheet || witness.sheet.disabled ) { throw error( 'CSS_NOT_APPLIED', witness.index ); }
+									if ( ! Array.from( doc.styleSheets ).includes( witness.sheet ) ) { schedule(); return; }
+									if ( doc.defaultView.getComputedStyle( witness.probe ).getPropertyValue( witness.key ).trim() !== 'verified' ) { schedule(); return; }
+								}
+								op.probes.forEach( cleanup => cleanup() ); op.probes.length = 0;
+								for ( const record of records ) { if ( rulesOf( record.node.sheet, record.index ) !== record.expected ) { throw error( 'CSS_NOT_APPLIED', record.index ); } }
+								op.resources.sort( ( a, b ) => a.index - b.index ).forEach( record => { record.status = 'applied'; } ); finish(); return;
+							}
+							for ( const record of records ) {
+								last.waitingFor = record.index;
+								if ( ! record.node.sheet ) { if ( record.node.tagName === 'STYLE' ) { throw error( 'CSP_INCOMPATIBLE', record.index ); } schedule(); return; }
+								if ( record.node.sheet.disabled ) { throw error( 'CSS_NOT_APPLIED', record.index ); }
+								if ( ! Array.from( doc.styleSheets ).includes( record.node.sheet ) ) { schedule(); return; }
+								if ( rulesOf( record.node.sheet, record.index ) !== record.expected ) { schedule(); return; }
+							}
+							if ( inline ) {
+								if ( ! inline.sheet ) { throw error( 'CSP_INCOMPATIBLE', records.length ); }
+								if ( validateText( inlineCss, records.length ) && ! rulesOf( inline.sheet, records.length ) ) { throw error( 'CSS_PARSE_ERROR', records.length ); }
+							}
+							// A temporary, unguessable witness survives one parent animation frame:
+							// parsed CSSOM and applied styles can become observable at different times.
+							// It is removed on every success/error/cancel, never kept in authored DOM.
+							op.witnesses = []; last.phase = 'application';
+							for ( const [ index, node ] of [ ...records.map( record => record.node ), ...( inline ? [ inline ] : [] ) ].entries() ) {
+								const nonce = () => Array.from( window.crypto.getRandomValues( new Uint32Array( 4 ) ), value => value.toString( 16 ).padStart( 8, '0' ) ).join( '' );
+								const probe = doc.createElement( 'span' ), key = '--lv-proof-' + nonce();
+								const sheet = node.sheet, ruleIndex = sheet.cssRules.length;
+								probe.id = 'lv-css-' + nonce(); probe.hidden = true; doc.body.appendChild( probe );
+								let rule = null;
+								const cleanup = () => { try { const at = rule ? Array.from( sheet.cssRules ).indexOf( rule ) : -1; if ( at >= 0 ) { sheet.deleteRule( at ); } } finally { rule = null; probe.remove(); } };
+								op.probes.push( cleanup );
+								sheet.insertRule( '#' + probe.id + ' { ' + key + ': verified !important; }', ruleIndex ); rule = sheet.cssRules[ ruleIndex ];
+								op.witnesses.push( { probe, key, sheet, node, index } );
+							}
+							schedule();
+						} catch ( failure ) { finish( failure.name === 'CanvasCssError' ? failure : error( 'CSSOM_INACCESSIBLE' ) ); }
+					}
+				} catch ( failure ) { finish( failure.name === 'CanvasCssError' ? failure : error( 'CANVAS_UNAVAILABLE' ) ); }
+			} );
+		}
+		return Object.freeze( {
+			prepare, stats: snapshot,
+			destroy() {
+				if ( destroyed ) { return; } destroyed = true; active?.cancel( 'VIEWPORT_DESTROYED' ); removeApplied();
+				startAnchor?.remove(); endAnchor?.remove(); startAnchor = endAnchor = doc = null; authorized = Object.freeze( [] );
+				proofs.clear();
+				last = { ...last, state: 'destroyed', framesActive: 0, listeners: 0, pending: 0, resources: [] };
+			},
+		} );
+	}
 	function create( { canvas, app, styles = [], styleTexts = {}, inlineCss = '', initialWidth = 1279, onResize = () => {}, onReady = () => {} } ) {
 		const stage = canvas.closest( '.lieve-stage-scroll' );
 		const zoomSelect = app.querySelector( '[data-editor-zoom]' ); const zoomListeners = new Set();
@@ -155,5 +361,5 @@
 			},
 		};
 	}
-	window.LieveViewport = { create, loadedCss, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
+	window.LieveViewport = { create, loadedCss, createCssReadiness, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
 }() );
