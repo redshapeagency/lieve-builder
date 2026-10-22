@@ -426,7 +426,114 @@
 		};
 	}
 	/* Inactive until explicitly mounted by a trusted caller. No CSS/startup ownership. */
-	function createInputAdapter( { viewport, controller, onOutline = () => {}, onError = () => {}, drag = null } ) {
+	/** Passive Task 15 contract. Only the guarded fixture constructs this satellite. */
+	function createInteractionCommands( { controller, context, cancelDrag = () => {} } ) {
+		let controls = controller.canvasControls(), surface, resolveAt, validViewport, unsubscribe, bar, pending = null, state = 'created';
+		let listeners = [], buttons = new Map(), seen = new WeakSet(), epoch = 0, menuOwner = null, menuElement = null, observer = null;
+		const measurements = [], counters = { activations: 0, denials: 0, menus: 0, focus: 0 };
+		const sample = ( kind, start ) => { if ( measurements.length < 2000 ) { measurements.push( { kind, ms: performance.now() - start } ); } };
+		const active = () => state === 'mounted' && validViewport() && surface.isConnected;
+		const once = event => { if ( ! active() || ! event?.isTrusted || seen.has( event ) ) { return false; } seen.add( event ); return true; };
+		function listen( target, type, callback, options ) { target.addEventListener( type, callback, options ); listeners.push( () => target.removeEventListener( type, callback, options ) ); }
+		function focus( target = surface ) { if ( active() && target?.isConnected ) { const start = performance.now(); target.focus( { preventScroll: true } ); counters.focus++; sample( 'focus', start ); } }
+		function closeMenu( restore = false ) { if ( context.contextReturnFocus === surface || bar?.contains( context.contextReturnFocus ) ) { context.closeContextMenu( restore ); } menuOwner = null; }
+		function currentMenu() { const start = performance.now(), current = menuOwner && menuOwner.model === context.state.document && controller.canvasIdentity().resolve( menuOwner.element ).identity?.instance === menuOwner.instance; sample( 'menu-validation', start ); return current; }
+		function guardMenuAction( event ) {
+			if ( ! context ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+			if ( context.contextReturnFocus !== surface ) { return; } // A later Structure/portal menu retains its original owner.
+			if ( active() && event.isTrusted && currentMenu() ) { return; }
+			event.preventDefault(); event.stopImmediatePropagation(); closeMenu( true ); counters.denials++;
+		}
+		function sync() {
+			if ( ! active() ) { return; } const start = performance.now(), entries = controls.list(), keep = new Set( entries.map( entry => entry.ticket ) );
+			pending = null;
+			for ( const [ ticket, button ] of buttons ) { if ( ! keep.has( ticket ) ) { const focused = document.activeElement === button; button.remove(); buttons.delete( ticket ); if ( focused ) { focus(); } } }
+			for ( const entry of entries ) {
+				if ( buttons.has( entry.ticket ) && entry.expanded !== null ) { buttons.get( entry.ticket ).setAttribute( 'aria-expanded', String( entry.expanded ) ); }
+				if ( buttons.has( entry.ticket ) ) { continue; }
+				const button = document.createElement( 'button' ); button.type = 'button'; button.className = 'lieve-button-secondary'; button.textContent = entry.label;
+				if ( entry.expanded !== null ) { button.setAttribute( 'aria-expanded', String( entry.expanded ) ); }
+				button.style.cssText = 'flex:none;outline-offset:3px;'; buttons.set( entry.ticket, button ); bar.appendChild( button );
+			}
+			bar.hidden = ! buttons.size;
+			bar.style.display = buttons.size ? 'flex' : 'none';
+			// Do not leave a menu pointing at an old model or replaced owner.
+			if ( menuOwner && ! currentMenu() ) { closeMenu( context.contextMenu?.contains( document.activeElement ) ); }
+			sample( 'controls-sync', start );
+		}
+		function activate( ticket, event ) {
+			if ( ! once( event ) || ! controls.current( ticket ) ) { counters.denials++; return false; }
+			const start = performance.now(), result = controls.execute( ticket ); if ( result ) { counters.activations++; } else { counters.denials++; } sample( 'preview-command', start ); return result;
+		}
+		function ownedButton( target ) { for ( const [ ticket, button ] of buttons ) { if ( button === target || button.contains( target ) ) { return ticket; } } return null; }
+		function resolveControl( hit ) { const start = performance.now(), ticket = hit?.element ? controls.resolve( hit.element ) : null; sample( 'command-resolution', start ); return ticket; }
+		function pointerDown( event, hit ) {
+			pending = null; if ( ! active() || ! event?.isTrusted ) { return false; } const ticket = resolveControl( hit );
+			if ( ! ticket ) { return false; }
+			cancelDrag(); event.preventDefault(); focus(); pending = { ticket, x: event.clientX, y: event.clientY, pointerId: event.pointerId, epoch }; return true;
+		}
+		function click( event ) {
+			const own = ownedButton( event.target ); if ( own ) { return activate( own, event ); }
+			const saved = pending; pending = null;
+			if ( ! saved || saved.epoch !== epoch || Number.isFinite( event.pointerId ) && event.pointerId !== saved.pointerId || Math.hypot( event.clientX - saved.x, event.clientY - saved.y ) > 5 ) { return false; }
+			return saved.ticket === resolveControl( resolveAt( event.clientX, event.clientY ) ) && activate( saved.ticket, event );
+		}
+		function contextMenu( event ) {
+			if ( ! active() || ! event.isTrusted || event.defaultPrevented ) { return; }
+			// Local focus contract only: Safari's default Tab policy can skip native
+			// buttons. Never intercept Tab in Inspector, text editors or outside this group.
+			if ( event.type === 'keydown' && event.key === 'Tab' ) {
+				const ordered = [ ...buttons.values() ], index = ordered.indexOf( event.target );
+				const next = event.target === surface && ! event.shiftKey ? ordered[ 0 ] : index >= 0 ? event.shiftKey ? index ? ordered[ index - 1 ] : surface : ordered[ index + 1 ] : null;
+				if ( next ) { event.preventDefault(); focus( next ); } return;
+			}
+			if ( event.type === 'keydown' && event.key === 'Escape' && event.target === surface ) { pending = null; return; }
+			let hit, x = event.clientX, y = event.clientY;
+			if ( event.type === 'keydown' ) {
+				if ( event.target !== surface || ! ( event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey ) ) { return; }
+				const id = context.state.selectedId, root = context.canvas.querySelector( '[data-editor-root="' + window.CSS.escape( id || '' ) + '"]' );
+				if ( ! root || controller.canvasIdentity().resolve( root ).identity?.selectId !== id ) { return; } const rect = context.viewport.toParent( root.getBoundingClientRect() ); x = rect.left + 8; y = rect.top + 8; hit = { element: root };
+			} else { hit = resolveAt( x, y ); }
+			pending = null; cancelDrag(); event.preventDefault();
+			const identity = hit?.element && controller.canvasIdentity().resolve( hit.element ), id = identity?.identity?.selectId;
+			if ( ! [ 'resolved', 'opaque' ].includes( identity?.status ) || ! id || ! context.findNode( context.state.document.children, id ) || ! once( event ) ) { closeMenu(); counters.denials++; return; }
+			const start = performance.now(); context.openContextMenu( id, x, y ); context.contextReturnFocus = surface;
+			menuOwner = { element: hit.element, instance: identity.identity.instance, model: context.state.document }; counters.menus++; sample( 'context-menu', start );
+			if ( menuElement !== context.contextMenu ) {
+				menuElement = context.contextMenu; listen( menuElement, 'click', guardMenuAction, true ); listen( menuElement, 'keydown', guardMenuAction, true );
+			}
+		}
+		function attach() {
+			listen( surface, 'contextmenu', contextMenu ); listen( surface, 'keydown', contextMenu );
+			listen( surface, 'pointermove', event => { if ( pending && Math.hypot( event.clientX - pending.x, event.clientY - pending.y ) > 5 ) { pending = null; } } );
+			listen( surface, 'pointercancel', () => { pending = null; } );
+			listen( surface, 'focusin', event => { if ( bar.contains( event.target ) ) { bar.style.opacity = '1'; bar.style.pointerEvents = 'auto'; } } );
+			listen( surface, 'focusout', event => { if ( ! bar.contains( event.relatedTarget ) ) { bar.style.opacity = '0'; bar.style.pointerEvents = 'none'; } } );
+			listen( bar, 'keydown', event => { if ( event.isTrusted && event.key === 'Escape' ) { event.preventDefault(); event.stopPropagation(); pending = null; focus(); } } );
+			listen( document, 'click', () => { if ( menuOwner && context.contextReturnFocus === surface && context.contextMenu?.hidden ) { if ( document.activeElement === document.body || context.contextMenu.contains( document.activeElement ) ) { focus(); } menuOwner = null; } } );
+			listen( window, 'blur', () => { pending = null; closeMenu(); } );
+			listen( document, 'pointerdown', event => { if ( ! event.isTrusted ) { return; } if ( ! surface.contains( event.target ) ) { pending = null; } if ( ! context.contextMenu?.contains( event.target ) ) { closeMenu(); } } );
+			unsubscribe = controls.subscribe( sync ); sync();
+		}
+		function suspend() { if ( state !== 'mounted' ) { return false; } closeMenu(); state = 'suspended'; epoch++; pending = null; menuElement = null; unsubscribe?.(); unsubscribe = null; listeners.splice( 0 ).forEach( remove => remove() ); bar.hidden = true; bar.style.display = 'none'; buttons.forEach( button => { button.tabIndex = -1; } ); return true; }
+		function resume() { if ( state !== 'suspended' || ! validViewport() ) { return false; } state = 'mounted'; epoch++; buttons.forEach( button => { button.tabIndex = 0; } ); attach(); return true; }
+		function destroy() { if ( state === 'destroyed' ) { return; } suspend(); state = 'destroyed'; epoch++; pending = null; observer?.disconnect(); observer = null; if ( context.contextReturnFocus === surface || bar?.contains( context.contextReturnFocus ) ) { context.contextReturnFocus = null; } bar?.remove(); buttons.clear(); controls?.destroy(); surface = resolveAt = validViewport = unsubscribe = bar = controls = controller = context = null; }
+		return Object.freeze( {
+			mount( target, resolve, valid ) {
+				if ( state !== 'created' ) { return false; } surface = target; resolveAt = resolve; validViewport = valid;
+				bar = document.createElement( 'div' ); bar.setAttribute( 'role', 'group' ); bar.setAttribute( 'aria-label', 'Canvas preview controls' );
+				bar.style.cssText = 'position:absolute;top:8px;left:8px;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100% - 16px);width:max-content;padding:6px;background:var(--lieve-surface,#fff);border-radius:8px;opacity:0;pointer-events:none;';
+				surface.appendChild( bar ); state = 'mounted'; attach();
+				if ( window.MutationObserver ) {
+					observer = new window.MutationObserver( () => { if ( state !== 'mounted' ) { return; } if ( ! active() ) { suspend(); return; } sync(); } );
+					observer.observe( surface.parentElement, { childList: true } ); observer.observe( context.canvas, { childList: true, subtree: true } );
+				}
+				return true;
+			}, pointerDown, click, owns: target => Boolean( bar?.contains( target ) ), cancel() { pending = null; }, suspend, resume, destroy,
+			stats() { return { ...counters, state, listeners: listeners.length, observers: observer ? 1 : 0, buttons: buttons.size, pending: Boolean( pending ), measurements: measurements.slice(), controls: controls?.stats() || null }; },
+		} );
+	}
+	function createInputAdapter( { viewport, controller, onOutline = () => {}, onError = () => {}, drag = null, commands = null } ) {
 		let frame = viewport?.frame, doc = viewport?.document, canvas = viewport?.canvas;
 		let stage = viewport?.stage, host = frame?.parentElement, surface = null, state = 'created';
 		let outlineFrame = 0, epoch = 0, resumeAfterPageShow = false;
@@ -504,7 +611,10 @@
 		function hitTest( x, y ) { const hit = resolveAt( x, y ); return selectable( hit ) ? { ...hit, id: hit.status === 'canvas' ? null : hit.identity.identity.selectId } : null; }
 		function pointerDown( event ) {
 			if ( state !== 'mounted' || ! event.isTrusted || event.defaultPrevented || event.cancelable === false || event.button !== 0 || ! event.isPrimary || event.pointerType !== 'mouse' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { return; }
-			const started = performance.now(), hit = hitTest( event.clientX, event.clientY ); if ( ! hit ) { return; }
+			if ( commands?.owns( event.target ) ) { return; }
+			const started = performance.now(), resolved = commands ? resolveAt( event.clientX, event.clientY ) : null;
+			if ( commands?.pointerDown( event, resolved ) ) { return; }
+			const hit = commands ? selectable( resolved ) ? { ...resolved, id: resolved.status === 'canvas' ? null : resolved.identity.identity.selectId } : null : hitTest( event.clientX, event.clientY ); if ( ! hit ) { return; }
 			try {
 				event.preventDefault(); surface.focus( { preventScroll: true } );
 				const before = performance.now(); controller.selectElement( hit.id ); const controllerMs = performance.now() - before;
@@ -526,7 +636,7 @@
 		function attachInputs() {
 			listen( inputListeners, surface, 'pointerdown', pointerDown );
 			listen( inputListeners, surface, 'wheel', wheel, { passive: false } );
-			listen( inputListeners, surface, 'click', event => { drag?.click( event ); event.preventDefault(); } );
+			listen( inputListeners, surface, 'click', event => { if ( drag?.click( event ) ) { commands?.cancel(); } else { commands?.click( event ); } event.preventDefault(); } );
 			listen( inputListeners, stage, 'scroll', queueOutline, { passive: true } );
 		}
 		function mount() {
@@ -541,24 +651,25 @@
 				surface.style.cssText = 'position:absolute;inset:0;z-index:10;margin:0;padding:0;border:0;background:transparent;box-sizing:border-box;user-select:none;touch-action:auto;';
 				host.appendChild( surface ); inputOwners.set( frame, lease ); state = 'mounted'; epoch++;
 				if ( drag && ! drag.mount( surface, resolveAt ) ) { throw error( 'DRAG_MOUNT_FAILED' ); }
+				if ( commands && ! commands.mount( surface, resolveAt, validViewport ) ) { throw error( 'COMMAND_MOUNT_FAILED' ); }
 				listen( lifecycleListeners, window, 'pagehide', pageHide ); listen( lifecycleListeners, window, 'pageshow', pageShow ); attachInputs(); return true;
 			} catch ( failure ) { report( 'MOUNT_FAILED' ); destroy(); return false; }
 		}
 		function suspend() {
 			resumeAfterPageShow = false;
 			if ( state !== 'mounted' ) { return false; }
-			state = 'suspended'; epoch++; drag?.suspend(); clear( inputListeners ); window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; return true;
+			state = 'suspended'; epoch++; drag?.suspend(); commands?.suspend(); clear( inputListeners ); window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; return true;
 		}
 		function resume() {
 			if ( state !== 'suspended' ) { return state === 'mounted'; }
 			if ( ! validViewport() || surface?.parentElement !== host || inputOwners.get( frame ) !== lease ) { report( 'INVALID_VIEWPORT' ); return false; }
 			state = 'mounted'; epoch++;
-			try { drag?.resume(); attachInputs(); queueOutline(); return true; }
+			try { drag?.resume(); commands?.resume(); attachInputs(); queueOutline(); return true; }
 			catch ( failure ) { suspend(); report( 'RESUME_FAILED' ); return false; }
 		}
 		function destroy() {
 			if ( state === 'destroyed' ) { return; } state = 'destroyed'; epoch++; resumeAfterPageShow = false;
-			window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; drag?.destroy(); drag = null; clear( inputListeners ); clear( lifecycleListeners );
+			window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; drag?.destroy(); commands?.destroy(); drag = commands = null; clear( inputListeners ); clear( lifecycleListeners );
 			if ( inputOwners.get( frame ) === lease ) { inputOwners.delete( frame ); }
 			surface?.remove(); surface = frame = doc = canvas = stage = host = viewport = controller = onOutline = onError = null;
 		}
@@ -566,5 +677,5 @@
 			stats() { return JSON.parse( JSON.stringify( { ...diagnostics, state, listeners: inputListeners.length + lifecycleListeners.length, inputListeners: inputListeners.length, lifecycleListeners: lifecycleListeners.length, framesActive: outlineFrame ? 1 : 0, surfaces: surface ? 1 : 0 } ) ); },
 		} );
 	}
-	window.LieveViewport = { create, loadedCss, createCssReadiness, createInputAdapter, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
+	window.LieveViewport = { create, loadedCss, createCssReadiness, createInputAdapter, createInteractionCommands, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
 }() );

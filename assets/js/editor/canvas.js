@@ -50,6 +50,69 @@
 	window.LieveEditorControllers ||= {};
 	window.LieveEditorControllers[ 'canvas' ] = function create( lieveContext ) {
 	let identityRegistry = null;
+	let controlRegistry = null;
+	// Passive until a trusted host opts in. Only this renderer can register controls.
+	function canvasControls() {
+		if ( controlRegistry ) { return controlRegistry.api; }
+		let records = new Map(), tickets = new WeakMap(), destroyed = false, scheduled = false;
+		const subscribers = new Set(), allowed = new Set( [ 'empty-add', 'popup-backdrop', 'popup-close-settings', 'preview-details' ] );
+		function valid( record ) {
+			if ( destroyed || ! record || record.model !== lieveContext.state.document || record.generation !== canvasIdentity().stats().generation ||
+				! record.element.isConnected || ! lieveContext.canvas.contains( record.element ) ) { return false; }
+			const identity = canvasIdentity().resolve( record.anchor );
+			return ( record.instance === null ? identity.status === 'canvas' : identity.identity?.instance === record.instance && ! [ 'stale', 'destroyed' ].includes( identity.status ) ) && record.guard();
+		}
+		function changed() {
+			if ( scheduled || destroyed ) { return; } scheduled = true;
+			queueMicrotask( () => { scheduled = false; if ( destroyed ) { return; } for ( const [ key, record ] of records ) { if ( ! valid( record ) ) { records.delete( key ); tickets.delete( record.ticket ); } } subscribers.forEach( callback => callback() ); } );
+		}
+		function register( element, kind, anchor, guard = () => true, detail = null ) {
+			if ( destroyed || ! element || ! allowed.has( kind ) ) { return; }
+			const previous = records.get( element ); if ( previous && valid( previous ) ) { return; }
+			const identity = canvasIdentity().resolve( anchor ), ticket = Object.freeze( {} );
+			const record = { element, kind, anchor, detail, guard, ticket, model: lieveContext.state.document,
+				generation: canvasIdentity().stats().generation, instance: identity.identity?.instance ?? null };
+			records.set( element, record ); tickets.set( ticket, record ); changed();
+		}
+		const labels = { 'empty-add': 'Add section', 'popup-backdrop': 'Edit popup settings', 'popup-close-settings': 'Edit popup close button', 'preview-details': 'Toggle details preview' };
+		const api = Object.freeze( {
+			resolve( element ) {
+				if ( destroyed || element?.ownerDocument !== lieveContext.canvas.ownerDocument ) { return null; }
+				for ( let current = element; current && current !== lieveContext.canvas; current = current.parentElement ) {
+					const record = records.get( current ); if ( valid( record ) ) { return record.ticket; }
+				}
+				return null;
+			},
+			list() { const result = []; for ( const [ element, record ] of records ) { if ( valid( record ) ) { result.push( Object.freeze( { ticket: record.ticket, kind: record.kind, label: labels[ record.kind ], element: record.element, expanded: record.kind === 'preview-details' ? Boolean( record.detail.open ) : null } ) ); } else { records.delete( element ); tickets.delete( record.ticket ); } } return result; },
+			current( ticket ) { return valid( tickets.get( ticket ) ); },
+			execute( ticket ) {
+				const record = tickets.get( ticket ); if ( ! valid( record ) ) { return false; }
+				switch ( record.kind ) {
+					case 'empty-add': lieveContext.addBlock( 'section' ); break;
+					case 'popup-backdrop': lieveContext.openPopupSettings(); break;
+					case 'popup-close-settings': lieveContext.openPopupSettings( 'style', 'close' ); break;
+					case 'preview-details': { const previous = record.detail.open; selectElement( canvasIdentity().resolve( record.anchor ).identity.selectId ); if ( ! valid( record ) ) { return false; } togglePreviewDetails( record.detail, previous ); window.requestAnimationFrame( updateSelectionOutline ); break; }
+					default: return false;
+				}
+				changed(); return true;
+			},
+			subscribe( callback ) { if ( destroyed ) { return () => {}; } subscribers.add( callback ); return () => subscribers.delete( callback ); },
+			destroy() { destroyed = true; scheduled = false; records.clear(); tickets = new WeakMap(); subscribers.clear(); },
+			stats() { return { destroyed, controls: records.size, subscribers: subscribers.size, scheduled }; },
+		} );
+		controlRegistry = { api, register, changed, reset() { records.clear(); tickets = new WeakMap(); changed(); } };
+		return api;
+	}
+	function togglePreviewDetails( details, previous = details.open ) { details.open = ! previous; }
+	function registerPreviewControls( node, visual ) {
+		if ( ! controlRegistry || node.type !== 'dropdown' || ! canvasIdentity().active( visual ) || lieveContext.listingEditor?.enabled( node ) ) { return; }
+		if ( ! visual.isConnected ) { queueMicrotask( () => { if ( visual.isConnected ) { registerPreviewControls( node, visual ); } } ); return; }
+		// Replace only the built-in top-level summary. Authored descendants stay opaque.
+		const details = visual.firstElementChild, old = details?.firstElementChild;
+		if ( details?.nodeName !== 'DETAILS' || old?.nodeName !== 'SUMMARY' ) { return; }
+		const summary = visual.ownerDocument.createElement( 'summary' ); summary.textContent = old.textContent; old.replaceWith( summary );
+		controlRegistry.register( summary, 'preview-details', visual, () => summary.parentElement === details && details.parentElement === visual && lieveContext.findNode( lieveContext.state.document.children, node.id )?.type === 'dropdown', details );
+	}
 	function canvasIdentity() {
 		identityRegistry ||= createCanvasIdentity( { root: lieveContext.canvas, readDocument: () => lieveContext.state.document } );
 		return identityRegistry;
@@ -266,7 +329,7 @@
 
 	function handlePreviewInteraction( event ) {
 		const summary = event.target.closest( 'summary' );
-		if ( summary?.parentElement.matches( 'details' ) ) { summary.parentElement.open = ! summary.parentElement.open; }
+		if ( summary?.parentElement.matches( 'details' ) ) { togglePreviewDetails( summary.parentElement ); }
 		const tab = event.target.closest( '[role="tab"][aria-controls]' );
 		const tabs = tab?.closest( '[data-lieve-tabs]' );
 		if ( tabs ) {
@@ -341,6 +404,7 @@
 				if ( ! sheet ) { sheet = owner.createElement('style'); sheet.dataset.componentPreview = node.id; owner.head.insertBefore(sheet, owner.getElementById('lieve-canvas-styles')); } sheet.textContent = componentStyles;
 			}
 			visual.querySelectorAll( 'style[data-lieve-styles]' ).forEach( ( item ) => item.remove() );
+			registerPreviewControls( node, visual );
 			window.LieveListings?.mount( visual, true );
 			window.LieveCodePreview?.mount( visual, { select: id => { lieveContext.closeContextMenu(); if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) selectElement( id ); }, contextMenu: ( id, x, y, origin ) => { if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) { lieveContext.openContextMenu( id, x, y ); lieveContext.contextReturnFocus = origin; } }, resize: () => { updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); } } );
 			revealSelectedPreview();
@@ -420,7 +484,7 @@
 			if ( shell ) {
 				shell.dataset.lievePopupOverlay = lieveContext.state.popupSettings.overlay ? 'on' : 'off';
 				let close = shell.querySelector( '[data-lieve-ui="popup-close"]' );
-				if ( lieveContext.state.popupSettings.closeButton && ! close ) { close = owner.createElement( 'button' ); close.type = 'button'; close.dataset.lieveUi = 'popup-close'; close.dataset.editorUi = ''; close.setAttribute( 'aria-label', 'Edit close button' ); close.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>'; close.addEventListener( 'click', event => { event.stopPropagation(); lieveContext.openPopupSettings( 'style', 'close' ); } ); shell.querySelector( '[data-lieve-ui="popup-dialog"]' ).prepend( close ); }
+				if ( lieveContext.state.popupSettings.closeButton && ! close ) { close = owner.createElement( 'button' ); close.type = 'button'; close.dataset.lieveUi = 'popup-close'; close.dataset.editorUi = ''; close.setAttribute( 'aria-label', 'Edit close button' ); close.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>'; close.addEventListener( 'click', event => { event.stopPropagation(); lieveContext.openPopupSettings( 'style', 'close' ); } ); shell.querySelector( '[data-lieve-ui="popup-dialog"]' ).prepend( close ); controlRegistry?.register( close, 'popup-close-settings', shell, () => lieveContext.isPopupTemplate() && lieveContext.state.popupSettings.closeButton ); }
 				if ( ! lieveContext.state.popupSettings.closeButton ) { close?.remove(); }
 			}
 		}
@@ -434,6 +498,7 @@
 		lieveContext.templateContext?.measure( lieveContext.canvas );
 		window.cancelAnimationFrame( lieveContext.selectionFrame ); lieveContext.selectionFrame = window.requestAnimationFrame( updateSelectionOutline );
 		lieveContext.canvasDrag?.invalidate();
+		controlRegistry?.changed();
 	}
 
 	function observeSelectionLayout( roots ) {
@@ -477,6 +542,7 @@
 	function renderCanvas() {
 		if ( identityRegistry?.stats().destroyed ) { return; }
 		canvasIdentity().reset();
+		controlRegistry?.reset();
 		lieveContext.motionEditor?.stop();
 		window.LieveListings?.destroy( lieveContext.canvas );
 		lieveContext.dynamicData?.hydrate( lieveContext.state.document, lieveContext.config.nonce, () => { renderCanvas(); renderCanvasStyles(); } );
@@ -499,6 +565,7 @@
 			shell.innerHTML = '<div data-lieve-ui="popup-backdrop" aria-hidden="true"></div><div data-lieve-ui="popup-dialog" class="lieve-builder-content"></div>';
 			shell.querySelector( '[data-lieve-ui="popup-backdrop"]' ).addEventListener( 'click', () => lieveContext.openPopupSettings() );
 			lieveContext.canvas.appendChild( shell ); contentCanvas = shell.querySelector( '[data-lieve-ui="popup-dialog"]' );
+			controlRegistry?.register( shell.firstElementChild, 'popup-backdrop', shell, () => lieveContext.isPopupTemplate() );
 		}
 
 		if ( ! lieveContext.state.document.children.length ) {
@@ -509,6 +576,7 @@
 			empty.querySelector( 'button' ).addEventListener( 'click', () => lieveContext.addBlock( 'section' ) );
 			if ( lieveContext.isPopupTemplate() ) { empty.innerHTML = '<strong>Your pop up. Your ideas.</strong><span>Add content, then style the dialog in Pop Up Settings.</span><button type="button" class="lieve-button-secondary">+ Add Something</button>'; empty.querySelector( 'button' ).addEventListener( 'click', () => lieveContext.addBlock( 'section' ) ); }
 			contentCanvas.appendChild( empty );
+			controlRegistry?.register( empty.querySelector( 'button' ), 'empty-add', lieveContext.canvas, () => ! lieveContext.state.document.children.length );
 			lieveContext.templateContext?.append( 'after', lieveContext.canvas, inheritedIdentity );
 			renderCanvasStyles();
 			return;
@@ -519,6 +587,6 @@
 		revealSelectedPreview();
 		renderCanvasStyles();
 	}
-	return { canvasIdentity, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
+	return { canvasIdentity, canvasControls, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
 	};
 } )();
