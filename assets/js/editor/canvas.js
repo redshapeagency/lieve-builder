@@ -107,6 +107,7 @@
 		const children = document.createElement( 'div' );
 		children.className = 'lieve-editor-children';
 		children.dataset.parentId = node.id;
+		if ( node.type === 'section' && owner ) { canvasIdentity().register( children, owner ); } // Trusted inner section lane, including its empty hint.
 		( node.children || [] ).forEach( ( child ) => children.appendChild( createNodeElement( child, owner ) ) );
 
 		return children;

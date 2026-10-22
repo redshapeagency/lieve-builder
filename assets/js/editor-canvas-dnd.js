@@ -4,7 +4,7 @@
 	const inside = ( rect, point ) => rect && point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom;
 	const distance = ( rect, point ) => Math.hypot( Math.max( rect.left - point.x, 0, point.x - rect.right ), Math.max( rect.top - point.y, 0, point.y - rect.bottom ) );
 	/** One canonical parent + next sibling, including flex/grid and empty containers. */
-	function resolve( nodes, point, { bounds, source, previous = null } ) {
+	function resolve( nodes, point, { bounds, source, previous = null, painted = null } ) {
 		if ( ! inside( bounds, point ) ) { return null; }
 		function slot( parent, siblings, target, before, area = false, axis = parent?.axis || 'y' ) {
 			const index = siblings.indexOf( target );
@@ -16,7 +16,7 @@
 		function visit( parent, siblings ) {
 			const visible = siblings.filter( node => node.rect && node.id !== source );
 			if ( ! visible.length ) { return parent ? slot( parent, [], null, false, true ) : { parentId: null, beforeId: null, targetId: null, area: true, axis: 'y', rect: bounds }; }
-			const target = [ ...visible ].reverse().find( node => inside( node.rect, point ) ) || visible.reduce( ( nearest, node ) => distance( node.rect, point ) < distance( nearest.rect, point ) ? node : nearest );
+			const target = painted?.size && visible.find( node => painted.has( node.id ) ) || [ ...visible ].reverse().find( node => inside( node.rect, point ) ) || visible.reduce( ( nearest, node ) => distance( node.rect, point ) < distance( nearest.rect, point ) ? node : nearest );
 			// Between grid rows, use the row boundary, not a column's midpoint.
 			if ( parent?.grid && parent.axis === 'x' && ( point.y < target.rect.top || point.y > target.rect.bottom ) ) {
 				const row = visible.filter( node => node.rect.top < target.rect.bottom && node.rect.bottom > target.rect.top );
@@ -176,5 +176,192 @@
 		win.addEventListener( 'blur', () => win.requestAnimationFrame( () => { if ( session?.pointerId !== undefined && ! owner.hasFocus() ) { stop(); } } ) );
 		return { cancel: () => stop(), invalidate() { geometry = null; if ( session?.active ) { schedule(); } } };
 	}
-	window.LieveCanvasDrag = { resolve, scrollVelocity, create };
+	/* Passive parent transport. The legacy resolver and Structure mutation core are shared. */
+	function createParent( { viewport, controller, structure, document: documents, context, onError = () => {} } ) {
+		let surface = null, hitAt = null, session = null, state = 'created', phase = 'idle', frame = 0, epoch = 0;
+		let overlay = null, marker = null, caption = null, ghost = null, intent = null, geometry = null, dirtyGeometry = true;
+		let mutation = null, resize = null, lastTime = 0, suppressClick = false;
+		let canvas = viewport.canvas, doc = viewport.document, owner = viewport.frame.ownerDocument, win = owner.defaultView, app = context.app;
+		const guards = [], listeners = [], data = { acquisitions: [], activations: [], moves: [], zones: [], commits: [], errors: [], starts: 0, completed: 0, cancelled: 0, scans: 0, measurements: 0, validations: 0, pointermoves: 0 };
+		const sample = ( key, value ) => { if ( data[ key ].length < 2000 ) { data[ key ].push( value ); } };
+		const listen = ( list, target, type, callback, options ) => { target.addEventListener( type, callback, options ); list.push( () => target.removeEventListener( type, callback, options ) ); };
+		const clear = list => list.splice( 0 ).forEach( remove => remove() );
+		const registry = () => controller.canvasIdentity();
+		const opaque = value => value?.reason === 'preview-contents-unmapped' || value?.identity?.context?.contents === 'unmapped';
+		const selectable = value => value?.status === 'resolved' && ! opaque( value ) && typeof value.identity?.selectId === 'string';
+		function report( code ) { sample( 'errors', { code } ); try { onError( Object.assign( new Error( 'Canvas drag unavailable (' + code + ').' ), { code } ) ); } catch ( error ) { /* Cleanup cannot be vetoed by diagnostics. */ } }
+		function validSession() {
+			if ( ! session || state !== 'mounted' || session.model !== context.state.document || viewport.frame.contentDocument !== doc || ! viewport.frame.isConnected || ! surface?.isConnected || ! canvas.isConnected || viewport.canvas !== canvas || surface.parentElement !== viewport.frame.parentElement || ! surface.hasPointerCapture( session.pointerId ) ) { return false; }
+			const stats = registry().stats(), source = registry().resolve( session.element );
+			return ! stats.destroyed && stats.generation === session.generation && stats.registrations === session.registrations && selectable( source ) && source.identity.instance === session.instance && source.identity.selectId === session.id && context.state.draggingId === ( phase === 'pending' ? null : session.id );
+		}
+		function indexGeometry() {
+			const elements = new Map(), models = new Map(), parents = new Map();
+			const walk = ( nodes, parent = null ) => nodes.forEach( node => { models.set( node.id, node ); parents.set( node.id, parent ); walk( node.children || [], node.id ); } ); walk( context.state.document.children );
+			// One bounded traversal at acquisition. Prune opaque previews and leaf contents;
+			// attributes never provide identities. Registered visuals replace their wrappers.
+			function visit( element ) {
+				const result = registry().resolve( element ), identity = result.identity;
+				if ( result.via === 'direct' && identity?.selectId && models.has( identity.selectId ) ) {
+					const rect = element.getBoundingClientRect();
+					if ( ! elements.has( identity.selectId ) || rect.width > 0 && rect.height > 0 ) { elements.set( identity.selectId, element ); }
+				}
+				if ( opaque( result ) || result.status === 'opaque' || result.via === 'direct' && identity && ! context.canNest( identity.type ) && element.children.length === 0 ) { return; }
+				for ( const child of element.children ) { visit( child ); }
+			}
+			visit( canvas ); data.scans++; return { elements, models, parents, nodes: [], layout: new Map() };
+		}
+		function measure() {
+			geometry.layout.clear();
+			const walk = nodes => nodes.map( node => {
+				const element = geometry.elements.get( node.id ), value = element && registry().resolve( element );
+				if ( ! element || ! value?.identity ) { return { id: node.id, children: [] }; }
+				const rect = viewport.toParent( element.getBoundingClientRect() ), css = doc.defaultView.getComputedStyle( element );
+				const matrix = new win.DOMMatrixReadOnly( css.transform === 'none' ? undefined : css.transform );
+				const unsupported = ! matrix.is2D || matrix.b || matrix.c || matrix.a <= 0 || matrix.d <= 0 || css.perspective && css.perspective !== 'none' || css.rotate && css.rotate !== 'none' && css.rotate !== '0deg' || css.scale && css.scale !== 'none' && ! /^(?:1|1 1)$/.test( css.scale ) || css.translate && css.translate !== 'none' && css.translate.split( /\s+/ ).length > 2 || css.position === 'fixed' || css.position === 'absolute' || css.order && css.order !== '0' || css.gridColumnStart && css.gridColumnStart !== 'auto' || css.gridRowStart && css.gridRowStart !== 'auto' || css.gridAutoFlow?.includes( 'dense' ) || css.writingMode && css.writingMode !== 'horizontal-tb' || css.direction === 'rtl';
+				const blocked = opaque( value ) || unsupported;
+				const result = { id: node.id, element, blocked, rect: rect.width > 0 && rect.height > 0 ? rect : null,
+					nestable: ! blocked && node.type !== 'component' && context.canNest( node.type ),
+					axis: css.display.includes( 'flex' ) && css.flexDirection.startsWith( 'row' ) || css.display.includes( 'grid' ) && ! css.gridAutoFlow?.startsWith( 'column' ) ? 'x' : 'y',
+					grid: css.display.includes( 'grid' ), reverse: css.display.includes( 'flex' ) && css.flexDirection.endsWith( 'reverse' ),
+					children: blocked || node.id === session.id ? [] : walk( node.children || [] ) }; geometry.layout.set( node.id, result ); return result;
+			} );
+			geometry.nodes = walk( context.state.document.children ); dirtyGeometry = false; data.measurements++;
+		}
+		function hide() { intent = null; if ( overlay ) { overlay.hidden = true; } if ( surface ) { surface.style.cursor = phase === 'dragging' ? 'not-allowed' : ''; } }
+		function feedback() {
+			overlay = owner.createElement( 'div' ); overlay.className = 'lieve-canvas-drop-overlay'; overlay.dataset.lieveParentDrop = ''; overlay.hidden = true; overlay.setAttribute( 'aria-hidden', 'true' );
+			marker = owner.createElement( 'div' ); marker.className = 'lieve-canvas-drop-marker'; caption = owner.createElement( 'span' ); caption.className = 'lieve-canvas-drop-caption'; marker.appendChild( caption ); overlay.appendChild( marker ); app.appendChild( overlay );
+			ghost = owner.createElement( 'div' ); ghost.className = 'lieve-canvas-drag-ghost'; ghost.setAttribute( 'aria-hidden', 'true' );
+			const grip = owner.createElement( 'span' ); grip.className = 'lieve-canvas-drag-grip'; grip.textContent = '⠿'; ghost.appendChild( grip );
+			const name = owner.createElement( 'span' ); name.textContent = geometry.models.get( session.id )?.props?.editorLabel || context.labels[ geometry.models.get( session.id )?.type ] || 'Element'; ghost.appendChild( name ); app.appendChild( ghost ); app.classList.add( 'is-dragging-canvas' );
+		}
+		function refresh( force = false ) {
+			if ( ! validSession() ) { cancel( 'stale' ); return null; }
+			const started = performance.now(), point = session.point, hit = hitAt( point.x, point.y );
+			if ( hit.status !== 'canvas' && ( ! selectable( hit.identity ) || ! geometry.elements.has( hit.identity.identity.selectId ) || context.containsId( geometry.models.get( session.id ), hit.identity.identity.selectId ) ) ) { hide(); return null; }
+			// Current paint target plus frame/scroll changes invalidate cached measurements.
+			const frameRect = viewport.frame.getBoundingClientRect(), root = doc.scrollingElement;
+			// Legacy toParent() owns the viewport scale, but not an extra parent CSS
+			// scale or frame border. Never project a slot with a mismatched basis.
+			const basis = viewport.toParent( { left: 0, top: 0, width: 1, height: 1 } );
+			if ( viewport.frame.clientLeft || viewport.frame.clientTop || Math.abs( basis.width - frameRect.width / viewport.frame.offsetWidth ) > .001 || Math.abs( basis.height - frameRect.height / viewport.frame.offsetHeight ) > .001 ) { hide(); return null; }
+			const signature = [ frameRect.left, frameRect.top, frameRect.width, frameRect.height, root?.scrollTop, root?.scrollLeft, viewport.stage.scrollTop, viewport.stage.scrollLeft ].join( ':' );
+			if ( signature !== session.signature ) { dirtyGeometry = true; session.signature = signature; }
+			const paintedId = hit.identity?.identity?.selectId, paintedElement = geometry.elements.get( paintedId ), cached = geometry.layout.get( paintedId )?.rect;
+			if ( paintedElement && cached ) { const current = viewport.toParent( paintedElement.getBoundingClientRect() ); if ( [ 'left', 'top', 'width', 'height' ].some( key => current[ key ] !== cached[ key ] ) ) { dirtyGeometry = true; } }
+			if ( force || dirtyGeometry ) { measure(); }
+			const bounds = viewport.bounds(), targetId = hit.identity?.identity?.selectId;
+			if ( targetId && ( ! geometry.layout.has( targetId ) || geometry.layout.get( targetId ).blocked ) ) { hide(); return null; }
+			const painted = new Set(); for ( let id = targetId; id; id = geometry.parents.get( id ) ) { painted.add( id ); }
+			const destination = resolve( geometry.nodes, point, { bounds, source: session.id, previous: intent, painted } );
+			if ( ! destination ) { hide(); return null; }
+			let validation = session.validation;
+			if ( force || ! validation || validation.parentId !== destination.parentId || validation.beforeId !== destination.beforeId ) {
+				const candidate = structure.treeDropDestination( destination.parentId, destination.beforeId ); data.validations++;
+				validation = session.validation = { parentId: destination.parentId, beforeId: destination.beforeId, candidate, accepted: structure.treeDropChangesPosition( candidate ) };
+			}
+			const candidate = validation.candidate; if ( ! validation.accepted ) { hide(); return null; }
+			if ( context.config.componentMode && ! candidate.parentId && context.findParent( context.state.document.children, session.id ) ) { hide(); return null; }
+			intent = { ...destination, ...candidate };
+			const rect = destination.rect, left = Math.max( bounds.left, rect.left ), top = Math.max( bounds.top, rect.top );
+			Object.assign( overlay.style, { left: bounds.left + 'px', top: bounds.top + 'px', width: bounds.width + 'px', height: bounds.height + 'px' } );
+			Object.assign( marker.style, { left: left - bounds.left + 'px', top: top - bounds.top + 'px', width: Math.max( destination.axis === 'x' ? 2 : 0, Math.min( bounds.right, rect.left + rect.width ) - left ) + 'px', height: Math.max( destination.axis === 'y' ? 2 : 0, Math.min( bounds.bottom, rect.top + rect.height ) - top ) + 'px' } );
+			marker.dataset.mode = destination.area ? 'inside' : destination.axis; caption.textContent = candidate.label; caption.style.top = top - bounds.top < 30 ? '6px' : ''; overlay.hidden = false; surface.style.cursor = 'grabbing';
+			sample( 'zones', { ms: performance.now() - started, parentId: candidate.parentId, beforeId: candidate.beforeId } ); return hit;
+		}
+		function tick( time ) {
+			frame = 0; if ( phase !== 'dragging' ) { return; }
+			try {
+				const hit = refresh(); if ( ! session ) { return; }
+				ghost.style.transform = 'translate3d(' + ( session.point.x - 14 ) + 'px,' + ( session.point.y - 14 ) + 'px,0)';
+				const elapsed = lastTime ? Math.max( 0, Math.min( 32, time - lastTime ) ) / 1000 : 1 / 60; lastTime = time;
+				let bounds = viewport.bounds();
+				for ( let target = hit?.element; target && canvas.contains( target ); target = target.parentElement ) {
+					if ( target.scrollHeight <= target.clientHeight || ! /^(auto|scroll)$/.test( doc.defaultView.getComputedStyle( target ).overflowY ) ) { continue; }
+					const rect = viewport.toParent( target.getBoundingClientRect() ), top = Math.max( bounds.top, rect.top ), bottom = Math.min( bounds.bottom, rect.bottom ); bounds = { ...bounds, top, bottom, height: bottom - top }; break;
+				}
+				const velocity = scrollVelocity( session.point, bounds );
+				if ( hit?.element && velocity && window.LieveViewport.scrollFrom( doc, { deltaX: 0, deltaY: velocity * elapsed, deltaMode: 0 }, hit.element ) ) { dirtyGeometry = true; schedule(); }
+			} catch ( error ) { cancel( 'error' ); report( 'DRAG_UPDATE_FAILED' ); }
+		}
+		function schedule() { if ( frame || phase !== 'dragging' ) { return; } const generation = epoch; frame = win.requestAnimationFrame( time => { if ( generation === epoch ) { tick( time ); } } ); }
+		function invalidate() { dirtyGeometry = true; if ( phase === 'dragging' ) { schedule(); } }
+		function cleanup() {
+			epoch++; win.cancelAnimationFrame( frame ); frame = 0; clear( listeners ); mutation?.disconnect(); resize?.disconnect(); mutation = resize = null;
+			const pointer = session?.pointerId; session = null; geometry = intent = null; lastTime = 0;
+			if ( pointer !== undefined && surface?.hasPointerCapture?.( pointer ) ) { try { surface.releasePointerCapture( pointer ); } catch ( error ) { report( 'CAPTURE_RELEASE_FAILED' ); } }
+			overlay?.remove(); ghost?.remove(); overlay = marker = caption = ghost = null; app?.classList.remove( 'is-dragging-canvas' ); if ( surface ) { surface.style.cursor = ''; }
+			if ( context && context.state.draggingId === data.lastSource ) { context.state.draggingId = null; }
+		}
+		function cancel( reason = 'cancelled' ) { if ( ! session ) { return false; } const active = phase === 'dragging'; phase = 'cancelled'; data.cancelled++; data.lastReason = reason; suppressClick ||= active; cleanup(); return true; }
+		function transactionalMove( destination ) {
+			// The existing commit pushes history before mutation/rendering and cannot roll
+			// back an exception. Protect this transport only, using its real snapshot API.
+			const state = context.state, before = documents.snapshot(), history = [ ...state.history ], future = [ ...state.future ];
+			const selectedId = state.selectedId, collapsed = new Set( state.collapsedIds ), dirty = state.dirty, liveEdit = context.liveEdit;
+			try { return structure.moveTreeElement( destination ); }
+			catch ( error ) {
+				documents.restoreSnapshot( before ); state.history = history; state.future = future; state.selectedId = selectedId; state.collapsedIds = collapsed; state.dirty = dirty; context.liveEdit = liveEdit;
+				try { context.renderAll(); } catch ( renderError ) { report( 'ROLLBACK_RENDER_FAILED' ); }
+				throw error;
+			}
+		}
+		function pointerUp( event ) {
+			if ( ! event.isTrusted || session?.pointerId !== event.pointerId ) { return; }
+			if ( event.button !== 0 || event.buttons !== 0 || event.pointerType !== 'mouse' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { cancel( 'invalid-release' ); return; }
+			if ( phase === 'pending' ) { phase = 'completed'; cleanup(); return; }
+			try {
+				session.point = { x: event.clientX, y: event.clientY }; refresh( true ); if ( ! session ) { return; }
+				if ( ! intent || ! validSession() ) { cancel( 'invalid-drop' ); return; }
+				const destination = intent, started = performance.now(); phase = 'dropping'; suppressClick = true;
+				const moved = transactionalMove( destination ); sample( 'commits', { ms: performance.now() - started, moved } );
+				phase = moved ? 'completed' : 'cancelled'; if ( moved ) { data.completed++; } else { data.cancelled++; } cleanup();
+			} catch ( error ) { cancel( 'error' ); report( 'DROP_FAILED' ); }
+		}
+		function pointerMove( event ) {
+			if ( ! event.isTrusted || session?.pointerId !== event.pointerId ) { return; }
+			const started = performance.now(); data.pointermoves++;
+			try {
+				if ( ! validSession() || event.buttons !== 1 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { cancel( 'pointer-lost' ); return; }
+				session.point = { x: event.clientX, y: event.clientY };
+				if ( phase === 'pending' && Math.hypot( session.point.x - session.origin.x, session.point.y - session.origin.y ) >= 5 ) {
+					const activation = performance.now(); phase = 'dragging'; context.state.draggingId = session.id; geometry = indexGeometry(); for ( const element of geometry.elements.values() ) { resize?.observe( element ); } dirtyGeometry = true; feedback(); data.starts++; sample( 'activations', { ms: performance.now() - activation } );
+				}
+				if ( phase === 'dragging' ) { event.preventDefault(); schedule(); }
+				sample( 'moves', { at: started, ms: performance.now() - started } );
+			} catch ( error ) { cancel( 'error' ); report( 'DRAG_START_FAILED' ); }
+		}
+		function pointerDown( event, hit ) {
+			if ( state !== 'mounted' || session || ! event.isTrusted || event.pointerType !== 'mouse' || event.button !== 0 || ! event.isPrimary || ! selectable( hit.identity ) || context.state.draggingId || context.state.saving ) { return; }
+			const started = performance.now(), resolved = registry().resolve( hit.element ); if ( ! selectable( resolved ) || resolved.identity.instance !== hit.identity.identity.instance ) { return; }
+			try {
+				const stats = registry().stats(), id = resolved.identity.selectId;
+				if ( ! context.findNode( context.state.document.children, id ) ) { return; }
+				session = { id, element: hit.element, instance: resolved.identity.instance, generation: stats.generation, registrations: stats.registrations, model: context.state.document, origin: { x: event.clientX, y: event.clientY }, point: { x: event.clientX, y: event.clientY }, pointerId: event.pointerId };
+				phase = 'pending'; data.lastSource = id; suppressClick = false;
+				listen( listeners, owner, 'pointermove', pointerMove, { capture: true, passive: false } ); listen( listeners, owner, 'pointerup', pointerUp, true );
+				listen( listeners, owner, 'pointercancel', e => { if ( e.pointerId === session?.pointerId ) { cancel( 'pointercancel' ); } }, true );
+				listen( listeners, surface, 'lostpointercapture', () => cancel( 'capture-lost' ) );
+				listen( listeners, owner, 'keydown', e => { if ( e.key === 'Escape' ) { e.preventDefault(); e.stopPropagation(); cancel( 'escape' ); } }, true );
+				listen( listeners, owner, 'scroll', invalidate, true ); listen( listeners, win, 'resize', invalidate ); listen( listeners, win, 'blur', () => cancel( 'blur' ) );
+				listen( listeners, viewport.frame, 'load', () => cancel( 'viewport-navigated' ) );
+				listen( listeners, owner, 'visibilitychange', () => { if ( owner.hidden ) { cancel( 'hidden' ); } } );
+				mutation = new win.MutationObserver( () => { if ( session && ! validSession() ) { cancel( 'rendered' ); } else { invalidate(); } } ); mutation.observe( canvas, { childList: true, subtree: true } ); mutation.observe( viewport.frame.parentElement, { childList: true } ); mutation.observe( viewport.stage, { childList: true } );
+				if ( win.ResizeObserver ) { resize = new win.ResizeObserver( invalidate ); resize.observe( canvas ); resize.observe( viewport.frame ); }
+				surface.setPointerCapture( event.pointerId ); sample( 'acquisitions', { ms: performance.now() - started } );
+			} catch ( error ) { cancel( 'capture-failed' ); report( 'DRAG_ACQUIRE_FAILED' ); }
+		}
+		return Object.freeze( {
+			mount( target, resolver ) { if ( state === 'destroyed' || ! target?.isConnected || target.ownerDocument !== owner || target.parentElement !== viewport.frame.parentElement || typeof resolver !== 'function' ) { return false; } if ( surface ) { return surface === target; } surface = target; hitAt = resolver; state = 'mounted';
+				for ( const type of [ 'dragover', 'drop', 'dragstart' ] ) { listen( guards, surface, type, event => { event.preventDefault(); event.stopPropagation(); if ( event.dataTransfer ) { event.dataTransfer.dropEffect = 'none'; } } ); } return true; },
+			pointerDown, invalidate, cancel,
+			click( event ) { if ( suppressClick ) { suppressClick = false; event.preventDefault(); event.stopImmediatePropagation(); return true; } return false; },
+			suspend() { cancel( 'suspended' ); if ( state !== 'destroyed' ) { state = 'suspended'; } },
+			resume() { if ( state === 'suspended' ) { state = 'mounted'; } },
+			destroy() { if ( state === 'destroyed' ) { return; } cancel( 'destroyed' ); clear( guards ); state = 'destroyed'; surface = hitAt = viewport = controller = structure = documents = context = onError = canvas = doc = owner = win = app = null; },
+			stats() { return JSON.parse( JSON.stringify( { ...data, state, phase, listeners: listeners.length + guards.length, operationListeners: listeners.length, framesActive: frame ? 1 : 0, observers: Number( Boolean( mutation ) ) + Number( Boolean( resize ) ), overlays: overlay ? 2 : 0, capture: Boolean( session && surface?.hasPointerCapture?.( session.pointerId ) ) } ) ); },
+		} );
+	}
+	window.LieveCanvasDrag = { resolve, scrollVelocity, create, createParent };
 }() );

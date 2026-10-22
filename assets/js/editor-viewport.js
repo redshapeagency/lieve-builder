@@ -363,7 +363,7 @@
 		};
 	}
 	/* Inactive until explicitly mounted by a trusted caller. No CSS/startup ownership. */
-	function createInputAdapter( { viewport, controller, onOutline = () => {}, onError = () => {} } ) {
+	function createInputAdapter( { viewport, controller, onOutline = () => {}, onError = () => {}, drag = null } ) {
 		let frame = viewport?.frame, doc = viewport?.document, canvas = viewport?.canvas;
 		let stage = viewport?.stage, host = frame?.parentElement, surface = null, state = 'created';
 		let outlineFrame = 0, epoch = 0, resumeAfterPageShow = false;
@@ -445,6 +445,7 @@
 			try {
 				event.preventDefault(); surface.focus( { preventScroll: true } );
 				const before = performance.now(); controller.selectElement( hit.id ); const controllerMs = performance.now() - before;
+				drag?.pointerDown( event, hit );
 				queueOutline(); diagnostics.selections++; sample( 'events', { trusted: true, id: hit.id, startedAt: started, controllerMs, totalMs: performance.now() - started } );
 			} catch ( failure ) { suspend(); report( 'SELECTION_FAILED' ); }
 		}
@@ -454,7 +455,7 @@
 			if ( ! hit.element || [ 'stale', 'destroyed' ].includes( hit.status ) ) { return; }
 			try {
 				diagnostics.scrollCalls++;
-				if ( window.LieveViewport.scrollFrom( doc, event, hit.element ) ) { event.preventDefault(); diagnostics.handledScrolls++; queueOutline(); }
+				if ( window.LieveViewport.scrollFrom( doc, event, hit.element ) ) { event.preventDefault(); diagnostics.handledScrolls++; queueOutline(); drag?.invalidate(); }
 			} catch ( failure ) { suspend(); report( 'SCROLL_FAILED' ); }
 		}
 		function pageHide( event ) { if ( event.persisted ) { const wasMounted = state === 'mounted'; suspend(); resumeAfterPageShow = wasMounted; } else { destroy(); } }
@@ -462,7 +463,7 @@
 		function attachInputs() {
 			listen( inputListeners, surface, 'pointerdown', pointerDown );
 			listen( inputListeners, surface, 'wheel', wheel, { passive: false } );
-			listen( inputListeners, surface, 'click', event => event.preventDefault() );
+			listen( inputListeners, surface, 'click', event => { drag?.click( event ); event.preventDefault(); } );
 			listen( inputListeners, stage, 'scroll', queueOutline, { passive: true } );
 		}
 		function mount() {
@@ -476,24 +477,25 @@
 				surface.setAttribute( 'aria-label', 'Canvas selection surface' ); surface.tabIndex = 0;
 				surface.style.cssText = 'position:absolute;inset:0;z-index:10;margin:0;padding:0;border:0;background:transparent;box-sizing:border-box;user-select:none;touch-action:auto;';
 				host.appendChild( surface ); inputOwners.set( frame, lease ); state = 'mounted'; epoch++;
+				if ( drag && ! drag.mount( surface, resolveAt ) ) { throw error( 'DRAG_MOUNT_FAILED' ); }
 				listen( lifecycleListeners, window, 'pagehide', pageHide ); listen( lifecycleListeners, window, 'pageshow', pageShow ); attachInputs(); return true;
 			} catch ( failure ) { report( 'MOUNT_FAILED' ); destroy(); return false; }
 		}
 		function suspend() {
 			resumeAfterPageShow = false;
 			if ( state !== 'mounted' ) { return false; }
-			state = 'suspended'; epoch++; clear( inputListeners ); window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; return true;
+			state = 'suspended'; epoch++; drag?.suspend(); clear( inputListeners ); window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; return true;
 		}
 		function resume() {
 			if ( state !== 'suspended' ) { return state === 'mounted'; }
 			if ( ! validViewport() || surface?.parentElement !== host || inputOwners.get( frame ) !== lease ) { report( 'INVALID_VIEWPORT' ); return false; }
 			state = 'mounted'; epoch++;
-			try { attachInputs(); queueOutline(); return true; }
+			try { drag?.resume(); attachInputs(); queueOutline(); return true; }
 			catch ( failure ) { suspend(); report( 'RESUME_FAILED' ); return false; }
 		}
 		function destroy() {
 			if ( state === 'destroyed' ) { return; } state = 'destroyed'; epoch++; resumeAfterPageShow = false;
-			window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; clear( inputListeners ); clear( lifecycleListeners );
+			window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; drag?.destroy(); drag = null; clear( inputListeners ); clear( lifecycleListeners );
 			if ( inputOwners.get( frame ) === lease ) { inputOwners.delete( frame ); }
 			surface?.remove(); surface = frame = doc = canvas = stage = host = viewport = controller = onOutline = onError = null;
 		}
