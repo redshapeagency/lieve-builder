@@ -177,12 +177,12 @@
 		return { cancel: () => stop(), invalidate() { geometry = null; if ( session?.active ) { schedule(); } } };
 	}
 	/* Passive parent transport. The legacy resolver and Structure mutation core are shared. */
-	function createParent( { viewport, controller, structure, document: documents, context, onError = () => {} } ) {
+	function createParent( { viewport, controller, structure, document: documents, context, catalogue = null, external = false, onError = () => {} } ) {
 		let surface = null, hitAt = null, session = null, state = 'created', phase = 'idle', frame = 0, epoch = 0;
 		let overlay = null, marker = null, caption = null, ghost = null, intent = null, geometry = null, dirtyGeometry = true;
-		let mutation = null, resize = null, lastTime = 0, suppressClick = false;
+		let mutation = null, resize = null, lastTime = 0, suppressClick = false, nativeEnded = null;
 		let canvas = viewport.canvas, doc = viewport.document, owner = viewport.frame.ownerDocument, win = owner.defaultView, app = context.app;
-		const guards = [], listeners = [], data = { acquisitions: [], activations: [], moves: [], zones: [], commits: [], errors: [], starts: 0, completed: 0, cancelled: 0, scans: 0, measurements: 0, validations: 0, pointermoves: 0 };
+		const guards = [], listeners = [], sources = [], data = { acquisitions: [], activations: [], moves: [], nativeMoves: [], zones: [], commits: [], errors: [], starts: 0, nativeStarts: 0, nativeZeroFrames: 0, nativeSmallFrames: 0, completed: 0, cancelled: 0, scans: 0, measurements: 0, validations: 0, pointermoves: 0 };
 		const sample = ( key, value ) => { if ( data[ key ].length < 2000 ) { data[ key ].push( value ); } };
 		const listen = ( list, target, type, callback, options ) => { target.addEventListener( type, callback, options ); list.push( () => target.removeEventListener( type, callback, options ) ); };
 		const clear = list => list.splice( 0 ).forEach( remove => remove() );
@@ -191,8 +191,11 @@
 		const selectable = value => value?.status === 'resolved' && ! opaque( value ) && typeof value.identity?.selectId === 'string';
 		function report( code ) { sample( 'errors', { code } ); try { onError( Object.assign( new Error( 'Canvas drag unavailable (' + code + ').' ), { code } ) ); } catch ( error ) { /* Cleanup cannot be vetoed by diagnostics. */ } }
 		function validSession() {
-			if ( ! session || state !== 'mounted' || session.model !== context.state.document || viewport.frame.contentDocument !== doc || ! viewport.frame.isConnected || ! surface?.isConnected || ! canvas.isConnected || viewport.canvas !== canvas || surface.parentElement !== viewport.frame.parentElement || ! surface.hasPointerCapture( session.pointerId ) ) { return false; }
-			const stats = registry().stats(), source = registry().resolve( session.element );
+			if ( ! session || state !== 'mounted' || session.model !== context.state.document || context.state.saving || viewport.frame.contentDocument !== doc || ! viewport.frame.isConnected || ! surface?.isConnected || ! canvas.isConnected || viewport.canvas !== canvas || surface.parentElement !== viewport.frame.parentElement ) { return false; }
+			const stats = registry().stats();
+			if ( session.native ) { return ! stats.destroyed && stats.generation === session.generation && stats.registrations === session.registrations && session.source.current() && context.state.draggingId === session.id; }
+			if ( ! surface.hasPointerCapture( session.pointerId ) ) { return false; }
+			const source = registry().resolve( session.element );
 			return ! stats.destroyed && stats.generation === session.generation && stats.registrations === session.registrations && selectable( source ) && source.identity.instance === session.instance && source.identity.selectId === session.id && context.state.draggingId === ( phase === 'pending' ? null : session.id );
 		}
 		function indexGeometry() {
@@ -228,18 +231,19 @@
 			} );
 			geometry.nodes = walk( context.state.document.children ); dirtyGeometry = false; data.measurements++;
 		}
-		function hide() { intent = null; if ( overlay ) { overlay.hidden = true; } if ( surface ) { surface.style.cursor = phase === 'dragging' ? 'not-allowed' : ''; } }
+		function hide() { intent = null; if ( session?.native ) { session.scrollDelta = 0; } if ( overlay ) { overlay.hidden = true; } if ( surface ) { surface.style.cursor = phase === 'dragging' ? 'not-allowed' : ''; } }
 		function feedback() {
 			overlay = owner.createElement( 'div' ); overlay.className = 'lieve-canvas-drop-overlay'; overlay.dataset.lieveParentDrop = ''; overlay.hidden = true; overlay.setAttribute( 'aria-hidden', 'true' );
 			marker = owner.createElement( 'div' ); marker.className = 'lieve-canvas-drop-marker'; caption = owner.createElement( 'span' ); caption.className = 'lieve-canvas-drop-caption'; marker.appendChild( caption ); overlay.appendChild( marker ); app.appendChild( overlay );
 			ghost = owner.createElement( 'div' ); ghost.className = 'lieve-canvas-drag-ghost'; ghost.setAttribute( 'aria-hidden', 'true' );
 			const grip = owner.createElement( 'span' ); grip.className = 'lieve-canvas-drag-grip'; grip.textContent = '⠿'; ghost.appendChild( grip );
-			const name = owner.createElement( 'span' ); name.textContent = geometry.models.get( session.id )?.props?.editorLabel || context.labels[ geometry.models.get( session.id )?.type ] || 'Element'; ghost.appendChild( name ); app.appendChild( ghost ); app.classList.add( 'is-dragging-canvas' );
+			const name = owner.createElement( 'span' ); name.textContent = geometry.models.get( session.id )?.props?.editorLabel || context.labels[ session.type || geometry.models.get( session.id )?.type ] || 'Element'; ghost.appendChild( name ); app.appendChild( ghost ); app.classList.add( 'is-dragging-canvas' );
 		}
 		function refresh( force = false ) {
 			if ( ! validSession() ) { cancel( 'stale' ); return null; }
 			const started = performance.now(), point = session.point, hit = hitAt( point.x, point.y );
-			if ( hit.status !== 'canvas' && ( ! selectable( hit.identity ) || ! geometry.elements.has( hit.identity.identity.selectId ) || context.containsId( geometry.models.get( session.id ), hit.identity.identity.selectId ) ) ) { hide(); return null; }
+			const emptyRoot = session.kind === 'insert' && ! context.state.document.children.length && hit.status === 'unmanaged' && hit.identity?.via === 'boundary' && hit.identity.identity?.kind === 'empty-canvas';
+			if ( ! emptyRoot && hit.status !== 'canvas' && ( ! selectable( hit.identity ) || ! geometry.elements.has( hit.identity.identity.selectId ) || context.containsId( geometry.models.get( session.id ), hit.identity.identity.selectId ) ) ) { hide(); return null; }
 			// Current paint target plus frame/scroll changes invalidate cached measurements.
 			const frameRect = viewport.frame.getBoundingClientRect(), root = doc.scrollingElement;
 			// Legacy toParent() owns the viewport scale, but not an extra parent CSS
@@ -253,16 +257,18 @@
 			if ( force || dirtyGeometry ) { measure(); }
 			const bounds = viewport.bounds(), targetId = hit.identity?.identity?.selectId;
 			if ( targetId && ( ! geometry.layout.has( targetId ) || geometry.layout.get( targetId ).blocked ) ) { hide(); return null; }
+			if ( force && targetId && context.findNode( context.state.document.children, targetId ) !== geometry.models.get( targetId ) ) { hide(); return null; }
 			const painted = new Set(); for ( let id = targetId; id; id = geometry.parents.get( id ) ) { painted.add( id ); }
 			const destination = resolve( geometry.nodes, point, { bounds, source: session.id, previous: intent, painted } );
 			if ( ! destination ) { hide(); return null; }
 			let validation = session.validation;
 			if ( force || ! validation || validation.parentId !== destination.parentId || validation.beforeId !== destination.beforeId ) {
 				const candidate = structure.treeDropDestination( destination.parentId, destination.beforeId ); data.validations++;
-				validation = session.validation = { parentId: destination.parentId, beforeId: destination.beforeId, candidate, accepted: structure.treeDropChangesPosition( candidate ) };
+				validation = session.validation = { parentId: destination.parentId, beforeId: destination.beforeId, candidate, accepted: session.kind === 'insert' ? documents.canInsertBlockAt( session.type, candidate ) : structure.treeDropChangesPosition( candidate ) };
 			}
 			const candidate = validation.candidate; if ( ! validation.accepted ) { hide(); return null; }
-			if ( context.config.componentMode && ! candidate.parentId && context.findParent( context.state.document.children, session.id ) ) { hide(); return null; }
+			if ( force && [ candidate.parentId, candidate.beforeId ].some( id => id && context.findNode( context.state.document.children, id ) !== geometry.models.get( id ) ) ) { hide(); return null; }
+			if ( session.kind !== 'insert' && context.config.componentMode && ! candidate.parentId && context.findParent( context.state.document.children, session.id ) ) { hide(); return null; }
 			intent = { ...destination, ...candidate };
 			const rect = destination.rect, left = Math.max( bounds.left, rect.left ), top = Math.max( bounds.top, rect.top );
 			Object.assign( overlay.style, { left: bounds.left + 'px', top: bounds.top + 'px', width: bounds.width + 'px', height: bounds.height + 'px' } );
@@ -282,13 +288,28 @@
 					const rect = viewport.toParent( target.getBoundingClientRect() ), top = Math.max( bounds.top, rect.top ), bottom = Math.min( bounds.bottom, rect.bottom ); bounds = { ...bounds, top, bottom, height: bottom - top }; break;
 				}
 				const velocity = scrollVelocity( session.point, bounds );
-				if ( hit?.element && velocity && window.LieveViewport.scrollFrom( doc, { deltaX: 0, deltaY: velocity * elapsed, deltaMode: 0 }, hit.element ) ) { dirtyGeometry = true; schedule(); }
+				if ( hit?.element && velocity ) {
+					let delta = velocity * elapsed;
+					if ( session.native ) {
+						// Native frames can be only 0–1ms apart. Accumulate real distance
+						// until both stage and scaled iframe can represent a scroll pixel.
+						const previous = session.scrollDelta || 0;
+						delta += Math.sign( previous ) === Math.sign( velocity ) ? previous : 0;
+						session.scrollDelta = 0;
+						if ( Math.abs( delta ) < Math.max( 1, viewport.toParent( { left: 0, top: 0, width: 1, height: 1 } ).height ) ) {
+							session.scrollDelta = delta; data.nativeSmallFrames++; if ( ! elapsed ) { data.nativeZeroFrames++; } schedule(); return;
+						}
+					}
+					if ( window.LieveViewport.scrollFrom( doc, { deltaX: 0, deltaY: delta, deltaMode: 0 }, hit.element ) ) { dirtyGeometry = true; schedule(); }
+				} else if ( session.native ) { session.scrollDelta = 0; }
 			} catch ( error ) { cancel( 'error' ); report( 'DRAG_UPDATE_FAILED' ); }
 		}
 		function schedule() { if ( frame || phase !== 'dragging' ) { return; } const generation = epoch; frame = win.requestAnimationFrame( time => { if ( generation === epoch ) { tick( time ); } } ); }
 		function invalidate() { dirtyGeometry = true; if ( phase === 'dragging' ) { schedule(); } }
 		function cleanup() {
 			epoch++; win.cancelAnimationFrame( frame ); frame = 0; clear( listeners ); mutation?.disconnect(); resize?.disconnect(); mutation = resize = null;
+			if ( external && session?.native ) { nativeEnded = { model: new WeakSet( [ context.state.document ] ), generation: registry().stats().generation }; }
+			if ( session?.native && session.kind === 'move' ) { structure.clearTreeDragPreview(); }
 			const pointer = session?.pointerId; session = null; geometry = intent = null; lastTime = 0;
 			if ( pointer !== undefined && surface?.hasPointerCapture?.( pointer ) ) { try { surface.releasePointerCapture( pointer ); } catch ( error ) { report( 'CAPTURE_RELEASE_FAILED' ); } }
 			overlay?.remove(); ghost?.remove(); overlay = marker = caption = ghost = null; app?.classList.remove( 'is-dragging-canvas' ); if ( surface ) { surface.style.cursor = ''; }
@@ -299,10 +320,10 @@
 			// The existing commit pushes history before mutation/rendering and cannot roll
 			// back an exception. Protect this transport only, using its real snapshot API.
 			const state = context.state, before = documents.snapshot(), history = [ ...state.history ], future = [ ...state.future ];
-			const selectedId = state.selectedId, collapsed = new Set( state.collapsedIds ), dirty = state.dirty, liveEdit = context.liveEdit;
-			try { return structure.moveTreeElement( destination ); }
+			const selectedId = state.selectedId, collapsed = new Set( state.collapsedIds ), dirty = state.dirty, liveEdit = context.liveEdit, insertion = context.catalogueInsertion;
+			try { return session.kind === 'insert' ? documents.addBlock( session.type, destination ) : structure.moveTreeElement( destination ); }
 			catch ( error ) {
-				documents.restoreSnapshot( before ); state.history = history; state.future = future; state.selectedId = selectedId; state.collapsedIds = collapsed; state.dirty = dirty; context.liveEdit = liveEdit;
+				documents.restoreSnapshot( before ); state.history = history; state.future = future; state.selectedId = selectedId; state.collapsedIds = collapsed; state.dirty = dirty; context.liveEdit = liveEdit; context.catalogueInsertion = insertion;
 				try { context.renderAll(); } catch ( renderError ) { report( 'ROLLBACK_RENDER_FAILED' ); }
 				throw error;
 			}
@@ -311,11 +332,14 @@
 			if ( ! event.isTrusted || session?.pointerId !== event.pointerId ) { return; }
 			if ( event.button !== 0 || event.buttons !== 0 || event.pointerType !== 'mouse' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { cancel( 'invalid-release' ); return; }
 			if ( phase === 'pending' ) { phase = 'completed'; cleanup(); return; }
+			finishDrop( event );
+		}
+		function finishDrop( event ) {
 			try {
 				session.point = { x: event.clientX, y: event.clientY }; refresh( true ); if ( ! session ) { return; }
 				if ( ! intent || ! validSession() ) { cancel( 'invalid-drop' ); return; }
 				const destination = intent, started = performance.now(); phase = 'dropping'; suppressClick = true;
-				const moved = transactionalMove( destination ); sample( 'commits', { ms: performance.now() - started, moved } );
+				const kind = session.kind || 'move', moved = transactionalMove( destination ); sample( 'commits', { ms: performance.now() - started, moved, kind } );
 				phase = moved ? 'completed' : 'cancelled'; if ( moved ) { data.completed++; } else { data.cancelled++; } cleanup();
 			} catch ( error ) { cancel( 'error' ); report( 'DROP_FAILED' ); }
 		}
@@ -352,15 +376,65 @@
 				surface.setPointerCapture( event.pointerId ); sample( 'acquisitions', { ms: performance.now() - started } );
 			} catch ( error ) { cancel( 'capture-failed' ); report( 'DRAG_ACQUIRE_FAILED' ); }
 		}
+		// Called only by creation-bound Structure/catalogue closures, never by a
+		// DataTransfer decoder, DOM selector, child event or public start-by-ID API.
+		function nativeStart( event, source ) {
+			const started = performance.now();
+			if ( state !== 'mounted' || session || event.type !== 'dragstart' || ! event.isTrusted || event.defaultPrevented || ! event.cancelable || event.currentTarget !== source.element || source.element.ownerDocument !== owner || ! source.element.contains( event.target ) || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || ! source.current() || context.state.draggingId || context.state.saving || ! [ 'move', 'insert' ].includes( source.kind ) ) { event.preventDefault(); return true; }
+			try {
+				if ( source.kind === 'move' && context.findNode( context.state.document.children, source.id ) !== source.node || source.kind === 'insert' && ( ! Object.hasOwn( context.config.elements || {}, source.type ) || context.config.elements[ source.type ].dependency || documents.nodeCount( context.state.document.children ) >= 400 ) ) { event.preventDefault(); return true; }
+				const stats = registry().stats(), id = source.kind === 'move' ? source.id : null;
+				session = { native: true, source, kind: source.kind, type: source.type, id, generation: stats.generation, registrations: stats.registrations, model: context.state.document, point: { x: event.clientX, y: event.clientY } };
+				phase = 'dragging'; context.state.draggingId = id; data.lastSource = id; suppressClick = false;
+				geometry = indexGeometry(); dirtyGeometry = true; feedback(); ghost.hidden = true;
+				if ( event.dataTransfer ) { event.dataTransfer.effectAllowed = source.kind === 'insert' ? 'copy' : 'move'; }
+				listen( listeners, owner, 'dragenter', nativeOver, true ); listen( listeners, owner, 'dragover', nativeOver, true );
+				listen( listeners, owner, 'drop', e => { if ( ! e.isTrusted ) { e.preventDefault(); e.stopImmediatePropagation(); return; } e.preventDefault(); e.stopImmediatePropagation(); finishDrop( e ); }, true );
+				listen( listeners, owner, 'dragend', e => { if ( e.isTrusted && source.element.contains( e.target ) ) { cancel( 'dragend' ); } }, true );
+				listen( listeners, owner, 'dragleave', e => { if ( ! e.relatedTarget && ( e.clientX <= 0 || e.clientY <= 0 || e.clientX >= win.innerWidth || e.clientY >= win.innerHeight ) ) { cancel( 'window-left' ); } }, true );
+				listen( listeners, owner, 'keydown', e => { if ( e.key === 'Escape' ) { e.preventDefault(); e.stopPropagation(); cancel( 'escape' ); } }, true );
+				listen( listeners, owner, 'scroll', invalidate, true ); listen( listeners, win, 'resize', invalidate ); listen( listeners, win, 'blur', () => cancel( 'blur' ) );
+				listen( listeners, viewport.frame, 'load', () => cancel( 'viewport-navigated' ) );
+				listen( listeners, owner, 'visibilitychange', () => { if ( owner.hidden ) { cancel( 'hidden' ); } } );
+				mutation = new win.MutationObserver( () => { if ( session && ! validSession() ) { cancel( 'rendered' ); } else { invalidate(); } } ); mutation.observe( canvas, { childList: true, subtree: true } ); mutation.observe( viewport.frame.parentElement, { childList: true } ); mutation.observe( context.structure, { childList: true, subtree: true } );
+				if ( win.ResizeObserver ) { resize = new win.ResizeObserver( invalidate ); resize.observe( canvas ); resize.observe( viewport.frame ); for ( const element of geometry.elements.values() ) { resize.observe( element ); } }
+				data.starts++; data.nativeStarts++; sample( 'acquisitions', { ms: performance.now() - started, kind: source.kind } );
+				return true;
+			} catch ( error ) { event.preventDefault(); cancel( 'error' ); report( 'NATIVE_ACQUIRE_FAILED' ); return true; }
+		}
+		function nativeOver( event ) {
+			if ( ! session?.native ) { return; }
+			const started = performance.now(); event.preventDefault(); event.stopImmediatePropagation();
+			if ( ! event.isTrusted || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { event.preventDefault(); cancel( 'invalid-native-input' ); return; }
+			try {
+				session.point = { x: event.clientX, y: event.clientY }; refresh();
+				if ( intent ) { event.preventDefault(); if ( event.dataTransfer ) { event.dataTransfer.dropEffect = session.kind === 'insert' ? 'copy' : 'move'; } schedule(); }
+				else { if ( event.dataTransfer ) { event.dataTransfer.dropEffect = 'none'; } win.cancelAnimationFrame( frame ); frame = 0; }
+				sample( 'nativeMoves', { ms: performance.now() - started, type: event.type } );
+			} catch ( error ) { cancel( 'error' ); report( 'NATIVE_UPDATE_FAILED' ); }
+		}
+		function nativeMouseDown( event ) {
+			if ( ! nativeEnded || state !== 'mounted' || session || ! event.isTrusted || event.type !== 'mousedown' || event.button !== 0 || event.buttons !== 1 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.target.ownerDocument !== owner || ! surface.contains( event.target ) ) { return false; }
+			const ended = nativeEnded; nativeEnded = null;
+			if ( ! ended.model.has( context.state.document ) || ended.generation !== registry().stats().generation || viewport.frame.contentDocument !== doc ) { return false; }
+			suppressClick = false; return true;
+		}
 		return Object.freeze( {
 			mount( target, resolver ) { if ( state === 'destroyed' || ! target?.isConnected || target.ownerDocument !== owner || target.parentElement !== viewport.frame.parentElement || typeof resolver !== 'function' ) { return false; } if ( surface ) { return surface === target; } surface = target; hitAt = resolver; state = 'mounted';
-				for ( const type of [ 'dragover', 'drop', 'dragstart' ] ) { listen( guards, surface, type, event => { event.preventDefault(); event.stopPropagation(); if ( event.dataTransfer ) { event.dataTransfer.dropEffect = 'none'; } } ); } return true; },
-			pointerDown, invalidate, cancel,
+				for ( const type of [ 'dragover', 'drop', 'dragstart' ] ) { listen( guards, surface, type, event => { event.preventDefault(); event.stopPropagation(); if ( event.dataTransfer ) { event.dataTransfer.dropEffect = 'none'; } } ); }
+				if ( external ) {
+					for ( const provider of [ structure, catalogue ] ) { const release = provider?.bindCanvasDrag( nativeStart ); if ( ! release ) { sources.splice( 0 ).forEach( remove => remove() ); clear( guards ); surface = hitAt = null; state = 'created'; return false; } sources.push( release ); }
+					listen( guards, owner, 'dragstart', () => cancel( 'new-native-source' ), true );
+					// Native HTML DnD normally emits no completing click. A fresh real
+					// pointer gesture must not inherit its post-drag click suppression.
+					listen( guards, owner, 'pointerdown', event => { if ( event.isTrusted && event.button === 0 && event.isPrimary ) { suppressClick = false; nativeEnded = null; } }, true );
+				} return true; },
+			pointerDown, invalidate, cancel, ...( external ? { nativeMouseDown } : {} ),
 			click( event ) { if ( suppressClick ) { suppressClick = false; event.preventDefault(); event.stopImmediatePropagation(); return true; } return false; },
-			suspend() { cancel( 'suspended' ); if ( state !== 'destroyed' ) { state = 'suspended'; } },
+			suspend() { cancel( 'suspended' ); nativeEnded = null; if ( state !== 'destroyed' ) { state = 'suspended'; } },
 			resume() { if ( state === 'suspended' ) { state = 'mounted'; } },
-			destroy() { if ( state === 'destroyed' ) { return; } cancel( 'destroyed' ); clear( guards ); state = 'destroyed'; surface = hitAt = viewport = controller = structure = documents = context = onError = canvas = doc = owner = win = app = null; },
-			stats() { return JSON.parse( JSON.stringify( { ...data, state, phase, listeners: listeners.length + guards.length, operationListeners: listeners.length, framesActive: frame ? 1 : 0, observers: Number( Boolean( mutation ) ) + Number( Boolean( resize ) ), overlays: overlay ? 2 : 0, capture: Boolean( session && surface?.hasPointerCapture?.( session.pointerId ) ) } ) ); },
+			destroy() { if ( state === 'destroyed' ) { return; } cancel( 'destroyed' ); nativeEnded = null; sources.splice( 0 ).forEach( remove => remove() ); clear( guards ); state = 'destroyed'; surface = hitAt = viewport = controller = structure = documents = context = catalogue = onError = canvas = doc = owner = win = app = null; },
+			stats() { return JSON.parse( JSON.stringify( { ...data, state, phase, sourceBindings: sources.length, listeners: listeners.length + guards.length, operationListeners: listeners.length, framesActive: frame ? 1 : 0, observers: Number( Boolean( mutation ) ) + Number( Boolean( resize ) ), overlays: overlay ? 2 : 0, capture: Boolean( session && surface?.hasPointerCapture?.( session.pointerId ) ) } ) ); },
 		} );
 	}
 	window.LieveCanvasDrag = { resolve, scrollVelocity, create, createParent };

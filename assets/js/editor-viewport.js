@@ -476,12 +476,12 @@
 		function pointerDown( event, hit ) {
 			pending = null; if ( ! active() || ! event?.isTrusted ) { return false; } const ticket = resolveControl( hit );
 			if ( ! ticket ) { return false; }
-			cancelDrag(); event.preventDefault(); focus(); pending = { ticket, x: event.clientX, y: event.clientY, pointerId: event.pointerId, epoch }; return true;
+			cancelDrag(); event.preventDefault(); focus(); pending = { ticket, x: event.clientX, y: event.clientY, pointerId: event.pointerId, mouse: event.type === 'mousedown', epoch }; return true;
 		}
 		function click( event ) {
 			const own = ownedButton( event.target ); if ( own ) { return activate( own, event ); }
 			const saved = pending; pending = null;
-			if ( ! saved || saved.epoch !== epoch || Number.isFinite( event.pointerId ) && event.pointerId !== saved.pointerId || Math.hypot( event.clientX - saved.x, event.clientY - saved.y ) > 5 ) { return false; }
+			if ( ! saved || saved.epoch !== epoch || ( saved.mouse ? event.button !== 0 || event.pointerType && event.pointerType !== 'mouse' : Number.isFinite( event.pointerId ) && event.pointerId !== saved.pointerId ) || Math.hypot( event.clientX - saved.x, event.clientY - saved.y ) > 5 ) { return false; }
 			return saved.ticket === resolveControl( resolveAt( event.clientX, event.clientY ) ) && activate( saved.ticket, event );
 		}
 		function contextMenu( event ) {
@@ -554,7 +554,7 @@
 		let stage = viewport?.stage, host = frame?.parentElement, surface = null, state = 'created';
 		let outlineFrame = 0, epoch = 0, resumeAfterPageShow = false;
 		const lease = Object.freeze( {} ), inputListeners = [], lifecycleListeners = [];
-		const diagnostics = { hitCount: 0, selections: 0, scrollCalls: 0, handledScrolls: 0, pointermoveWork: 0, hits: [], events: [], errors: [] };
+		const diagnostics = { hitCount: 0, selections: 0, nativeMouseRestorations: 0, scrollCalls: 0, handledScrolls: 0, pointermoveWork: 0, hits: [], events: [], errors: [] };
 		const error = code => Object.assign( new Error( 'Canvas input unavailable (' + code + ').' ), { name: 'CanvasInputError', code } );
 		const sample = ( key, value ) => { if ( diagnostics[ key ].length < 2000 ) { diagnostics[ key ].push( value ); } };
 		function validViewport() {
@@ -625,8 +625,9 @@
 			return hit.status === 'canvas' || [ 'resolved', 'opaque' ].includes( hit.status ) && typeof hit.identity?.identity?.selectId === 'string' && hit.identity.identity.selectId.length > 0;
 		}
 		function hitTest( x, y ) { const hit = resolveAt( x, y ); return selectable( hit ) ? { ...hit, id: hit.status === 'canvas' ? null : hit.identity.identity.selectId } : null; }
-		function pointerDown( event ) {
-			if ( state !== 'mounted' || ! event.isTrusted || event.defaultPrevented || event.cancelable === false || event.button !== 0 || ! event.isPrimary || event.pointerType !== 'mouse' || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { return; }
+		function pointerDown( event, nativeMouse = false ) {
+			if ( state !== 'mounted' || ! event.isTrusted || event.defaultPrevented || event.cancelable === false || event.button !== 0 || ( nativeMouse ? event.type !== 'mousedown' || event.buttons !== 1 : ! event.isPrimary || event.pointerType !== 'mouse' ) || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { return; }
+			if ( nativeMouse ) { diagnostics.nativeMouseRestorations++; }
 			if ( commands?.owns( event.target ) ) { return; }
 			const started = performance.now(), resolved = commands ? resolveAt( event.clientX, event.clientY ) : null;
 			if ( commands?.pointerDown( event, resolved ) ) { return; }
@@ -634,7 +635,7 @@
 			try {
 				event.preventDefault(); surface.focus( { preventScroll: true } );
 				const before = performance.now(); controller.selectElement( hit.id ); const controllerMs = performance.now() - before;
-				drag?.pointerDown( event, hit );
+				if ( ! nativeMouse ) { drag?.pointerDown( event, hit ); } // Never invent a pointer ID/capture from a MouseEvent.
 				queueOutline(); diagnostics.selections++; sample( 'events', { trusted: true, id: hit.id, startedAt: started, controllerMs, totalMs: performance.now() - started } );
 			} catch ( failure ) { suspend(); report( 'SELECTION_FAILED' ); }
 		}
@@ -651,6 +652,9 @@
 		function pageShow( event ) { if ( event.persisted && resumeAfterPageShow ) { resumeAfterPageShow = false; resume(); } }
 		function attachInputs() {
 			listen( inputListeners, surface, 'pointerdown', pointerDown );
+			if ( drag?.nativeMouseDown ) {
+				listen( inputListeners, surface, 'mousedown', event => { if ( ! commands?.owns( event.target ) && drag.nativeMouseDown( event ) ) { pointerDown( event, true ); } } );
+			}
 			listen( inputListeners, surface, 'wheel', wheel, { passive: false } );
 			listen( inputListeners, surface, 'click', event => { if ( drag?.click( event ) ) { commands?.cancel(); } else { commands?.click( event ); } event.preventDefault(); } );
 			listen( inputListeners, stage, 'scroll', queueOutline, { passive: true } );

@@ -134,6 +134,32 @@
 		let pinned = sanitizePins( config.pinnedElements, config.elements || {} );
 		let savedPins = [ ...pinned ];
 		let savingPins = false;
+		let canvasDragHandoff = null;
+		const dragBindings = new Map(), pinnedTiles = new Map();
+		function prepareDragSource( tile, type ) {
+			if ( ! canvasDragHandoff || ! Object.hasOwn( config.elements || {}, type ) ) { return; }
+			const definition = config.elements[ type ], old = tile.querySelector( '[data-add-block]' );
+			if ( ! old || definition.dependency ) { return; }
+			// Fresh application control; DOM markers are presentation/lookup hints only.
+			const button = document.createElement( 'button' ); button.type = 'button'; button.draggable = true;
+			button.dataset.addBlock = type; button.dataset.elementSearch = old.dataset.elementSearch; button.hidden = old.hidden; button.disabled = old.disabled;
+			const icon = old.querySelector( '.lieve-element-tile-icon' ); if ( icon ) { button.appendChild( icon.cloneNode( true ) ); }
+			const label = document.createElement( 'span' ); label.className = 'lieve-element-tile-label'; label.textContent = definition.label; button.appendChild( label ); old.replaceWith( button );
+			const signature = JSON.stringify( definition ), start = event => {
+				if ( ! canvasDragHandoff ) { event.preventDefault(); return; }
+				canvasDragHandoff( event, Object.freeze( { kind: 'insert', type, element: button,
+					current: () => button.isConnected && button.parentElement === tile && catalogue.contains( button ) && ! button.disabled && ! button.hidden && ! tile.hidden &&
+						config.elements[ type ] === definition && ! definition.dependency && JSON.stringify( definition ) === signature,
+				} ) ); event.stopPropagation();
+			};
+			button.addEventListener( 'dragstart', start ); dragBindings.set( button, () => { button.removeEventListener( 'dragstart', start ); button.draggable = false; } );
+		}
+		function bindCanvasDrag( start ) {
+			if ( typeof start !== 'function' || canvasDragHandoff ) { return null; }
+			canvasDragHandoff = start;
+			originals.forEach( ( tile, type ) => prepareDragSource( tile, type ) ); pinnedTiles.forEach( ( type, tile ) => prepareDragSource( tile, type ) );
+			return () => { if ( canvasDragHandoff !== start ) { return; } canvasDragHandoff = null; dragBindings.forEach( remove => remove() ); dragBindings.clear(); };
+		}
 		const samePins = ( a, b ) => JSON.stringify( a ) === JSON.stringify( b );
 
 		async function request( url, value ) {
@@ -174,14 +200,17 @@
 		renderAppearance();
 
 		function renderPinned() {
+			pinnedTiles.clear();
 			pinnedLibrary.replaceChildren( ...pinned.filter( type => originals.has( type ) ).map( type => {
 				const tile = originals.get( type ).cloneNode( true );
 				tile.hidden = false;
 				const insert = tile.querySelector( '[data-add-block]' );
 				insert.hidden = false;
 				insert.dataset.elementSearch += ' pinned';
+				pinnedTiles.set( tile, type ); prepareDragSource( tile, type );
 				return tile;
 			} ) );
+			dragBindings.forEach( ( remove, button ) => { if ( ! button.isConnected ) { remove(); dragBindings.delete( button ); } } );
 			catalogue.querySelectorAll( '[data-pin-element]' ).forEach( button => {
 				const type = button.dataset.pinElement;
 				const active = pinned.includes( type );
@@ -247,7 +276,7 @@
 		const form = modal.querySelector( 'form' );
 		const open = app.querySelector( '#lieve-breakpoints-open' );
 		const responsive = window.LieveResponsive.createManager( { form, config, modal, open, onChange: onBreakpointsChange, onError } );
-		return { submitBreakpoints: responsive.submit, refreshBreakpoints: responsive.refresh };
+		return { bindCanvasDrag, submitBreakpoints: responsive.submit, refreshBreakpoints: responsive.refresh };
 	}
 	window.LieveWorkspace = { create, sanitizePins, validBreakpoints, createPanelResize, sanitizePanelWidths, fitPanelWidths, gridTabIndex, createFieldFocus };
 }() );

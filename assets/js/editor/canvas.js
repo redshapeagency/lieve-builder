@@ -746,6 +746,7 @@
 
 		if ( ! lieveContext.state.document.children.length ) {
 			const empty = document.createElement( 'div' );
+			canvasIdentity().register( empty, canvasIdentity().owner( { id: null, selectId: null, type: 'empty-canvas', kind: 'empty-canvas' } ), 'descendants' );
 			empty.className = 'lieve-canvas-empty';
 			empty.dataset.editorUi = '';
 			empty.innerHTML = '<div class="lieve-empty-symbol">' + lieveContext.elementIcon( 'section' ) + '</div><strong>Your canvas. Your ideas.</strong><span>Start with a section, then add elements from the library. Everything stays unstyled until you make it yours.</span><button type="button" class="lieve-button-primary">Add your first section</button>';

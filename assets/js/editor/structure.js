@@ -2,6 +2,14 @@
 	'use strict';
 	window.LieveEditorControllers ||= {};
 	window.LieveEditorControllers[ 'structure' ] = function create( lieveContext ) {
+	let canvasDragHandoff = null, treeGeneration = 0;
+	// Passive creation seam: only closures installed on actual renderer-created rows
+	// can offer a source. Copied attributes/rows and native payloads cannot mint one.
+	function bindCanvasDrag( start ) {
+		if ( typeof start !== 'function' || canvasDragHandoff ) { return null; }
+		canvasDragHandoff = start;
+		return () => { if ( canvasDragHandoff === start ) { canvasDragHandoff = null; } };
+	}
 	function renameElement( id, value ) {
 		const node = lieveContext.findNode( lieveContext.state.document.children, id ); if ( ! node ) { return false; }
 		const name = Array.from( String( value ).replace( /<[^>]*>/g, '' ).trim() ).slice( 0, 120 ).join( '' );
@@ -330,7 +338,7 @@
 		lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( next ) + '"]' )?.scrollIntoView( { block: 'nearest' } );
 	}
 
-	function renderTreeBranch( nodes, depth, fragment, ancestors = [], parentId = null ) {
+	function renderTreeBranch( nodes, depth, fragment, ancestors = [], parentId = null, dragPath = [] ) {
 		nodes.forEach( ( node, index ) => {
 			const branch = document.createElement( 'div' ); branch.className = 'lieve-tree-branch';
 			branch.dataset.id = node.id; branch.dataset.parentId = parentId || ''; branch.dataset.depth = depth;
@@ -418,6 +426,12 @@
 			row.addEventListener( 'keydown', ( event ) => handleTreeKeyDown( event, node ) );
 			row.addEventListener( 'dragstart', ( event ) => {
 				if ( event.target.closest( '.lieve-tree-toggle, .lieve-tree-actions, .lieve-tree-rename' ) ) { event.preventDefault(); return; }
+				if ( canvasDragHandoff ) {
+					if ( canvasDragHandoff( event, Object.freeze( { kind: 'move', id: sourceId, node, element: row,
+					current: () => sourceGeneration === treeGeneration && sourceModel === lieveContext.state.document && row.isConnected && lieveContext.structure.contains( row ) &&
+							node.id === sourceId && sourceModel.children === sourcePath[0].nodes && sourcePath.every( ( link, at ) => link.nodes[ link.index ] === link.node && ( ! at || sourcePath[ at - 1 ].node.children === link.nodes ) ) && sourcePath.at( -2 )?.node.type !== 'component',
+					} ) ) ) { if ( ! event.defaultPrevented && event.dataTransfer?.setDragImage ) { setTreeDragPreview( row, event ); } event.stopPropagation(); return; }
+				}
 				event.stopPropagation();
 				clearTreeDragMotion(); clearTreeDropPlaceholder();
 				setTreeDragPreview( row, event );
@@ -429,6 +443,7 @@
 				// Applying it during dragstart can cancel Chrome's drag session.
 				window.setTimeout( () => { if ( lieveContext.state.draggingId === node.id && lieveContext.structure.contains( branch ) ) { branch.classList.add( 'is-dragging' ); } }, 0 );
 			} );
+			const sourceModel = lieveContext.state.document, sourceGeneration = treeGeneration, sourceId = node.id, sourcePath = [ ...dragPath, { nodes, node, index } ];
 			row.addEventListener( 'dragend', () => {
 				lieveContext.state.draggingId = null;
 				clearTreeDragMotion();
@@ -439,12 +454,13 @@
 			branch.appendChild( row ); fragment.appendChild( branch );
 			if ( childCount && ! lieveContext.state.collapsedIds.has( node.id ) ) {
 				const children = document.createElement( 'div' ); children.className = 'lieve-tree-children'; children.setAttribute( 'role', 'group' ); branch.appendChild( children );
-				renderTreeBranch( node.children, depth + 1, children, [ ...ancestors, index < nodes.length - 1 ], node.id );
+				renderTreeBranch( node.children, depth + 1, children, [ ...ancestors, index < nodes.length - 1 ], node.id, sourcePath );
 			}
 		} );
 	}
 
 	function renderStructure() {
+		treeGeneration++;
 		const panel = lieveContext.structure.parentElement; const scrollTop = panel.scrollTop; const scrollLeft = panel.scrollLeft;
 		const active = lieveContext.structure.contains( document.activeElement ) ? document.activeElement : null;
 		const focusId = active?.closest( '.lieve-tree-row[data-id]' )?.dataset.id;
@@ -468,6 +484,6 @@
 		panel.scrollTop = scrollTop; panel.scrollLeft = scrollLeft;
 		if ( focusId && ! active.matches( 'input' ) ) { lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( focusId ) + '"] ' + focusClass )?.focus( { preventScroll: true } ); }
 	}
-	return { renameElement, beginTreeRename, clearTreeDragPreview, setTreeDragPreview, clearTreeDropPlaceholder, treeDropDestination, validTreeDrop, treeDropChangesPosition, treeDropPosition, treeRowDropPosition, resolveTreeDrop, showTreeDropPlaceholder, clearTreeDragMotion, updateTreeHover, treeScrollVelocity, scrollTreeDrag, moveTreeElement, applyTreeDrop, handleTreeDragOver, handleTreeDrop, cancelTreeDrag, handleTreeKeyDown, renderTreeBranch, renderStructure };
+	return { bindCanvasDrag, renameElement, beginTreeRename, clearTreeDragPreview, setTreeDragPreview, clearTreeDropPlaceholder, treeDropDestination, validTreeDrop, treeDropChangesPosition, treeDropPosition, treeRowDropPosition, resolveTreeDrop, showTreeDropPlaceholder, clearTreeDragMotion, updateTreeHover, treeScrollVelocity, scrollTreeDrag, moveTreeElement, applyTreeDrop, handleTreeDragOver, handleTreeDrop, cancelTreeDrag, handleTreeKeyDown, renderTreeBranch, renderStructure };
 	};
 } )();

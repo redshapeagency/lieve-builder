@@ -296,7 +296,17 @@
 		lieveContext.renderAll();
 	}
 
-	function addBlock( type ) {
+	// Optional explicit destination for trusted catalogue handoff. The ordinary
+	// click path keeps its original insertion context and uses the same commit.
+	function canInsertBlockAt( type, destination ) {
+		if ( ! destination || ! Object.hasOwn( lieveContext.config.elements || {}, type ) || lieveContext.config.elements[ type ].dependency || nodeCount( lieveContext.state.document.children ) >= 400 ) { return false; }
+		const parent = destination.parentId ? findNode( lieveContext.state.document.children, destination.parentId ) : null;
+		if ( destination.parentId && ( ! parent || parent.type === 'component' || ! canNest( parent.type ) ) || lieveContext.config.componentMode && ! parent && lieveContext.state.document.children.length ) { return false; }
+		const siblings = parent ? parent.children || [] : lieveContext.state.document.children;
+		return ( ! parent || nodeDepth( parent.id ) + 1 <= 12 ) && ( ! destination.beforeId || siblings.some( node => node.id === destination.beforeId ) );
+	}
+	function addBlock( type, destination = null ) {
+		if ( destination && ! canInsertBlockAt( type, destination ) ) { return false; }
 		if ( lieveContext.config.elements?.[ type ]?.dependency ) { return; }
 		const block = makeBlock( type );
 		if ( nodeCount( lieveContext.state.document.children ) >= 400 ) {
@@ -307,7 +317,7 @@
 		const selectedParent = findParent( lieveContext.state.document.children, lieveContext.state.selectedId );
 		const repeatedInsertion = lieveContext.catalogueInsertion && selected?.id === lieveContext.catalogueInsertion.lastAddedId &&
 			( selectedParent?.id ?? null ) === lieveContext.catalogueInsertion.parentId;
-		const parent = repeatedInsertion ? selectedParent : selected && canNest( selected.type ) ? selected : selectedParent;
+		const parent = destination ? destination.parentId ? findNode( lieveContext.state.document.children, destination.parentId ) : null : repeatedInsertion ? selectedParent : selected && canNest( selected.type ) ? selected : selectedParent;
 		if ( parent?.type === 'component' ) { lieveContext.showToast( 'Choose a named Slot to add local component content.' ); return; }
 		if ( lieveContext.config.componentMode && ! parent && lieveContext.state.document.children.length ) { lieveContext.showToast( 'A component has one model root. Select its container to add content inside it.' ); return; }
 		if ( parent && nodeDepth( parent.id ) + 1 + subtreeDepth( block ) > 12 ) {
@@ -316,15 +326,22 @@
 		}
 
 		commit( () => {
-			if ( parent ) {
-				parent.children.push( block );
-				lieveContext.state.collapsedIds.delete( parent.id );
+			if ( destination ) {
+				const siblings = parent ? parent.children : lieveContext.state.document.children;
+				siblings.splice( destination.beforeId ? siblings.findIndex( node => node.id === destination.beforeId ) : siblings.length, 0, block );
+				if ( parent ) { lieveContext.state.collapsedIds.delete( parent.id ); }
 			} else {
-				lieveContext.state.document.children.push( block );
+				if ( parent ) {
+					parent.children.push( block );
+					lieveContext.state.collapsedIds.delete( parent.id );
+				} else {
+					lieveContext.state.document.children.push( block );
+				}
 			}
 			lieveContext.state.selectedId = block.id;
 			lieveContext.catalogueInsertion = { parentId: parent?.id ?? null, lastAddedId: block.id };
 		} );
+		return true;
 	}
 
 	function deleteSelected() {
@@ -448,6 +465,6 @@
 	function walkNodes( nodes, visit ) {
 		nodes.forEach( ( node ) => { visit( node ); walkNodes( node.children || [], visit ); } );
 	}
-	return { canNest, clone, normalizeDocument, uid, escapeHtml, makeBlock, findNode, findParent, containsId, nodeDepth, subtreeDepth, nodeCount, canDrop, removeNode, insertRelative, cloneWithNewIds, documentWithNewIds, serializeSnapshot, snapshot, restoreSnapshot, commit, liveChange, undo, redo, addBlock, deleteSelected, pasteAllContent, clearAllContent, duplicateSelected, moveSelected, moveRelative, moveInside, moveToRoot, pasteElement, wrapSelected, walkNodes };
+	return { canInsertBlockAt, canNest, clone, normalizeDocument, uid, escapeHtml, makeBlock, findNode, findParent, containsId, nodeDepth, subtreeDepth, nodeCount, canDrop, removeNode, insertRelative, cloneWithNewIds, documentWithNewIds, serializeSnapshot, snapshot, restoreSnapshot, commit, liveChange, undo, redo, addBlock, deleteSelected, pasteAllContent, clearAllContent, duplicateSelected, moveSelected, moveRelative, moveInside, moveToRoot, pasteElement, wrapSelected, walkNodes };
 	};
 } )();
