@@ -426,6 +426,14 @@
 		};
 	}
 	/* Inactive until explicitly mounted by a trusted caller. No CSS/startup ownership. */
+	const keyboardOwners = new WeakMap();
+	// Admission only, not a shortcut dispatcher. Authored attributes confer no lease.
+	function keyboardContext( target, focusOnly = false ) {
+		for ( let node = target; node; node = node.parentElement ) {
+			if ( keyboardOwners.has( node ) ) { const check = keyboardOwners.get( node ); return typeof check === 'function' && check( focusOnly ); }
+		}
+		return null;
+	}
 	/** Passive Task 15 contract. Only the guarded fixture constructs this satellite. */
 	function createInteractionCommands( { controller, context, cancelDrag = () => {} } ) {
 		let controls = controller.canvasControls(), surface, resolveAt, validViewport, unsubscribe, bar, pending = null, state = 'created';
@@ -485,7 +493,7 @@
 			return saved.ticket === resolveControl( resolveAt( event.clientX, event.clientY ) ) && activate( saved.ticket, event );
 		}
 		function contextMenu( event ) {
-			if ( ! active() || ! event.isTrusted || event.defaultPrevented ) { return; }
+			if ( ! active() || ! event.isTrusted || event.defaultPrevented || event.isComposing || event.keyCode === 229 ) { return; }
 			// Local focus contract only: Safari's default Tab policy can skip native
 			// buttons. Never intercept Tab in Inspector, text editors or outside this group.
 			if ( event.type === 'keydown' && event.key === 'Tab' ) {
@@ -516,7 +524,7 @@
 			listen( surface, 'focusin', event => { if ( bar.contains( event.target ) ) { bar.style.opacity = '1'; bar.style.pointerEvents = 'auto'; } } );
 			listen( surface, 'focusout', event => { if ( ! bar.contains( event.relatedTarget ) ) { bar.style.opacity = '0'; bar.style.pointerEvents = 'none'; } } );
 			listen( bar, 'keydown', event => {
-				if ( ! active() || ! event.isTrusted || event.defaultPrevented ) { return; }
+				if ( ! active() || ! event.isTrusted || event.defaultPrevented || event.isComposing || event.keyCode === 229 ) { return; }
 				if ( event.key === 'Escape' ) { event.preventDefault(); event.stopPropagation(); pending = null; focus(); return; }
 				if ( ! [ 'ArrowLeft', 'ArrowRight', 'Home', 'End' ].includes( event.key ) ) { return; }
 				const ticket = ownedButton( event.target ), entries = controls.list(), entry = entries.find( item => item.ticket === ticket );
@@ -670,6 +678,13 @@
 				surface.setAttribute( 'aria-label', 'Canvas selection surface' ); surface.tabIndex = 0;
 				surface.style.cssText = 'position:absolute;inset:0;z-index:10;margin:0;padding:0;border:0;background:transparent;box-sizing:border-box;user-select:none;touch-action:auto;';
 				host.appendChild( surface ); inputOwners.set( frame, lease ); state = 'mounted'; epoch++;
+				keyboardOwners.set( surface, focusOnly => {
+					if ( state !== 'mounted' || ! validViewport() || inputOwners.get( frame ) !== lease ) { return false; }
+					const status = controller.canvasIdentity().resolve( canvas ).status;
+					// A live workspace root can receive focus while its model is stale,
+					// but cannot issue document commands until the renderer owns it.
+					return status === 'canvas' || focusOnly === true && status === 'stale';
+				} );
 				if ( drag && ! drag.mount( surface, resolveAt ) ) { throw error( 'DRAG_MOUNT_FAILED' ); }
 				if ( commands && ! commands.mount( surface, resolveAt, validViewport ) ) { throw error( 'COMMAND_MOUNT_FAILED' ); }
 				if ( portals && ! portals.mount( surface, validViewport ) ) { throw error( 'PORTAL_MOUNT_FAILED' ); }
@@ -692,11 +707,12 @@
 			if ( state === 'destroyed' ) { return; } state = 'destroyed'; epoch++; resumeAfterPageShow = false;
 			window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; drag?.destroy(); commands?.destroy(); portals?.destroy(); drag = commands = portals = null; clear( inputListeners ); clear( lifecycleListeners );
 			if ( inputOwners.get( frame ) === lease ) { inputOwners.delete( frame ); }
+			if ( surface ) { keyboardOwners.set( surface, false ); } // Weak terminal tombstone, no retained callback/model.
 			surface?.remove(); surface = frame = doc = canvas = stage = host = viewport = controller = onOutline = onError = null;
 		}
 		return Object.freeze( { mount, resolveAt, hitTest, suspend, resume, destroy,
 			stats() { return JSON.parse( JSON.stringify( { ...diagnostics, state, listeners: inputListeners.length + lifecycleListeners.length, inputListeners: inputListeners.length, lifecycleListeners: lifecycleListeners.length, framesActive: outlineFrame ? 1 : 0, surfaces: surface ? 1 : 0 } ) ); },
 		} );
 	}
-	window.LieveViewport = { create, loadedCss, createCssReadiness, createInputAdapter, createInteractionCommands, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
+	window.LieveViewport = { create, loadedCss, createCssReadiness, createInputAdapter, createInteractionCommands, keyboardContext, scrollFrom( owner, input, target ) { return scrollers.get( owner )?.( input, target ) || false; } };
 }() );

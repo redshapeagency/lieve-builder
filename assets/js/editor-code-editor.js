@@ -123,13 +123,18 @@
 			if ( editor ) { editor.setOption( 'mode', mode ); editor.setOption( 'readOnly', field.readOnly ); editor.setValue( options.value ); editor.clearHistory(); editor.getInputField().setAttribute( 'aria-label', options.label + ' code' ); }
 			syncing = false; tools();
 			modal.open( options.trigger ); if ( editor ) { editor.refresh(); } focus();
-		}, refresh() {
+		}, refresh( transition ) {
+			if ( transition ) {
+				if ( root.hidden || active !== transition.owner || ! transition.replacement ) { return false; }
+				active = transition.replacement;
+			}
 			if ( ! active?.read ) { return; } const value = active.read();
 			if ( value === undefined ) { modal.close(); return; }
 			field.readOnly = ! editable();
-			if ( editor ) { editor.setOption( 'readOnly', ! editable() ); if ( editor.getValue() !== value ) { const selection = editor.listSelections(), position = editor.getScrollInfo(); syncing = true; editor.setValue( value ); editor.setSelections( selection ); editor.scrollTo( position.left, position.top ); editor.save(); syncing = false; refreshMatches(); } tools(); return; }
+			if ( editor ) { editor.setOption( 'readOnly', ! editable() ); if ( editor.getValue() !== value ) { const selection = editor.listSelections(), position = editor.getScrollInfo(); syncing = true; editor.setValue( value ); editor.setSelections( selection ); editor.scrollTo( position.left, position.top ); editor.save(); syncing = false; refreshMatches(); } tools(); return true; }
 			if ( field.value !== value ) { const start = field.selectionStart, end = field.selectionEnd, top = field.scrollTop, left = field.scrollLeft; field.value = value; field.setSelectionRange( Math.min( start, value.length ), Math.min( end, value.length ) ); field.scrollTop = top; field.scrollLeft = left; refreshMatches(); }
 			tools();
+			return true;
 		}, close: modal.close };
 	}, mount, matches };
 } )();

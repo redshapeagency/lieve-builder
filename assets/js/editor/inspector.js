@@ -2,6 +2,7 @@
 	'use strict';
 	window.LieveEditorControllers ||= {};
 	window.LieveEditorControllers[ 'inspector' ] = function create( lieveContext ) {
+	let inspectorOwner = null, preservedView = null, expandedCode = null;
 	function inspectorSettingSummary( node ) {
 		const sharedClass = node?.type === 'popup-shell' ? null : lieveContext.editingClass();
 		if ( sharedClass ) {
@@ -281,24 +282,51 @@
 
 	function mountInspectorRichText( node, restore ) {
 		if ( lieveContext.inspectorTab !== 'content' || lieveContext.richTextController ) { return; }
+		const model = lieveContext.state.document, isCurrent = () => lieveContext.state.document === model && lieveContext.findNode( model.children, node.id ) === node;
 		const root = lieveContext.inspector.querySelector( '[data-rich-text]' );
-		if ( root ) { lieveContext.richTextController = window.LieveRichText?.mount( { root, textarea: root.querySelector( '[data-prop="content"]' ), app: lieveContext.app, dynamicData: lieveContext.dynamicData, ...lieveContext.config.richText, restore, onSave: () => lieveContext.save() } ) || null; if ( lieveContext.richTextController ) { lieveContext.richTextController.nodeId = node.id; } }
+		if ( root ) { lieveContext.richTextController = window.LieveRichText?.mount( { root, textarea: root.querySelector( '[data-prop="content"]' ), app: lieveContext.app, dynamicData: lieveContext.dynamicData, ...lieveContext.config.richText, restore, isCurrent, onSave: () => { if ( isCurrent() ) { lieveContext.save(); } } } ) || null; if ( lieveContext.richTextController ) { lieveContext.richTextController.nodeId = node.id; } }
 	}
 
 	function mountInspectorCode( node, restore ) {
 		if ( node.type !== 'html' || lieveContext.inspectorTab !== 'content' ) { return; }
-		if ( ! lieveContext.codeFields ) { lieveContext.codeFields = window.LieveCodeEditor?.mount( { root: lieveContext.inspector, canEdit: () => ! lieveContext.state.saving, restore: restore || {} } ) || null; if ( lieveContext.codeFields ) { lieveContext.codeFields.nodeId = node.id; } }
+		const model = lieveContext.state.document;
+		if ( ! lieveContext.codeFields ) { lieveContext.codeFields = window.LieveCodeEditor?.mount( { root: lieveContext.inspector, canEdit: () => ! lieveContext.state.saving && lieveContext.state.document === model && lieveContext.findNode( model.children, node.id ) === node, restore: restore || {} } ) || null; if ( lieveContext.codeFields ) { lieveContext.codeFields.nodeId = node.id; } }
 		else { lieveContext.codeFields.refresh(); }
+	}
+
+	function expandedCodeOptions( node, property, field, trigger ) {
+		const model = lieveContext.state.document, isCurrent = () => lieveContext.state.document === model && lieveContext.findNode( model.children, node.id ) === node;
+		const options = { label: { content: 'HTML/PHP', customCss: 'CSS', customJs: 'JavaScript' }[ property ], value: node.props[ property ] || '', readOnly: field.readOnly || field.disabled, trigger,
+			canEdit: () => isCurrent() && ! lieveContext.state.saving, dynamicEnabled: () => isCurrent() && Boolean( node.props.dynamicCode ),
+			dynamic: picker => { if ( isCurrent() ) { picker.trigger.dataset.codeDynamic = property; openCodeDynamic( picker.trigger, picker ); } }, closeDynamic: lieveContext.closeTokenPicker,
+			read: () => isCurrent() ? node.props[ property ] || '' : undefined, change: value => { if ( isCurrent() ) { writeCustomCode( node.id, property, value ); } },
+			finish: () => { if ( expandedCode?.options === options ) { expandedCode = null; } lieveContext.liveEdit = null; },
+		};
+		return options;
 	}
 
 	function renderInspector() {
 		lieveContext.inspectorRevision++;
 		lieveContext.inspectorSelects.forEach( select => select.destroy() ); lieveContext.inspectorSelects = [];
-		lieveContext.codeEditor?.refresh();
-		const codeRestore = lieveContext.codeFields?.nodeId === lieveContext.state.selectedId ? lieveContext.codeFields.capture() : null;
+		const sameOwner = inspectorOwner?.model === lieveContext.state.document && inspectorOwner.node.id === lieveContext.state.selectedId && lieveContext.findNode( lieveContext.state.document.children, inspectorOwner.node.id ) === inspectorOwner.node;
+		const keepCodeOwner = sameOwner && expandedCode?.owner === inspectorOwner;
+		// Only the existing explicit view-preservation transaction (e.g. accepted
+		// manual Save) may restore a caret across canonical server normalization.
+		const preserveFocus = Boolean( preservedView && preservedView === inspectorOwner && inspectorOwner.postId === lieveContext.config.postId && inspectorOwner.node.id === lieveContext.state.selectedId && inspectorOwner.node.type === lieveContext.findNode( lieveContext.state.document.children, lieveContext.state.selectedId )?.type );
+		// A confirmed Save is the only cross-model handoff. Replace the active
+		// options with fresh callbacks; never revive callbacks from the old model.
+		const savedCode = preserveFocus && expandedCode?.owner === inspectorOwner && lieveContext.state.saving && ! lieveContext.state.dirty && lieveContext.state.savedSnapshot === lieveContext.snapshot() ? expandedCode : null;
+		preservedView = null;
+		if ( savedCode ) {
+			const node = lieveContext.findNode( lieveContext.state.document.children, lieveContext.state.selectedId ), previous = savedCode.options;
+			const options = expandedCodeOptions( node, savedCode.property, { readOnly: previous.readOnly, disabled: false }, previous.trigger );
+			if ( lieveContext.codeEditor?.refresh( { owner: previous, replacement: options } ) ) { expandedCode = { ...savedCode, options }; }
+			else { expandedCode = null; }
+		} else { lieveContext.codeEditor?.refresh(); }
+		const codeRestore = lieveContext.codeFields?.nodeId === lieveContext.state.selectedId && ( sameOwner || preserveFocus ) ? lieveContext.codeFields.capture() : null;
 		lieveContext.codeFields?.destroy(); lieveContext.codeFields = null;
 		lieveContext.motionEditor?.stop();
-		const richRestore = lieveContext.richTextController?.nodeId === lieveContext.state.selectedId ? lieveContext.richTextController.capture() : null;
+		const richRestore = lieveContext.richTextController?.nodeId === lieveContext.state.selectedId && ( sameOwner || preserveFocus ) ? lieveContext.richTextController.capture() : null;
 		lieveContext.richTextController?.destroy(); lieveContext.richTextController = null;
 		lieveContext.interactController?.destroy(); lieveContext.interactController = null;
 		lieveContext.elementConditionController?.destroy(); lieveContext.elementConditionController = null;
@@ -307,6 +335,9 @@
 		lieveContext.hideEditorTooltip();
 		lieveContext.closeTokenPicker();
 		const node = lieveContext.findNode( lieveContext.state.document.children, lieveContext.state.selectedId );
+		const model = lieveContext.state.document, isCurrent = () => lieveContext.state.document === model && lieveContext.findNode( model.children, node?.id ) === node;
+		inspectorOwner = node ? { node, model, postId: lieveContext.config.postId } : null;
+		if ( ( savedCode || keepCodeOwner ) && expandedCode ) { expandedCode.owner = inspectorOwner; }
 		if ( lieveContext.popupPanelOpen && lieveContext.isPopupTemplate() ) { lieveContext.activeClassId = null; renderPopupInspector(); return; }
 		if ( lieveContext.popupPanelOpen ) { lieveContext.styleTarget = 'root'; lieveContext.styleState = 'normal'; }
 		lieveContext.popupPanelOpen = false;
@@ -370,7 +401,7 @@
 
 		lieveContext.inspector.querySelectorAll( '[data-prop]' ).forEach( ( field ) => {
 			const update = ( event ) => {
-				if ( event?.isComposing || field.validity?.badInput ) { return; }
+				if ( ! isCurrent() || ! field.isConnected || event?.isComposing || field.validity?.badInput ) { return; }
 				const property = field.dataset.prop;
 				let value = field.type === 'checkbox' ? field.checked : field.value;
 				if ( field.type === 'number' && value !== '' ) {
@@ -397,14 +428,16 @@
 			field.addEventListener( 'blur', () => { lieveContext.liveEdit = null; } );
 		} );
 		const phpToggle = lieveContext.inspector.querySelector( '[data-prop="phpPreview"]' ); if ( phpToggle ) { phpToggle.disabled = ! lieveContext.config.customCode?.phpEnabled || ! lieveContext.config.customCode?.canAuthor; }
-		lieveContext.inspector.querySelectorAll( '[data-clear-code]' ).forEach( button => button.addEventListener( 'click', () => { lieveContext.liveEdit = null; writeCustomCode( node.id, button.dataset.clearCode, '' ); lieveContext.liveEdit = null; lieveContext.codeEditor?.refresh(); } ) );
-		lieveContext.inspector.querySelectorAll( '[data-code-dynamic]' ).forEach( button => button.addEventListener( 'click', () => openCodeDynamic( button ) ) );
+		lieveContext.inspector.querySelectorAll( '[data-clear-code]' ).forEach( button => button.addEventListener( 'click', () => { if ( ! isCurrent() ) { return; } lieveContext.liveEdit = null; writeCustomCode( node.id, button.dataset.clearCode, '' ); lieveContext.liveEdit = null; lieveContext.codeEditor?.refresh(); } ) );
+		lieveContext.inspector.querySelectorAll( '[data-code-dynamic]' ).forEach( button => button.addEventListener( 'click', () => { if ( isCurrent() ) { openCodeDynamic( button ); } } ) );
 		lieveContext.inspector.querySelectorAll( '[data-expand-code]' ).forEach( button => button.addEventListener( 'click', () => {
+			if ( ! isCurrent() ) { return; }
 			lieveContext.codeFields?.flush();
 			const property = button.dataset.expandCode, field = lieveContext.inspector.querySelector( '[data-prop="' + property + '"]' );
 			if ( ! field || ! window.LieveCodeEditor ) { return; }
 			lieveContext.codeEditor ||= window.LieveCodeEditor.create( { app: lieveContext.app } );
-			lieveContext.codeEditor.open( { label: { content: 'HTML/PHP', customCss: 'CSS', customJs: 'JavaScript' }[ property ], value: field.value, readOnly: field.readOnly || field.disabled, trigger: button, canEdit: () => ! lieveContext.state.saving, dynamicEnabled: () => Boolean( lieveContext.findNode( lieveContext.state.document.children, node.id )?.props.dynamicCode ), dynamic: options => { options.trigger.dataset.codeDynamic = property; openCodeDynamic( options.trigger, options ); }, closeDynamic: lieveContext.closeTokenPicker, read: () => { const current = lieveContext.findNode( lieveContext.state.document.children, node.id ); return current ? current.props[ property ] || '' : undefined; }, change: value => writeCustomCode( node.id, property, value ), finish: () => { lieveContext.liveEdit = null; } } );
+			const options = expandedCodeOptions( node, property, field, button );
+			expandedCode = { owner: inspectorOwner, options, property }; lieveContext.codeEditor.open( options );
 		} ) );
 		lieveContext.bindStyleControls( node );
 		lieveContext.listingEditor?.bind( { root: lieveContext.inspector, node, device: lieveContext.styleDevice, read: () => lieveContext.findNode( lieveContext.state.document.children, node.id ), change: lieveContext.liveChange, refresh: () => preserveInspectorScroll( renderInspector ) } );
@@ -487,11 +520,17 @@
 	}
 
 	function preserveEditorScroll( change ) {
+		const previousView = preservedView;
+		// Save normalizes the accepted response before entering this existing view
+		// transaction. Preserve only presentation here, never the old callbacks'
+		// mutation authority; renderInspector checks the page, selection and type.
+		preservedView = inspectorOwner;
 		// Capture at response time: scrolling while a save is pending is intentional.
 		const scrollers = new Map( [ document.scrollingElement, lieveContext.canvas.ownerDocument.scrollingElement, lieveContext.viewport?.stage || lieveContext.canvas.closest( '.lieve-stage-scroll' ), lieveContext.structure.parentElement, document.getElementById( 'lieve-seo-panel' ), document.getElementById( 'lieve-head-panel' ), document.getElementById( 'lieve-page-markup-panel' ) ].filter( Boolean ).map( panel => [ panel, { top: panel.scrollTop, left: panel.scrollLeft } ] ) );
 		const canvasFocus = lieveContext.canvas.ownerDocument !== document && document.activeElement === lieveContext.viewport?.frame ? lieveContext.canvas.ownerDocument.activeElement?.closest( '[data-editor-root]' )?.dataset.editorRoot : null;
 		try { return preserveInspectorScroll( change, true ); }
 		finally {
+			preservedView = previousView;
 			if ( canvasFocus ) { lieveContext.canvas.querySelector( '[data-editor-root="' + window.CSS.escape( canvasFocus ) + '"]' )?.focus( { preventScroll: true } ); }
 			scrollers.forEach( ( position, panel ) => { panel.scrollTop = position.top; panel.scrollLeft = position.left; } );
 			lieveContext.updateSelectionOutline();

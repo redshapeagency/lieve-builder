@@ -2,10 +2,15 @@
 	'use strict';
 	window.LieveEditorControllers ||= {};
 	window.LieveEditorControllers[ 'context-menu' ] = function create( lieveContext ) {
+	let menuOwner = null;
+	function currentMenuOwner() {
+		return Boolean( menuOwner && menuOwner.model === lieveContext.state.document && lieveContext.state.selectedId === menuOwner.node.id && lieveContext.findNode( menuOwner.model.children, menuOwner.node.id ) === menuOwner.node );
+	}
 	function closeContextMenu( restoreFocus = false ) {
 		if ( ! lieveContext.contextMenu || lieveContext.contextMenu.hidden ) { return; }
+		const current = currentMenuOwner() || window.LieveViewport?.keyboardContext?.( lieveContext.contextReturnFocus, true ) === true; menuOwner = null;
 		lieveContext.contextMenu.hidden = true;
-		if ( restoreFocus && lieveContext.contextReturnFocus?.isConnected ) { lieveContext.contextReturnFocus.focus( { preventScroll: true } ); }
+		if ( restoreFocus && current && lieveContext.contextReturnFocus?.isConnected ) { lieveContext.contextReturnFocus.focus( { preventScroll: true } ); }
 	}
 
 	function copyElementStyles( node ) {
@@ -123,11 +128,14 @@
 	function openContextMenu( id, x, y ) {
 		lieveContext.treeRename?.finish( true );
 		lieveContext.selectElement( id ); const node = lieveContext.findNode( lieveContext.state.document.children, id ); if ( ! node ) { return; }
+		menuOwner = { model: lieveContext.state.document, node };
 		lieveContext.contextReturnFocus = lieveContext.canvas.querySelector( '.lieve-editor-node[data-id="' + window.CSS.escape( id ) + '"]' );
 		if ( ! lieveContext.contextMenu ) {
 			lieveContext.contextMenu = document.createElement( 'div' ); lieveContext.contextMenu.className = 'lieve-context-menu'; lieveContext.contextMenu.setAttribute( 'role', 'presentation' ); lieveContext.app.appendChild( lieveContext.contextMenu );
-			lieveContext.contextMenu.addEventListener( 'click', ( event ) => { const button = event.target.closest( '[data-context-action]' ); if ( button && ! button.disabled ) { runContextAction( button.dataset.contextAction ); } } );
+			lieveContext.contextMenu.addEventListener( 'click', ( event ) => { if ( ! currentMenuOwner() ) { event.preventDefault(); event.stopImmediatePropagation(); closeContextMenu(); return; } const button = event.target.closest( '[data-context-action]' ); if ( button && ! button.disabled ) { runContextAction( button.dataset.contextAction ); } } );
 			lieveContext.contextMenu.addEventListener( 'keydown', ( event ) => {
+				if ( ! currentMenuOwner() ) { if ( event.key !== 'Tab' ) { event.preventDefault(); } event.stopImmediatePropagation(); closeContextMenu(); return; }
+				if ( event.defaultPrevented || event.isComposing || event.keyCode === 229 ) { return; }
 				const buttons = Array.from( lieveContext.contextMenu.querySelectorAll( '[data-context-action]:not(:disabled)' ) ); const index = buttons.indexOf( document.activeElement );
 				if ( [ 'ArrowDown', 'ArrowUp', 'Home', 'End' ].includes( event.key ) ) { event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : index < 0 ? ( event.key === 'ArrowDown' ? 0 : buttons.length - 1 ) : ( index + ( event.key === 'ArrowDown' ? 1 : -1 ) + buttons.length ) % buttons.length; buttons[ next ]?.focus(); }
 				if ( [ 'ArrowLeft', 'ArrowRight' ].includes( event.key ) ) { const row = event.target.closest( '.lieve-context-transfer' ); if ( row ) { event.preventDefault(); const actions = Array.from( row.querySelectorAll( 'button:not(:disabled)' ) ); const at = actions.indexOf( document.activeElement ); actions[ ( at + ( event.key === 'ArrowRight' ? 1 : -1 ) + actions.length ) % actions.length ]?.focus(); } }

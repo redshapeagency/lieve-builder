@@ -19,25 +19,26 @@
 	}
 
 	function beginTreeRename( id ) {
-		if ( lieveContext.treeRename?.id === id && lieveContext.treeRename.input.isConnected ) { lieveContext.treeRename.input.focus(); return; }
+		if ( lieveContext.treeRename?.id === id && lieveContext.treeRename.input.isConnected && lieveContext.treeRename.current?.() !== false ) { lieveContext.treeRename.input.focus(); return; }
 		lieveContext.treeRename?.finish( true );
 		lieveContext.selectElement( id ); lieveContext.showWorkspacePanel( 'structure' );
 		if ( window.matchMedia( '(max-width: 900px)' ).matches ) { lieveContext.closeDrawers(); lieveContext.app.dataset.drawer = 'elements'; document.querySelector( '[data-toggle-drawer="elements"]' )?.setAttribute( 'aria-expanded', 'true' ); }
 		const node = lieveContext.findNode( lieveContext.state.document.children, id ); const row = lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( id ) + '"]' );
 		if ( ! node || ! row ) { return; }
+		const model = lieveContext.state.document, current = () => lieveContext.state.document === model && lieveContext.findNode( model.children, id ) === node;
 		const select = row.querySelector( '.lieve-tree-select' ); const input = document.createElement( 'input' );
 		input.type = 'text'; input.className = 'lieve-tree-rename'; input.maxLength = 120; input.setAttribute( 'aria-label', 'Rename element' ); input.value = node.props.editorLabel || lieveContext.labels[ node.type ] || node.type;
 		row.classList.add( 'is-renaming' ); row.draggable = false; select.draggable = false; select.setAttribute( 'aria-label', 'Select ' + input.value );
 		row.insertBefore( input, select.nextSibling ); let finished = false;
 		const finish = ( apply, focus = false ) => {
 			if ( finished ) { return; } finished = true; lieveContext.treeRename = null;
-			const changed = apply && renameElement( id, input.value ); if ( ! changed ) { renderStructure(); }
-			if ( focus ) { lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( id ) + '"] .lieve-tree-select' )?.focus(); }
+			const owned = current(), changed = apply && owned && renameElement( id, input.value ); if ( ! changed ) { renderStructure(); }
+			if ( focus && owned ) { lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( id ) + '"] .lieve-tree-select' )?.focus(); }
 		};
-		lieveContext.treeRename = { id, input, finish, deactivate: () => { finished = true; } };
+		lieveContext.treeRename = { id, input, finish, current, deactivate: () => { finished = true; } };
 		input.addEventListener( 'click', ( event ) => event.stopPropagation() ); input.addEventListener( 'dragstart', ( event ) => { event.preventDefault(); event.stopPropagation(); } );
 		input.addEventListener( 'blur', () => finish( true ) );
-		input.addEventListener( 'keydown', ( event ) => { if ( event.isComposing ) { return; } if ( event.key === 'Enter' || event.key === 'Escape' ) { event.preventDefault(); event.stopPropagation(); finish( event.key === 'Enter', true ); } } );
+		input.addEventListener( 'keydown', ( event ) => { if ( event.defaultPrevented || event.isComposing || event.keyCode === 229 ) { return; } if ( event.key === 'Enter' || event.key === 'Escape' ) { event.preventDefault(); event.stopPropagation(); finish( event.key === 'Enter', true ); } } );
 		input.focus(); input.select();
 	}
 
@@ -318,7 +319,7 @@
 	}
 
 	function handleTreeKeyDown( event, node ) {
-		if ( event.target.matches( 'input, textarea' ) || event.altKey || event.ctrlKey || event.metaKey ) { return; }
+		if ( event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.target.matches( 'input, textarea' ) || event.altKey || event.ctrlKey || event.metaKey ) { return; }
 		if ( event.key === 'F2' ) { event.preventDefault(); event.stopPropagation(); beginTreeRename( node.id ); return; }
 		if ( ! [ 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End' ].includes( event.key ) ) { return; }
 		event.preventDefault(); event.stopPropagation();
@@ -423,7 +424,12 @@
 				lieveContext.contextReturnFocus = lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( node.id ) + '"] .lieve-tree-actions' );
 			} );
 			row.appendChild( actions );
-			row.addEventListener( 'keydown', ( event ) => handleTreeKeyDown( event, node ) );
+			row.addEventListener( 'keydown', event => {
+				if ( sourceModel !== lieveContext.state.document || sourceGeneration !== treeGeneration || ! row.isConnected || sourceModel.children !== sourcePath[0].nodes || ! sourcePath.every( ( link, at ) => link.nodes[ link.index ] === link.node && ( ! at || sourcePath[ at - 1 ].node.children === link.nodes ) ) ) {
+					if ( event.key !== 'Tab' ) { event.preventDefault(); } event.stopPropagation(); return;
+				}
+				handleTreeKeyDown( event, node );
+			}, true );
 			row.addEventListener( 'dragstart', ( event ) => {
 				if ( event.target.closest( '.lieve-tree-toggle, .lieve-tree-actions, .lieve-tree-rename' ) ) { event.preventDefault(); return; }
 				if ( canvasDragHandoff ) {

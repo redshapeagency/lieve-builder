@@ -785,6 +785,7 @@
 
 	function updateButtons() {
 		codeFields?.sync();
+		codeEditor?.refresh();
 		structureActions?.sync();
 		refreshInspectorIndicators();
 		if ( inspector.querySelector( '[data-inspector-context]' ) ) { syncInspectorContext(); }
@@ -1060,9 +1061,12 @@
 	app.addEventListener( 'contextmenu', handleEditorContextMenu );
 	viewport?.document.addEventListener( 'contextmenu', handleEditorContextMenu );
 	function handleEditorContextKey( event ) {
+		if ( event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.target.closest?.( 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), .CodeMirror' ) ) { return; }
 		if ( event.key !== 'ContextMenu' && ! ( event.shiftKey && event.key === 'F10' ) ) { return; }
 		const target = event.target.closest( '.lieve-tree-row[data-id], .lieve-editor-node[data-id]' ); if ( ! target ) { return; }
+		const tree = target.closest?.( '#lieve-structure' );
 		event.preventDefault(); const rect = viewport && target.ownerDocument === canvas.ownerDocument ? viewport.toParent( target.getBoundingClientRect() ) : target.getBoundingClientRect(); openContextMenu( target.dataset.id, rect.left + 16, rect.top + 20 );
+		if ( tree && tree === structure ) { contextReturnFocus = tree.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( target.dataset.id ) + '"]' ); }
 	}
 	app.addEventListener( 'keydown', handleEditorContextKey );
 	viewport?.document.addEventListener( 'keydown', handleEditorContextKey );
@@ -1132,6 +1136,15 @@
 	}
 
 	onEditorDocuments( 'keydown', ( event ) => {
+		// One application dispatcher; native fields and local editors own their keys.
+		if ( ! event.isTrusted || event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.altKey || ! event.target?.isConnected || viewport?.readiness?.().destroyed ) { return; }
+		if ( window.LieveViewport?.keyboardContext?.( event.target ) === false ) {
+			// Refuse application commands AND their browser defaults (Backspace can
+			// navigate away). Tab remains native so an inactive surface is not a trap.
+			if ( [ 'Delete', 'Backspace', '/', 'ContextMenu' ].includes( event.key ) || event.shiftKey && event.key === 'F10' || ( event.metaKey || event.ctrlKey ) && [ 's', 'z', 'd' ].includes( event.key.toLowerCase() ) ) { event.preventDefault(); }
+			return;
+		}
+		if ( ! app.contains( event.target ) && event.target !== document.body && event.target.ownerDocument !== canvas.ownerDocument ) { return; }
 		if ( designSystem?.isOpen() || classWorkspace?.isOpen() ) {
 			if ( ( event.metaKey || event.ctrlKey ) && event.key.toLowerCase() === 's' ) { event.preventDefault(); if ( classWorkspace?.isOpen() ) { classWorkspace.submit(); } else { designSystem.submit(); } }
 			return;
@@ -1141,7 +1154,7 @@
 			return;
 		}
 		if ( event.key === 'Escape' && contextMenu && ! contextMenu.hidden ) { event.preventDefault(); closeContextMenu( true ); return; }
-		if ( event.key === '/' && ! event.metaKey && ! event.ctrlKey && ! [ 'INPUT', 'TEXTAREA', 'SELECT' ].includes( event.target.tagName ) && ! event.target.isContentEditable && conditionsModal?.hidden !== false && templateModal?.hidden !== false ) {
+		if ( event.key === '/' && ! event.metaKey && ! event.ctrlKey && ! [ 'INPUT', 'TEXTAREA', 'SELECT' ].includes( event.target.tagName ) && ! event.target.isContentEditable && ! app.querySelector( '.lieve-template-modal:not([hidden])' ) && conditionsModal?.hidden !== false && templateModal?.hidden !== false ) {
 			event.preventDefault(); showWorkspacePanel( 'elements' );
 			if ( window.matchMedia( '(max-width: 900px)' ).matches ) { closeDrawers(); app.dataset.drawer = 'elements'; document.querySelector( '[data-toggle-drawer="elements"]' )?.setAttribute( 'aria-expanded', 'true' ); }
 			document.getElementById( 'lieve-element-search' )?.focus(); return;
@@ -1156,8 +1169,9 @@
 		}
 		const command = event.metaKey || event.ctrlKey;
 		const editing = [ 'INPUT', 'TEXTAREA', 'SELECT' ].includes( event.target.tagName ) || event.target.isContentEditable;
-		if ( ! editing && conditionsModal?.hidden !== false && templateModal?.hidden !== false && ( event.key === 'Delete' || event.key === 'Backspace' ) && state.selectedId ) { event.preventDefault(); deleteSelected(); return; }
-		if ( command && event.key.toLowerCase() === 'd' && ! editing && state.selectedId ) { event.preventDefault(); duplicateSelected(); return; }
+		const modalOpen = app.querySelector( '.lieve-template-modal:not([hidden])' );
+		if ( ! editing && ! modalOpen && ( event.key === 'Delete' || event.key === 'Backspace' ) && state.selectedId ) { event.preventDefault(); deleteSelected(); return; }
+		if ( command && event.key.toLowerCase() === 'd' && ! editing && ! modalOpen && state.selectedId ) { event.preventDefault(); duplicateSelected(); return; }
 		if ( command && event.key.toLowerCase() === 's' ) {
 			event.preventDefault();
 			if ( conditionsModal && ! conditionsModal.hidden ) {
@@ -1166,7 +1180,7 @@
 			save();
 		}
 		if ( command && event.key.toLowerCase() === 'z' ) {
-			if ( treeRename?.input === event.target ) { return; }
+			if ( editing || modalOpen ) { return; }
 			event.preventDefault();
 			if ( event.shiftKey ) {
 				redo();

@@ -1,7 +1,7 @@
 /* WordPress's local editor, scoped to one Rich Text property. No content preset CSS. */
 ( function () {
 	'use strict';
-	function mount( { root, textarea, app, dynamicData, canVisual = true, canUpload = false, onSave, onError, restore } ) {
+	function mount( { root, textarea, app, dynamicData, canVisual = true, canUpload = false, onSave, onError, restore, isCurrent = () => true } ) {
 		if ( ! root || ! textarea ) { return null; }
 		const id = textarea.id, body = root.querySelector( '[data-rich-body]' ), bindingPanel = root.querySelector( '[data-rich-binding]' );
 		const label = root.querySelector( '[data-rich-source]' ), status = root.querySelector( '[data-rich-status]' );
@@ -10,16 +10,16 @@
 		const portalStyles = new Map( tokens.map( key => [ key, document.body.style.getPropertyValue( '--lieve-rich-' + key ) ] ) );
 		let editor = null, modeTabs = null, destroyed = false, syncing = false, initialized = false, bound = null, lastWritten = textarea.value;
 		function emit( value ) {
-			if ( destroyed || ! textarea.isConnected || value === lastWritten ) { return; }
+			if ( destroyed || ! isCurrent() || ! textarea.isConnected || value === lastWritten ) { return; }
 			lastWritten = value; textarea.value = value; syncing = true;
 			try { textarea.dispatchEvent( new Event( 'input', { bubbles: true } ) ); } finally { syncing = false; }
 		}
 		function writeVisual( event ) {
-			if ( event?.isComposing || destroyed || syncing || ! initialized || ! editor || editor.isHidden() || dynamicData?.parse( textarea.value ) ) { return; }
+			if ( event?.isComposing || destroyed || ! isCurrent() || syncing || ! initialized || ! editor || editor.isHidden() || dynamicData?.parse( textarea.value ) ) { return; }
 			emit( editor.getContent() );
 		}
 		function flush() {
-			if ( destroyed || syncing || ! textarea.isConnected || dynamicData?.parse( textarea.value ) ) { return; }
+			if ( destroyed || ! isCurrent() || syncing || ! textarea.isConnected || dynamicData?.parse( textarea.value ) ) { return; }
 			if ( editor && ! editor.isHidden() ) { if ( editor.isDirty() ) { writeVisual(); } }
 			else { emit( textarea.value ); }
 		}
@@ -76,9 +76,9 @@
 			return { mode: html ? 'html' : 'visual', focused, bookmark, start: textarea.selectionStart, end: textarea.selectionEnd, top: textarea.scrollTop };
 		}
 		function restoreView() {
-			if ( ! restore || bound ) { return; }
+			if ( ! restore || bound || ! isCurrent() ) { return; }
 			if ( restore.mode === 'html' ) { switchMode( 'html' ); }
-			if ( ! restore.focused ) { return; }
+			if ( ! restore.focused || document.activeElement !== document.body && ! root.contains( document.activeElement ) ) { return; }
 			const panel = root.closest( '[data-inspector-section]' ), top = panel?.scrollTop, left = panel?.scrollLeft;
 			if ( restore.mode === 'html' ) { textarea.focus( { preventScroll: true } ); textarea.setSelectionRange( restore.start || 0, restore.end || 0 ); textarea.scrollTop = restore.top || 0; }
 			else { editor.getBody().focus( { preventScroll: true } ); try { if ( restore.bookmark ) { editor.selection.moveToBookmark( restore.bookmark ); } } catch { /* Sanitized HTML may no longer contain an old bookmark. */ } }
@@ -91,6 +91,15 @@
 		const quicktagsEvent = 'quicktags-init.lieveRichText-' + id;
 		function quicktagsReady( event, instance ) { if ( ! destroyed && instance?.id === id ) { enhanceQuicktags(); } }
 		window.jQuery?.( document ).on( quicktagsEvent, quicktagsReady );
+		// WordPress nests its editor container in the tools. Move the bare container
+		// before TinyMCE creates its iframe: reparenting a live iframe reloads it.
+		const beforeVisualEvent = 'wp-before-tinymce-init.lieveRichText-' + id;
+		function arrangeContainer( event, settings ) {
+			if ( settings?.selector !== '#' + id ) { return; }
+			const wrap = root.querySelector( '.wp-editor-wrap' ), container = root.querySelector( '.wp-editor-container' );
+			if ( wrap && container && container.parentElement !== wrap ) { wrap.appendChild( container ); }
+		}
+		window.jQuery?.( document ).on( beforeVisualEvent, arrangeContainer );
 		textarea.addEventListener( 'input', syncField ); root.addEventListener( 'click', quicktagClick ); root.addEventListener( 'click', switchClick, true );
 		const themeObserver = typeof MutationObserver === 'function' ? new MutationObserver( syncTheme ) : null;
 		themeObserver?.observe( app, { attributes: true, attributeFilter: [ 'data-color-mode', 'style' ] } );
@@ -115,15 +124,15 @@
 						editor = instance;
 						instance.on( 'BeforeSetContent', event => { if ( dynamicData?.parse( event.content ) ) { event.content = ''; } } );
 						instance.on( 'init', () => {
-							if ( destroyed || ! textarea.isConnected ) { instance.remove(); return; }
+							if ( destroyed || ! isCurrent() || ! textarea.isConnected ) { instance.remove(); return; }
 							if ( bound ) { textarea.value = lastWritten; }
 							initialized = true; syncTheme(); syncField();
 							enhanceQuicktags();
 							instance.getBody().setAttribute( 'aria-label', 'Rich Text visual content' );
 							instance.getBody().setAttribute( 'role', 'textbox' ); instance.getBody().setAttribute( 'aria-multiline', 'true' );
 							// Override WordPress's post-form save shortcut, not its rich-text Undo.
-							instance.addShortcut( 'meta+s', 'Save page', () => { flush(); onSave?.(); } );
-							instance.addShortcut( 'ctrl+s', 'Save page', () => { flush(); onSave?.(); } );
+							instance.addShortcut( 'meta+s', 'Save page', () => { if ( ! destroyed && isCurrent() ) { flush(); onSave?.(); } } );
+							instance.addShortcut( 'ctrl+s', 'Save page', () => { if ( ! destroyed && isCurrent() ) { flush(); onSave?.(); } } );
 							restoreView();
 						} );
 						instance.on( 'input change compositionend Undo Redo', writeVisual );
@@ -133,10 +142,8 @@
 				} : false,
 			} );
 			// Keep view/data actions outside the hideable body, in one stable shared header.
-			const wrap = root.querySelector( '.wp-editor-wrap' ), container = root.querySelector( '.wp-editor-container' );
-			if ( wrap && container && container.parentElement !== wrap ) { wrap.appendChild( container ); }
 			const tabsHost = root.querySelector( '[data-rich-tabs]' ); modeTabs = root.querySelector( '.wp-editor-tabs' );
-			if ( tabsHost && modeTabs ) { tabsHost.appendChild( modeTabs ); root.querySelector( '.wp-editor-tools' )?.remove(); }
+			if ( tabsHost && modeTabs ) { tabsHost.appendChild( modeTabs ); const tools = root.querySelector( '.wp-editor-tools' ); if ( tools && ! tools.querySelector( '.wp-editor-container' ) ) { tools.remove(); } }
 			const visualTab = document.getElementById( id + '-tmce' ), codeTab = document.getElementById( id + '-html' );
 			if ( visualTab ) { visualTab.textContent = 'Visual'; } if ( codeTab ) { codeTab.textContent = 'HTML'; }
 			const htmlMode = initialized && editor?.isHidden();
@@ -146,10 +153,12 @@
 			// Editor-source keystrokes are already handled by the page's normal input/save path.
 			if ( ! visual ) { status.textContent = 'Visual editing is disabled in your WordPress profile. HTML editing remains available.'; status.hidden = false; }
 		} catch ( error ) { status.textContent = error.message; status.hidden = false; onError?.( error ); }
+		finally { window.jQuery?.( document ).off( beforeVisualEvent, arrangeContainer ); }
 		return {
 			flush, sync: syncField, capture,
 			destroy() {
 				if ( destroyed ) { return; } destroyed = true;
+				isCurrent = null;
 				window.jQuery?.( document ).off( quicktagsEvent, quicktagsReady );
 				themeObserver?.disconnect(); textarea.removeEventListener( 'input', syncField ); root.removeEventListener( 'click', quicktagClick ); root.removeEventListener( 'click', switchClick, true );
 				const value = textarea.value;
