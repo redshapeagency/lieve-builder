@@ -549,7 +549,7 @@
 			stats() { return { ...counters, state, listeners: listeners.length, observers: observer ? 1 : 0, buttons: buttons.size, pending: Boolean( pending ), measurements: measurements.slice(), controls: controls?.stats() || null }; },
 		} );
 	}
-	function createInputAdapter( { viewport, controller, onOutline = () => {}, onError = () => {}, drag = null, commands = null } ) {
+	function createInputAdapter( { viewport, controller, onOutline = () => {}, onError = () => {}, drag = null, commands = null, portals = null } ) {
 		let frame = viewport?.frame, doc = viewport?.document, canvas = viewport?.canvas;
 		let stage = viewport?.stage, host = frame?.parentElement, surface = null, state = 'created';
 		let outlineFrame = 0, epoch = 0, resumeAfterPageShow = false;
@@ -580,7 +580,7 @@
 			outlineFrame = window.requestAnimationFrame( () => {
 				if ( state !== 'mounted' || epoch !== generation ) { return; }
 				outlineFrame = 0; if ( ! validViewport() ) { return; }
-				try { onOutline(); } catch ( failure ) { suspend(); report( 'OUTLINE_FAILED' ); }
+				try { onOutline(); portals?.refresh(); } catch ( failure ) { suspend(); report( 'OUTLINE_FAILED' ); }
 			} );
 		}
 		function geometry( clientX, clientY ) {
@@ -672,24 +672,25 @@
 				host.appendChild( surface ); inputOwners.set( frame, lease ); state = 'mounted'; epoch++;
 				if ( drag && ! drag.mount( surface, resolveAt ) ) { throw error( 'DRAG_MOUNT_FAILED' ); }
 				if ( commands && ! commands.mount( surface, resolveAt, validViewport ) ) { throw error( 'COMMAND_MOUNT_FAILED' ); }
+				if ( portals && ! portals.mount( surface, validViewport ) ) { throw error( 'PORTAL_MOUNT_FAILED' ); }
 				listen( lifecycleListeners, window, 'pagehide', pageHide ); listen( lifecycleListeners, window, 'pageshow', pageShow ); attachInputs(); return true;
 			} catch ( failure ) { report( 'MOUNT_FAILED' ); destroy(); return false; }
 		}
 		function suspend() {
 			resumeAfterPageShow = false;
 			if ( state !== 'mounted' ) { return false; }
-			state = 'suspended'; epoch++; drag?.suspend(); commands?.suspend(); clear( inputListeners ); window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; return true;
+			state = 'suspended'; epoch++; drag?.suspend(); commands?.suspend(); portals?.suspend(); clear( inputListeners ); window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; return true;
 		}
 		function resume() {
 			if ( state !== 'suspended' ) { return state === 'mounted'; }
 			if ( ! validViewport() || surface?.parentElement !== host || inputOwners.get( frame ) !== lease ) { report( 'INVALID_VIEWPORT' ); return false; }
 			state = 'mounted'; epoch++;
-			try { drag?.resume(); commands?.resume(); attachInputs(); queueOutline(); return true; }
+			try { drag?.resume(); commands?.resume(); portals?.resume(); attachInputs(); queueOutline(); return true; }
 			catch ( failure ) { suspend(); report( 'RESUME_FAILED' ); return false; }
 		}
 		function destroy() {
 			if ( state === 'destroyed' ) { return; } state = 'destroyed'; epoch++; resumeAfterPageShow = false;
-			window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; drag?.destroy(); commands?.destroy(); drag = commands = null; clear( inputListeners ); clear( lifecycleListeners );
+			window.cancelAnimationFrame( outlineFrame ); outlineFrame = 0; drag?.destroy(); commands?.destroy(); portals?.destroy(); drag = commands = portals = null; clear( inputListeners ); clear( lifecycleListeners );
 			if ( inputOwners.get( frame ) === lease ) { inputOwners.delete( frame ); }
 			surface?.remove(); surface = frame = doc = canvas = stage = host = viewport = controller = onOutline = onError = null;
 		}

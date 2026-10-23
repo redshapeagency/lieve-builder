@@ -546,6 +546,9 @@
 		// CSS changes are applied locally, without a new REST request or preview flash.
 		const previewNode = previewNodeData( node );
 		const key = previewKey( node );
+		const previewModel = lieveContext.state.document;
+		const livePortalOwner = () => previewModel === lieveContext.state.document && lieveContext.findNode( lieveContext.state.document.children, node.id ) === node && previewKey( node ) === key;
+		const portalBinding = Object.freeze( { id: node.id, node, model: previewModel, root: visual, live: livePortalOwner, current: () => livePortalOwner() && canvasIdentity().active( visual ) } );
 		const old = lieveContext.previewJobs.get( node.id );
 		if ( old && old.key !== key ) { old.controller.abort(); window.clearTimeout( old.timer ); }
 		let phpRecord = lieveContext.executeCodePreview( node ) ? lieveContext.phpPreviewSources.get( node.id ) : null;
@@ -582,7 +585,7 @@
 			visual.querySelectorAll( 'style[data-lieve-styles]' ).forEach( ( item ) => item.remove() );
 			if ( exact || node.type === 'dropdown' ) { registerPreviewControls( node, visual ); }
 			window.LieveListings?.mount( visual, true );
-			window.LieveCodePreview?.mount( visual, { select: id => { lieveContext.closeContextMenu(); if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) selectElement( id ); }, contextMenu: ( id, x, y, origin ) => { if ( lieveContext.findNode( lieveContext.state.document.children, id ) ) { lieveContext.openContextMenu( id, x, y ); lieveContext.contextReturnFocus = origin; } }, resize: () => { updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); } } );
+			if ( exact ) { window.LieveCodePreview?.mount( visual, { binding: portalBinding, select: id => { if ( ! portalBinding.current() ) return; lieveContext.closeContextMenu(); selectElement( id ); }, contextMenu: ( id, x, y, origin ) => { if ( portalBinding.current() ) { lieveContext.openContextMenu( id, x, y ); lieveContext.contextReturnFocus = origin; } }, resize: () => { updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); } } ); }
 			revealSelectedPreview();
 			if ( visual.isConnected ) { renderCanvasStyles(); }
 		}

@@ -3,7 +3,9 @@
 	'use strict';
 	const channel = document.currentScript?.dataset.channel;
 	if ( ! channel ) return;
-	const send = ( type, data = {} ) => window.parent.postMessage( { lieveCodePreview: channel, type, ...data }, '*' );
+	let generation = null, sequence = 0, earlyError = null;
+	const send = ( type, data = {} ) => window.parent.postMessage( { lieveCodePreview: channel, generation, sequence: ++sequence, type, ...data }, '*' );
+	const reportError = message => { if ( generation ) send( 'error', { message } ); else earlyError = message; };
 	let pending = null, variables = [], revision = 0, parsed = false;
 	const measure = () => {
 		if ( pending ) return;
@@ -20,7 +22,10 @@
 	};
 	window.addEventListener( 'message', event => {
 		const data = event.data;
-		if ( event.source !== window.parent || ! data || data.lieveCodePreview !== channel || data.type !== 'context' || ! Number.isSafeInteger( data.revision ) || data.revision <= revision ) return;
+		if ( event.source !== window.parent || ! data || data.lieveCodePreview !== channel || data.type !== 'context' || ! /^[a-f0-9]{32}$/.test( data.generation || '' ) || ! Number.isSafeInteger( data.revision ) || data.revision <= ( data.generation === generation ? revision : 0 ) ) return;
+		if ( generation !== null && generation !== data.generation ) sequence = 0;
+		generation = data.generation;
+		if ( earlyError ) { reportError( earlyError ); earlyError = null; }
 		revision = data.revision;
 		variables.forEach( name => document.documentElement.style.removeProperty( name ) ); variables = [];
 		Object.entries( data.variables || {} ).slice( 0, 300 ).forEach( ( [ name, value ] ) => {
@@ -49,8 +54,14 @@
 	};
 	document.addEventListener( 'click', preventLinkNavigation, true );
 	document.addEventListener( 'auxclick', preventLinkNavigation, true );
-	document.addEventListener( 'pointerdown', () => send( 'select' ), true );
-	document.addEventListener( 'focusin', () => send( 'select' ) );
+	let pointerSelection = false;
+	document.addEventListener( 'pointerdown', event => { pointerSelection = event.isTrusted; if ( pointerSelection ) send( 'select' ); }, true );
+	// WebKit can omit the first pointerdown after native DnD. A real mouse
+	// press still selects only this portal's canonical owner; it is never DnD input.
+	document.addEventListener( 'mousedown', event => { if ( event.isTrusted && event.button === 0 && ! pointerSelection ) send( 'select' ); pointerSelection = false; }, true );
+	document.addEventListener( 'pointerup', () => { pointerSelection = false; }, true );
+	document.addEventListener( 'pointercancel', () => { pointerSelection = false; }, true );
+	document.addEventListener( 'focusin', event => { if ( event.isTrusted ) send( 'select' ); } );
 	// Context menus do not bubble out of an opaque-origin preview. Send only a
 	// local point; the editor supplies the owning node and permitted actions.
 	document.addEventListener( 'contextmenu', event => {
@@ -81,8 +92,8 @@
 			if ( canScroll( true, dx ) || canScroll( false, dy ) ) return;
 		}
 		event.preventDefault();
-		send( 'wheel', { deltaX: event.deltaX, deltaY: event.deltaY, deltaMode: event.deltaMode, shiftKey: event.shiftKey } );
+		send( 'wheel', { deltaX: event.deltaX, deltaY: event.deltaY, deltaMode: event.deltaMode, shiftKey: event.shiftKey, clientX: event.clientX, clientY: event.clientY } );
 	}, { passive: false } );
-	window.addEventListener( 'error', event => send( 'error', { message: String( event.message || 'JavaScript preview error.' ).slice( 0, 240 ) } ) );
-	window.addEventListener( 'unhandledrejection', () => send( 'error', { message: 'An asynchronous script failed in this preview.' } ) );
+	window.addEventListener( 'error', event => reportError( String( event.message || 'JavaScript preview error.' ).slice( 0, 240 ) ) );
+	window.addEventListener( 'unhandledrejection', () => reportError( 'An asynchronous script failed in this preview.' ) );
 } )();
