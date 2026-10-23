@@ -55,8 +55,8 @@
 	function canvasControls() {
 		if ( controlRegistry ) { return controlRegistry.api; }
 		let records = new Map(), tickets = new WeakMap(), destroyed = false, scheduled = false;
-		const subscribers = new Set(), allowed = new Set( [ 'empty-add', 'popup-backdrop', 'popup-close-settings', 'preview-details', 'preview-tab', 'preview-accordion', 'preview-slide-previous', 'preview-slide-next', 'preview-slide-index' ] );
-		const builds = [], navigations = [];
+		const subscribers = new Set(), allowed = new Set( [ 'empty-add', 'popup-backdrop', 'popup-close-settings', 'preview-details', 'preview-tab', 'preview-accordion', 'preview-slide-previous', 'preview-slide-next', 'preview-slide-index', 'preview-offcanvas-open', 'preview-offcanvas-close' ] );
+		const builds = [], navigations = [], offcanvasOperations = [];
 		function valid( record, checks = null ) {
 			if ( destroyed || ! record || record.model !== lieveContext.state.document || record.generation !== canvasIdentity().stats().generation ||
 				! record.element.isConnected || ! lieveContext.canvas.contains( record.element ) ) { return false; }
@@ -65,6 +65,10 @@
 			if ( checks && ! checks.has( record.guard ) ) { checks.set( record.guard, record.guard() ); }
 			if ( ! ( checks ? checks.get( record.guard ) : record.guard() ) ) { return false; }
 			const item = record.detail;
+			if ( item?.widget === 'offcanvas' ) {
+				return item.controls[ item.index ] === record.element && item.controls[0].parentElement === item.root &&
+					item.dialog.parentElement === item.root && item.controls[1].parentElement === item.dialog;
+			}
 			if ( item?.widget === 'slider' ) {
 				return item.controls[ item.index ] === record.element && record.element.parentElement === item.parent &&
 					( item.parent === item.root || item.parent.parentElement === item.root );
@@ -85,6 +89,7 @@
 			records.set( element, record ); tickets.set( ticket, record ); changed();
 		}
 		const labels = { 'empty-add': 'Add section', 'popup-backdrop': 'Edit popup settings', 'popup-close-settings': 'Edit popup close button', 'preview-details': 'Toggle details preview' };
+		const disabled = record => Boolean( record.element.disabled || record.kind === 'preview-offcanvas-close' && ! record.detail.dialog.hasAttribute( 'open' ) );
 		const api = Object.freeze( {
 			resolve( element ) {
 				if ( destroyed || element?.ownerDocument !== lieveContext.canvas.ownerDocument ) { return null; }
@@ -97,20 +102,28 @@
 				const result = [], checks = new Map();
 				for ( const [ element, record ] of records ) {
 					if ( valid( record, checks ) ) { const item = record.detail; result.push( Object.freeze( { ticket: record.ticket, kind: record.kind, label: item?.widget ? item.label : labels[ record.kind ], element,
-						expanded: record.kind === 'preview-details' ? Boolean( item.open ) : record.kind === 'preview-accordion' ? Boolean( item.details.open ) : null,
+						expanded: record.kind === 'preview-offcanvas-open' ? item.dialog.hasAttribute( 'open' ) : record.kind === 'preview-details' ? Boolean( item.open ) : record.kind === 'preview-accordion' ? Boolean( item.details.open ) : null,
 						selected: record.kind === 'preview-tab' ? item.controls[ item.index ].getAttribute( 'aria-selected' ) === 'true' : record.kind === 'preview-slide-index' ? item.slides.findIndex( slide => ! slide.hidden ) === item.slideIndex : null,
-						disabled: Boolean( element.disabled ), group: item?.widget === 'tabs' ? item.group : null } ) ); }
+						disabled: disabled( record ), group: item?.widget === 'tabs' ? item.group : null } ) ); }
 					else { records.delete( element ); tickets.delete( record.ticket ); }
 				}
 				return result;
 			},
-			current( ticket ) { const record = tickets.get( ticket ); return valid( record ) && ! record.element.disabled; },
+			current( ticket ) { const record = tickets.get( ticket ); return valid( record ) && ! disabled( record ); },
 			execute( ticket ) {
-				const record = tickets.get( ticket ); if ( ! valid( record ) || record.element.disabled ) { return false; }
+				const record = tickets.get( ticket ); if ( ! valid( record ) || disabled( record ) ) { return false; }
 				switch ( record.kind ) {
 					case 'empty-add': lieveContext.addBlock( 'section' ); break;
 					case 'popup-backdrop': lieveContext.openPopupSettings(); break;
 					case 'popup-close-settings': lieveContext.openPopupSettings( 'style', 'close' ); break;
+					case 'preview-offcanvas-open': case 'preview-offcanvas-close': {
+						const start = performance.now(), item = record.detail, open = record.kind === 'preview-offcanvas-open';
+						selectElement( canvasIdentity().resolve( record.anchor ).identity.selectId );
+						const selected = performance.now(); if ( ! valid( record ) || disabled( record ) ) { return false; }
+						setPreviewOffcanvasOpen( item.dialog, open );
+						if ( offcanvasOperations.length < 2000 ) { offcanvasOperations.push( { open, selectionMs: selected - start, ms: performance.now() - selected } ); }
+						updateSelectionOutline(); break;
+					}
 					case 'preview-slide-previous': case 'preview-slide-next': case 'preview-slide-index': {
 						const item = record.detail, previous = item.slides.findIndex( slide => ! slide.hidden );
 						selectElement( canvasIdentity().resolve( record.anchor ).identity.selectId );
@@ -136,7 +149,7 @@
 			},
 			subscribe( callback ) { if ( destroyed ) { return () => {}; } subscribers.add( callback ); return () => subscribers.delete( callback ); },
 			destroy() { destroyed = true; scheduled = false; records.clear(); tickets = new WeakMap(); subscribers.clear(); },
-			stats() { return { destroyed, controls: records.size, subscribers: subscribers.size, scheduled, widgetBuilds: builds.slice(), sliderNavigations: navigations.slice() }; },
+			stats() { return { destroyed, controls: records.size, subscribers: subscribers.size, scheduled, widgetBuilds: builds.slice(), sliderNavigations: navigations.slice(), offcanvasOperations: offcanvasOperations.slice() }; },
 		} );
 		controlRegistry = { api, register, changed, active: () => ! destroyed,
 			forget( anchor ) { for ( const [ element, record ] of records ) { if ( record.anchor === anchor ) { records.delete( element ); tickets.delete( record.ticket ); } } changed(); },
@@ -146,6 +159,10 @@
 		return api;
 	}
 	function togglePreviewDetails( details, previous = details.open ) { details.open = ! previous; }
+	function setPreviewOffcanvasOpen( dialog, open ) {
+		if ( ! dialog ) { return; }
+		if ( open ) { dialog.setAttribute( 'open', '' ); } else { dialog.removeAttribute( 'open' ); }
+	}
 	function activatePreviewTab( controls, panels, tab, target ) {
 		controls.forEach( button => { const active = button === tab; button.setAttribute( 'aria-selected', String( active ) ); button.tabIndex = active ? 0 : -1; } );
 		panels.forEach( panel => { panel.hidden = panel !== target; } );
@@ -158,9 +175,10 @@
 		dots.forEach( ( { element, index: position } ) => { if ( position === next ) { element.setAttribute( 'aria-current', 'true' ); } else { element.removeAttribute( 'aria-current' ); } } );
 	}
 	function registerPreviewControls( node, visual ) {
-		if ( ! controlRegistry?.active() || ! [ 'dropdown', 'tabs', 'accordion', 'tabs-nested', 'accordion-nested', 'slider' ].includes( node.type ) || ! canvasIdentity().active( visual ) || lieveContext.listingEditor?.enabled( node ) ) { return; }
+		if ( ! controlRegistry?.active() || ! [ 'dropdown', 'tabs', 'accordion', 'tabs-nested', 'accordion-nested', 'slider', 'offcanvas' ].includes( node.type ) || ! canvasIdentity().active( visual ) || lieveContext.listingEditor?.enabled( node ) ) { return; }
 		if ( ! visual.isConnected ) { queueMicrotask( () => { if ( visual.isConnected ) { registerPreviewControls( node, visual ); } } ); return; }
 		if ( lieveContext.findNode( lieveContext.state.document.children, node.id ) !== node ) { return; }
+		if ( node.type === 'offcanvas' ) { registerPreviewOffcanvas( node, visual ); return; }
 		if ( node.type === 'slider' ) { registerPreviewSlider( node, visual ); return; }
 		if ( node.type !== 'dropdown' ) { registerPreviewItems( node, visual ); return; }
 		// Replace only the built-in top-level summary. Authored descendants stay opaque.
@@ -168,6 +186,29 @@
 		if ( details?.nodeName !== 'DETAILS' || old?.nodeName !== 'SUMMARY' ) { return; }
 		const summary = visual.ownerDocument.createElement( 'summary' ); summary.textContent = old.textContent; old.replaceWith( summary );
 		controlRegistry.register( summary, 'preview-details', visual, () => summary.parentElement === details && details.parentElement === visual && lieveContext.findNode( lieveContext.state.document.children, node.id )?.type === 'dropdown', details );
+	}
+	function registerPreviewOffcanvas( node, visual ) {
+		const start = performance.now(), root = visual.firstElementChild, source = node.props?.label;
+		if ( source != null && typeof source !== 'string' || typeof lieveContext.styles?.elementNumber !== 'function' || visual.children.length !== 1 || root?.nodeName !== 'DIV' || root.children.length !== 2 ) { return; }
+		const label = source && source !== '0' ? source : 'Open panel', id = 'lieve-' + lieveContext.styles.elementNumber( node.id ) + '-dialog';
+		const oldOpen = root.children[0], oldDialog = root.children[1], oldClose = oldDialog.firstElementChild;
+		if ( label.includes( '{{' ) || oldOpen.nodeName !== 'BUTTON' || oldOpen.children.length || oldOpen.textContent !== label ||
+			oldDialog.nodeName !== 'DIALOG' || oldDialog.id !== id || oldOpen.getAttribute( 'data-lieve-open' ) !== id ||
+			oldClose?.nodeName !== 'BUTTON' || oldClose.children.length || ! oldClose.hasAttribute( 'data-lieve-dialog-close' ) ) { return; }
+		// This is a projection check, not HTML authentication. Create the entire fixed
+		// control set from the canonical model; only the panel body remains opaque.
+		const doc = visual.ownerDocument, opener = doc.createElement( 'button' ), dialog = doc.createElement( 'dialog' ), closer = doc.createElement( 'button' );
+		opener.type = closer.type = 'button'; opener.textContent = label; closer.textContent = oldClose.textContent;
+		dialog.id = id; opener.setAttribute( 'data-lieve-open', id ); closer.setAttribute( 'data-lieve-dialog-close', '' );
+		dialog.appendChild( closer ); Array.from( oldDialog.childNodes ).forEach( child => { if ( child !== oldClose ) { dialog.appendChild( child ); } } );
+		oldOpen.replaceWith( opener ); oldDialog.replaceWith( dialog );
+		const definition = previewKey( node ), controls = [ opener, closer ];
+		const current = () => root.parentElement === visual && root.children.length === 2 && root.children[0] === opener && root.children[1] === dialog && dialog.firstElementChild === closer &&
+			lieveContext.findNode( lieveContext.state.document.children, node.id ) === node && previewKey( node ) === definition;
+		controls.forEach( ( element, index ) => controlRegistry.register( element, index ? 'preview-offcanvas-close' : 'preview-offcanvas-open', visual, current, {
+			widget: 'offcanvas', index, controls, root, dialog, label: ( node.props?.editorLabel || 'Offcanvas' ) + ' — ' + ( index ? 'Close panel' : 'Open panel' ),
+		} ) );
+		controlRegistry.built( controls.length, start );
 	}
 	function registerPreviewItems( node, visual ) {
 		const start = performance.now(), nested = node.type.endsWith( '-nested' ), tabs = node.type.startsWith( 'tabs' ), root = visual.firstElementChild;
@@ -478,8 +519,8 @@
 			if ( !slides.length ) { return; } const index = control.hasAttribute('data-lieve-slide-index') ? Number(control.dataset.lieveSlideIndex) : current + ( control.hasAttribute( 'data-lieve-slide-next' ) ? 1 : -1 );
 			activatePreviewSlide( slides, index, slider.dataset.sliderLoop !== 'false', slider.querySelector( '[data-lieve-slide-status]' ), Array.from( slider.querySelectorAll( '[data-lieve-slide-index]' ), element => ( { element, index: Number( element.dataset.lieveSlideIndex ) } ) ) );
 		}
-		const opener = event.target.closest( '[data-lieve-open]' ); if ( opener ) { lieveContext.canvas.querySelector( '#' + window.CSS.escape( opener.dataset.lieveOpen ) )?.setAttribute( 'open', '' ); }
-		const closer = event.target.closest( '[data-lieve-dialog-close]' ); if ( closer ) { closer.closest( 'dialog' )?.removeAttribute( 'open' ); }
+		const opener = event.target.closest( '[data-lieve-open]' ); if ( opener ) { setPreviewOffcanvasOpen( lieveContext.canvas.querySelector( '#' + window.CSS.escape( opener.dataset.lieveOpen ) ), true ); }
+		const closer = event.target.closest( '[data-lieve-dialog-close]' ); if ( closer ) { setPreviewOffcanvasOpen( closer.closest( 'dialog' ), false ); }
 		window.requestAnimationFrame( updateSelectionOutline );
 	}
 

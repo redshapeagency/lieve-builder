@@ -542,7 +542,7 @@
 				surface.appendChild( bar ); state = 'mounted'; attach();
 				if ( window.MutationObserver ) {
 					observer = new window.MutationObserver( () => { if ( state !== 'mounted' ) { return; } if ( ! active() ) { suspend(); return; } sync(); } );
-					observer.observe( surface.parentElement, { childList: true } ); observer.observe( context.canvas, { childList: true, subtree: true, attributes: true, attributeFilter: [ 'disabled' ] } );
+					observer.observe( surface.parentElement, { childList: true } ); observer.observe( context.canvas, { childList: true, subtree: true, attributes: true, attributeFilter: [ 'disabled', 'open' ] } );
 				}
 				return true;
 			}, pointerDown, click, owns: target => Boolean( bar?.contains( target ) ), cancel() { pending = null; }, suspend, resume, destroy,
