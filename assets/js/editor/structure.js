@@ -3,12 +3,24 @@
 	window.LieveEditorControllers ||= {};
 	window.LieveEditorControllers[ 'structure' ] = function create( lieveContext ) {
 	let canvasDragHandoff = null, treeGeneration = 0;
+	// Application-lifetime presentation cache. Only renderer-created rows enter
+	// this map; a full render drops the previous model, paths and row references.
+	// Neither the map nor its selected-row projection is document authority.
+	let treeRows = null, treeProjection = null, structureDisposed = false;
 	// Passive creation seam: only closures installed on actual renderer-created rows
 	// can offer a source. Copied attributes/rows and native payloads cannot mint one.
 	function bindCanvasDrag( start ) {
-		if ( typeof start !== 'function' || canvasDragHandoff ) { return null; }
+		if ( structureDisposed || typeof start !== 'function' || canvasDragHandoff ) { return null; }
 		canvasDragHandoff = start;
 		return () => { if ( canvasDragHandoff === start ) { canvasDragHandoff = null; } };
+	}
+	// Terminal application teardown only. Persisted pagehide retains its current
+	// projection; a later render still verifies every exact model/path reference.
+	function destroyStructure() {
+		if ( structureDisposed ) { return; } structureDisposed = true; treeGeneration++;
+		treeProjection = null; treeRows = null; canvasDragHandoff = null;
+		lieveContext.treeRename?.deactivate(); lieveContext.treeRename = null;
+		clearTreeDragMotion(); clearTreeDragPreview(); clearTreeDropPlaceholder();
 	}
 	function renameElement( id, value ) {
 		const node = lieveContext.findNode( lieveContext.state.document.children, id ); if ( ! node ) { return false; }
@@ -32,7 +44,7 @@
 		row.insertBefore( input, select.nextSibling ); let finished = false;
 		const finish = ( apply, focus = false ) => {
 			if ( finished ) { return; } finished = true; lieveContext.treeRename = null;
-			const owned = current(), changed = apply && owned && renameElement( id, input.value ); if ( ! changed ) { renderStructure(); }
+			const owned = current(), changed = apply && owned && renameElement( id, input.value ); if ( ! changed ) { renderStructure( true ); }
 			if ( focus && owned ) { lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( id ) + '"] .lieve-tree-select' )?.focus(); }
 		};
 		lieveContext.treeRename = { id, input, finish, current, deactivate: () => { finished = true; } };
@@ -239,12 +251,16 @@
 			if ( ! lieveContext.state.draggingId || lieveContext.treeHoverId !== id || lieveContext.treeDropIntent?.parentId !== id || lieveContext.treeDropIntent.mode !== 'inside' ) { return; }
 			const node = lieveContext.findNode( lieveContext.state.document.children, id ); const branch = lieveContext.structure.querySelector( '.lieve-tree-branch[data-id="' + window.CSS.escape( id ) + '"]' );
 			if ( ! branch || ! node?.children?.length ) { return; }
+			const owner = treeRows?.get( id ); if ( owner && ! owner.current() ) { return; }
+			// Hover expansion keeps the drag source alive, but changes the visible
+			// projection. The next normal render must rebuild the complete cache.
+			treeProjection = null;
 			lieveContext.state.collapsedIds.delete( id ); lieveContext.treeHoverId = null;
 			const children = document.createElement( 'div' ); children.className = 'lieve-tree-children'; children.setAttribute( 'role', 'group' );
 			branch.appendChild( children );
 			const ancestors = []; let current = node;
 			while ( current ) { const parent = lieveContext.findParent( lieveContext.state.document.children, current.id ); const siblings = parent ? parent.children : lieveContext.state.document.children; ancestors.unshift( siblings.at( -1 )?.id !== current.id ); current = parent; }
-			renderTreeBranch( node.children, lieveContext.nodeDepth( id ) + 1, children, ancestors, id );
+			renderTreeBranch( node.children, lieveContext.nodeDepth( id ) + 1, children, ancestors, id, owner?.path || [] );
 			branch.querySelector( '.lieve-tree-toggle' )?.setAttribute( 'aria-expanded', 'true' );
 			branch.querySelector( ':scope > .lieve-tree-row[data-id]' )?.setAttribute( 'aria-expanded', 'true' );
 			showTreeDropPlaceholder( lieveContext.treeDropIntent );
@@ -340,10 +356,15 @@
 	}
 
 	function renderTreeBranch( nodes, depth, fragment, ancestors = [], parentId = null, dragPath = [] ) {
+		if ( structureDisposed ) { return; }
 		nodes.forEach( ( node, index ) => {
 			const branch = document.createElement( 'div' ); branch.className = 'lieve-tree-branch';
 			branch.dataset.id = node.id; branch.dataset.parentId = parentId || ''; branch.dataset.depth = depth;
 			const row = document.createElement( 'div' );
+			let toggleCurrent = null;
+			const sourceModel = lieveContext.state.document, sourceGeneration = treeGeneration, sourceId = node.id, sourcePath = [ ...dragPath, { nodes, node, index } ];
+			const currentRow = () => ! structureDisposed && sourceModel === lieveContext.state.document && sourceGeneration === treeGeneration && node.id === sourceId && row.isConnected && lieveContext.structure.contains( row ) && row.parentNode === branch && sourceModel.children === sourcePath[0].nodes && sourcePath.every( ( link, at ) => link.nodes[ link.index ] === link.node && ( ! at || sourcePath[ at - 1 ].node.children === link.nodes ) );
+			const rejectStaleRow = event => { if ( currentRow() ) { return false; } if ( event.key !== 'Tab' ) { event.preventDefault(); } event.stopPropagation(); return true; };
 			row.className = 'lieve-tree-row' + ( depth === 0 ? ' is-root' : '' ) + ( lieveContext.state.selectedId === node.id ? ' is-selected' : '' );
 			row.dataset.id = node.id;
 			row.dataset.depth = depth;
@@ -376,6 +397,7 @@
 				toggle.setAttribute( 'aria-label', 'Toggle ' + name + ' children' );
 				toggle.setAttribute( 'aria-expanded', String( ! lieveContext.state.collapsedIds.has( node.id ) ) );
 				const toggleBranch = () => {
+					if ( ! currentRow() ) { return; }
 					if ( lieveContext.state.collapsedIds.has( node.id ) ) {
 						lieveContext.state.collapsedIds.delete( node.id );
 					} else {
@@ -384,10 +406,20 @@
 					renderStructure();
 					lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( node.id ) + '"] .lieve-tree-toggle' )?.focus();
 				};
+				toggleCurrent = toggleBranch;
 				toggle.addEventListener( 'click', toggleBranch );
 				toggle.addEventListener( 'pointerdown', ( event ) => {
+					if ( rejectStaleRow( event ) ) { return; }
 					if ( ! lieveContext.treeRename || event.button !== 0 ) { return; }
-					event.preventDefault(); lieveContext.treeRename.finish( true ); toggleBranch();
+					event.preventDefault(); lieveContext.treeRename.finish( true );
+					if ( currentRow() ) { toggleBranch(); }
+					else {
+						// Confirming rename synchronously rebuilt this same model. Use
+						// its freshly created disclosure, never revive the old callback
+						// or hand an identically named replacement model its authority.
+						const fresh = treeRows?.get( sourceId );
+						if ( sourceModel === lieveContext.state.document && fresh?.node === node && fresh.current() ) { fresh.toggle?.(); }
+					}
 				} );
 				row.appendChild( toggle );
 			} else {
@@ -400,6 +432,7 @@
 			select.setAttribute( 'aria-label', 'Select ' + name );
 			select.innerHTML = '<span class="lieve-tree-icon" aria-hidden="true">' + lieveContext.elementIcon( node.type ) + '</span><span class="lieve-tree-label" title="' + lieveContext.escapeHtml( name + ' · Click to rename' ) + '">' + lieveContext.escapeHtml( name ) + '</span>';
 			select.addEventListener( 'pointerdown', ( event ) => {
+				if ( rejectStaleRow( event ) ) { return; }
 				// Confirm before blur rebuilds the tree and removes the clicked row.
 				if ( ! lieveContext.treeRename || event.button !== 0 ) { return; }
 				event.preventDefault();
@@ -407,6 +440,7 @@
 				else { lieveContext.treeRename.finish( true ); lieveContext.selectElement( node.id ); }
 			} );
 			select.addEventListener( 'click', ( event ) => {
+				if ( rejectStaleRow( event ) ) { return; }
 				if ( event.target.closest( '.lieve-tree-label' ) ) { beginTreeRename( node.id ); return; }
 				lieveContext.selectElement( node.id );
 				lieveContext.canvas.querySelector( '.lieve-editor-node[data-id="' + window.CSS.escape( node.id ) + '"]' )?.scrollIntoView( { block: 'center' } );
@@ -418,24 +452,24 @@
 			const actions = document.createElement( 'button' ); actions.type = 'button'; actions.className = 'lieve-tree-actions';
 			actions.setAttribute( 'aria-label', 'Actions for ' + name ); actions.setAttribute( 'aria-haspopup', 'menu' );
 			actions.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="13" cy="8" r="1.2"/></svg>';
-			actions.addEventListener( 'pointerdown', ( event ) => { if ( lieveContext.treeRename && event.button === 0 ) { event.preventDefault(); } } );
+			actions.addEventListener( 'pointerdown', ( event ) => { if ( rejectStaleRow( event ) ) { return; } if ( lieveContext.treeRename && event.button === 0 ) { event.preventDefault(); } } );
 			actions.addEventListener( 'click', ( event ) => {
+				if ( rejectStaleRow( event ) ) { return; }
 				event.stopPropagation(); const bounds = actions.getBoundingClientRect(); lieveContext.openContextMenu( node.id, bounds.right, bounds.bottom );
 				lieveContext.contextReturnFocus = lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( node.id ) + '"] .lieve-tree-actions' );
 			} );
 			row.appendChild( actions );
+			row.addEventListener( 'contextmenu', rejectStaleRow, true );
 			row.addEventListener( 'keydown', event => {
-				if ( sourceModel !== lieveContext.state.document || sourceGeneration !== treeGeneration || ! row.isConnected || sourceModel.children !== sourcePath[0].nodes || ! sourcePath.every( ( link, at ) => link.nodes[ link.index ] === link.node && ( ! at || sourcePath[ at - 1 ].node.children === link.nodes ) ) ) {
-					if ( event.key !== 'Tab' ) { event.preventDefault(); } event.stopPropagation(); return;
-				}
+				if ( rejectStaleRow( event ) ) { return; }
 				handleTreeKeyDown( event, node );
 			}, true );
 			row.addEventListener( 'dragstart', ( event ) => {
+				if ( rejectStaleRow( event ) ) { return; }
 				if ( event.target.closest( '.lieve-tree-toggle, .lieve-tree-actions, .lieve-tree-rename' ) ) { event.preventDefault(); return; }
 				if ( canvasDragHandoff ) {
 					if ( canvasDragHandoff( event, Object.freeze( { kind: 'move', id: sourceId, node, element: row,
-					current: () => sourceGeneration === treeGeneration && sourceModel === lieveContext.state.document && row.isConnected && lieveContext.structure.contains( row ) &&
-							node.id === sourceId && sourceModel.children === sourcePath[0].nodes && sourcePath.every( ( link, at ) => link.nodes[ link.index ] === link.node && ( ! at || sourcePath[ at - 1 ].node.children === link.nodes ) ) && sourcePath.at( -2 )?.node.type !== 'component',
+					current: () => currentRow() && sourcePath.at( -2 )?.node.type !== 'component',
 					} ) ) ) { if ( ! event.defaultPrevented && event.dataTransfer?.setDragImage ) { setTreeDragPreview( row, event ); } event.stopPropagation(); return; }
 				}
 				event.stopPropagation();
@@ -449,8 +483,8 @@
 				// Applying it during dragstart can cancel Chrome's drag session.
 				window.setTimeout( () => { if ( lieveContext.state.draggingId === node.id && lieveContext.structure.contains( branch ) ) { branch.classList.add( 'is-dragging' ); } }, 0 );
 			} );
-			const sourceModel = lieveContext.state.document, sourceGeneration = treeGeneration, sourceId = node.id, sourcePath = [ ...dragPath, { nodes, node, index } ];
 			row.addEventListener( 'dragend', () => {
+				if ( ! currentRow() ) { return; }
 				lieveContext.state.draggingId = null;
 				clearTreeDragMotion();
 				clearTreeDragPreview();
@@ -458,6 +492,7 @@
 				lieveContext.clearDropIndicators();
 			} );
 			branch.appendChild( row ); fragment.appendChild( branch );
+			treeRows?.set( sourceId, { row, branch, node, path: sourcePath, current: currentRow, toggle: toggleCurrent } );
 			if ( childCount && ! lieveContext.state.collapsedIds.has( node.id ) ) {
 				const children = document.createElement( 'div' ); children.className = 'lieve-tree-children'; children.setAttribute( 'role', 'group' ); branch.appendChild( children );
 				renderTreeBranch( node.children, depth + 1, children, [ ...ancestors, index < nodes.length - 1 ], node.id, sourcePath );
@@ -465,7 +500,33 @@
 		} );
 	}
 
-	function renderStructure() {
+	function renderStructure( force = false ) {
+		if ( structureDisposed ) { return; }
+		// Compare exact canonical references and the complete presentation shape,
+		// including hidden descendants. No JSON snapshot, DOM identity inference,
+		// recursive findNode per row, or mutation of document/history is needed.
+		const sameTree = treeProjection && treeProjection.model === lieveContext.state.document && treeProjection.roots === lieveContext.state.document.children && treeProjection.shape.every( item =>
+			item.nodes.length === item.length && item.nodes[ item.index ] === item.node && item.node.id === item.id && item.node.type === item.type && item.node.children === item.children && ( item.children?.length || 0 ) === item.count &&
+			( item.node.props?.editorLabel || lieveContext.labels[ item.node.type ] || item.node.type ) === item.name && lieveContext.canNest( item.node.type ) === item.nestable && lieveContext.state.collapsedIds.has( item.id ) === item.collapsed
+		) && Array.from( treeRows.values() ).every( item => item.current() && item.branch.parentNode === item.parent );
+		// Legacy child-document callbacks can leave Firefox's native focus scope
+		// stuck in the composition frame when its active parent controls survive.
+		// Preserve the existing full-render/focus contract for that exact owned
+		// frame; parent-owned input and Structure keyboard keep the delta path.
+		if ( ! force && sameTree && document.activeElement !== lieveContext.viewport?.frame && ! lieveContext.treeRename && ! lieveContext.state.draggingId && ! lieveContext.treeDragPreview && ! lieveContext.treeDropPlaceholder && ! lieveContext.treeScrollFrame && ! lieveContext.treeHoverTimer && ! lieveContext.treeDragPointer && ! lieveContext.structure.classList.contains( 'is-dragging' ) ) {
+			// Selection-only projection: canonical state remains the single source.
+			// Keep the actual focused control/caret, geometry and scroll untouched.
+			const selected = treeRows.get( lieveContext.state.selectedId )?.row || null;
+			if ( treeProjection.selected !== selected ) {
+				if ( treeProjection.selected ) { treeProjection.selected.classList.remove( 'is-selected' ); treeProjection.selected.setAttribute( 'aria-selected', 'false' ); }
+				if ( selected ) { selected.classList.add( 'is-selected' ); selected.setAttribute( 'aria-selected', 'true' ); }
+				treeProjection.selected = selected;
+			}
+			const entry = selected || treeRows.values().next().value?.row;
+			if ( treeProjection.entry !== entry ) { if ( treeProjection.entry ) { treeProjection.entry.tabIndex = -1; } if ( entry ) { entry.tabIndex = 0; } treeProjection.entry = entry; }
+			return;
+		}
+		treeProjection = null; treeRows = new Map();
 		treeGeneration++;
 		const panel = lieveContext.structure.parentElement; const scrollTop = panel.scrollTop; const scrollLeft = panel.scrollLeft;
 		const active = lieveContext.structure.contains( document.activeElement ) ? document.activeElement : null;
@@ -489,7 +550,12 @@
 		rows.forEach( row => { row.tabIndex = row === entry ? 0 : -1; } );
 		panel.scrollTop = scrollTop; panel.scrollLeft = scrollLeft;
 		if ( focusId && ! active.matches( 'input' ) ) { lieveContext.structure.querySelector( '.lieve-tree-row[data-id="' + window.CSS.escape( focusId ) + '"] ' + focusClass )?.focus( { preventScroll: true } ); }
+		const shape = [];
+		const capture = nodes => nodes.forEach( ( node, index ) => { shape.push( { node, nodes, index, length: nodes.length, id: node.id, type: node.type, children: node.children, count: node.children?.length || 0, name: node.props?.editorLabel || lieveContext.labels[ node.type ] || node.type, nestable: lieveContext.canNest( node.type ), collapsed: lieveContext.state.collapsedIds.has( node.id ) } ); if ( node.children?.length ) { capture( node.children ); } } );
+		capture( lieveContext.state.document.children );
+		treeRows.forEach( item => { item.parent = item.branch.parentNode; } );
+		treeProjection = { model: lieveContext.state.document, roots: lieveContext.state.document.children, shape, selected: treeRows.get( lieveContext.state.selectedId )?.row || null, entry };
 	}
-	return { bindCanvasDrag, renameElement, beginTreeRename, clearTreeDragPreview, setTreeDragPreview, clearTreeDropPlaceholder, treeDropDestination, validTreeDrop, treeDropChangesPosition, treeDropPosition, treeRowDropPosition, resolveTreeDrop, showTreeDropPlaceholder, clearTreeDragMotion, updateTreeHover, treeScrollVelocity, scrollTreeDrag, moveTreeElement, applyTreeDrop, handleTreeDragOver, handleTreeDrop, cancelTreeDrag, handleTreeKeyDown, renderTreeBranch, renderStructure };
+	return { bindCanvasDrag, destroy: destroyStructure, renameElement, beginTreeRename, clearTreeDragPreview, setTreeDragPreview, clearTreeDropPlaceholder, treeDropDestination, validTreeDrop, treeDropChangesPosition, treeDropPosition, treeRowDropPosition, resolveTreeDrop, showTreeDropPlaceholder, clearTreeDragMotion, updateTreeHover, treeScrollVelocity, scrollTreeDrag, moveTreeElement, applyTreeDrop, handleTreeDragOver, handleTreeDrop, cancelTreeDrag, handleTreeKeyDown, renderTreeBranch, renderStructure };
 	};
 } )();
