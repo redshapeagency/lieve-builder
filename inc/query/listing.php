@@ -171,7 +171,10 @@ function lieve_render_listing( $node, $attributes ) {
 				$aliases = array(); $children = lieve_listing_instances( $node['children'] ?? array(), $GLOBALS['lieve_listing_instance_scope'], $aliases );
 				$GLOBALS['lieve_document_element_ids'] = array_replace( $before['lieve_document_element_ids'] ?? array(), $aliases );
 				$children = lieve_listing_remap_references( $children, $aliases );
+				$projection = $preview ? ( $GLOBALS['lieve_editor_listing_projection'] ?? null ) : null;
+				if ( $projection instanceof Lieve_Editor_Listing_Projection ) { $projection->begin_item( $node, $type, $item_id, $index + 1 ); }
 				echo '<div data-lieve-listing-item data-listing-position="' . ( $index + 1 ) . '"' . ( 'slider' === $listing['mode'] ? ' role="group" aria-roledescription="slide" aria-label="' . esc_attr( ( $index + 1 ) . ' of ' . count( $items ) ) . '"' : '' ) . '>'; lieve_render_nodes( $children ); echo '</div>';
+				if ( $projection instanceof Lieve_Editor_Listing_Projection ) { $projection->end_item( $node ); }
 			}
 			echo '</div>';
 			if ( $preview && ( count( $items ) > $cap || $limited ) ) { echo '<p data-editor-ui class="lieve-editor-preview-message">Preview limited to ' . ( $limited ? 'the rendering budget' : $cap . ' items' ) . '. The saved model is unchanged.</p>'; }

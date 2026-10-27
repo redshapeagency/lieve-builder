@@ -3,17 +3,19 @@
 	/** Trusted renderer registrations only. Never infer identity from authored attributes. */
 	function createCanvasIdentity( { root, readDocument } ) {
 		let records = new WeakMap(), owners = new WeakMap(), model = readDocument();
+		const guarded = new Set();
 		let generation = 0, sequence = 0, registrations = 0, destroyed = false;
 		const validOwner = owner => {
 			if ( destroyed || ! owner || ! owners.has( owner ) || owners.get( owner ).generation !== generation || model !== readDocument() ) { return false; }
-			for ( let item = owner; item; item = owners.get( item ).parent ) { if ( ! owners.get( item ).active ) { return false; } }
+			for ( let item = owner; item; item = owners.get( item ).parent ) { const record = owners.get( item ); if ( ! record.active || record.current && ! record.current() ) { return false; } }
 			return true;
 		};
 		const result = ( status, reason, identity = null, via = null ) => Object.freeze( { status, reason, identity, via } );
-		function owner( identity, parent = null ) {
+		function owner( identity, parent = null, current = null ) {
 			if ( destroyed || parent && ! validOwner( parent ) ) { throw new Error( 'Inactive canvas identity owner.' ); }
 			const token = Object.freeze( {} );
-			owners.set( token, { generation, active: true, parent, identity: Object.freeze( { ...identity, context: Object.freeze( { ...identity.context } ), instance: ++sequence } ) } ); return token;
+			const record = { generation, active: true, parent, current, identity: Object.freeze( { ...identity, context: Object.freeze( { ...identity.context } ), instance: ++sequence } ) };
+			owners.set( token, record ); if ( current ) { guarded.add( record ); } return token;
 		}
 		function register( element, token, policy = 'self' ) {
 			if ( ! validOwner( token ) || element?.nodeType !== 1 || ! [ 'self', 'descendants', 'opaque' ].includes( policy ) ) { throw new Error( 'Invalid canvas identity registration.' ); }
@@ -36,14 +38,23 @@
 			}
 			return result( 'unmanaged', 'unregistered-node' );
 		}
+		function invalidateMany( elements ) {
+			const revoked = new Set();
+			for ( const element of elements ) { const record = owners.get( records.get( element )?.token ); if ( record ) { record.active = false; revoked.add( record ); } }
+			if ( ! revoked.size ) { return; }
+			// Release guards, which may capture model/DOM references, while preserving
+			// weak stale tombstones. Cleanup is bounded, never part of pointer movement.
+			for ( const record of guarded ) { for ( let ancestor = record; ancestor; ancestor = owners.get( ancestor.parent ) ) { if ( revoked.has( ancestor ) ) { record.current = null; guarded.delete( record ); break; } } }
+		}
 		return Object.freeze( {
 			owner, register, resolve,
+			ownerFor( element ) { const token = records.get( element )?.token; return validOwner( token ) ? token : null; },
 			active( element ) { return validOwner( records.get( element )?.token ); },
 			parent( element ) { return owners.get( records.get( element )?.token )?.parent || null; },
-			invalidate( element ) { const token = owners.get( records.get( element )?.token ); if ( token ) { token.active = false; } },
-			reset() { if ( destroyed ) { return; } generation++; model = readDocument(); },
-			destroy() { destroyed = true; records = new WeakMap(); owners = new WeakMap(); root = model = readDocument = null; },
-			stats() { return Object.freeze( { generation, registrations, instances: sequence, destroyed } ); },
+			invalidateMany, invalidate( element ) { invalidateMany( [ element ] ); },
+			reset() { if ( destroyed ) { return; } guarded.forEach( record => { record.current = null; } ); guarded.clear(); generation++; model = readDocument(); },
+			destroy() { destroyed = true; guarded.clear(); records = new WeakMap(); owners = new WeakMap(); root = model = readDocument = null; },
+			stats() { return Object.freeze( { generation, registrations, instances: sequence, guards: guarded.size, destroyed } ); },
 		} );
 	}
 	window.LieveCanvasIdentity = Object.freeze( { create: createCanvasIdentity } );
@@ -51,6 +62,151 @@
 	window.LieveEditorControllers[ 'canvas' ] = function create( lieveContext ) {
 	let identityRegistry = null;
 	let controlRegistry = null;
+	let listingProjection = null;
+	function listingAuthorityKey( node ) {
+		const value = previewNodeData( node );
+		// These owner-only properties are compiled locally by the existing Style
+		// and Listing controls. They cannot change query results or model edges.
+		delete value.props.styles;
+		if ( value.props.listing ) { delete value.props.listing.layout; }
+		return JSON.stringify( value );
+	}
+	/** Passive renderer capability; only the guarded experimental coordinator opts in. */
+	function canvasListingProjection() {
+		if ( listingProjection ) { return listingProjection.api; }
+		let records = new WeakMap(), leases = new WeakMap(), roots = new Map(), chosen = null, preference = null, dead = false;
+		const cache = new Map(), pending = new Set(), hosts = new Map();
+		const counts = { mounts: 0, nodes: 0, denied: 0, buildMs: 0, selections: 0 };
+		const containers = new Set( [ 'section', 'container', 'block', 'div', 'slot' ] );
+		const signature = node => previewKey( node ) + '|query:' + ( lieveContext.config.queryRevision || '' );
+		const sameResult = ( a, b ) => a && b && a.owner === b.owner && a.query === b.query && a.type === b.type && a.result === b.result;
+		function current( record ) { return ! dead && record.live() && record.element.isConnected && record.element.parentElement === record.parent && canvasIdentity().active( record.element ); }
+		function choose( record ) {
+			if ( ! current( record ) ) { counts.denied++; return false; }
+			chosen = record; preference = record.occurrence; lieveContext.selectedListingPosition = String( record.occurrence.position ); counts.selections++; return true;
+		}
+		function at( element ) {
+			for ( let node = element; node && node !== lieveContext.canvas; node = node.parentElement ) {
+				const record = records.get( node ); if ( record ) { return current( record ) ? record : null; }
+			}
+			return null;
+		}
+		function select( id, element ) {
+			if ( element ) {
+				const identity = canvasIdentity().resolve( element );
+				if ( ! [ 'resolved', 'opaque', 'canvas' ].includes( identity.status ) ) { counts.denied++; return false; }
+				if ( identity.identity?.context?.listingOccurrence ) {
+					const record = at( element ); return record?.node.id === id && choose( record );
+				}
+			}
+			const candidates = roots.get( id ) || [];
+			const record = candidates.find( item => current( item ) && sameResult( item.occurrence, preference ) ) || candidates.find( current );
+			if ( record ) { return choose( record ); }
+			chosen = null; preference = null; lieveContext.selectedListingPosition = null; return true;
+		}
+		function outline() {
+			const id = lieveContext.state.selectedId;
+			if ( ! roots.has( id ) ) { return null; }
+			if ( ! chosen || chosen.node.id !== id || ! current( chosen ) ) {
+				const record = ( roots.get( id ) || [] ).find( item => current( item ) && ( ! preference || sameResult( item.occurrence, preference ) ) );
+				if ( record ) { choose( record ); } else { chosen = null; lieveContext.selectedListingPosition = null; return []; }
+			}
+			return chosen.bounds.filter( element => element.isConnected && ( chosen.element.contains( element ) || records.get( element ) === chosen ) );
+		}
+		function reset() { pending.forEach( job => job.abort() ); pending.clear(); canvasIdentity().invalidateMany( hosts.values() ); hosts.clear(); records = new WeakMap(); leases = new WeakMap(); roots = new Map(); chosen = null; }
+		async function load( node, visual ) {
+			if ( dead || canvasIdentity().stats().destroyed ) { return; }
+			const model = lieveContext.state.document, key = signature( node ), generation = canvasIdentity().stats().generation;
+			const authority = listingAuthorityKey( node ), queryRevision = lieveContext.config.queryRevision;
+			const previous = hosts.get( node.id ); if ( previous && previous !== visual ) { canvasIdentity().invalidate( previous ); leases.delete( previous ); }
+			hosts.set( node.id, visual );
+			const lease = Object.freeze( {} ); leases.set( visual, lease );
+			const obsolete = [];
+			for ( const [ id, entries ] of roots ) { const retained = entries.filter( entry => { if ( entry.occurrence.owner !== node.id ) { return true; } obsolete.push( entry.element ); return false; } ); if ( retained.length ) { roots.set( id, retained ); } else { roots.delete( id ); } }
+			canvasIdentity().invalidateMany( obsolete );
+			const live = () => ! dead && leases.get( visual ) === lease && model === lieveContext.state.document && generation === canvasIdentity().stats().generation && lieveContext.findNode( model.children, node.id ) === node && listingAuthorityKey( node ) === authority && lieveContext.config.queryRevision === queryRevision;
+			const controller = new AbortController(); pending.add( controller );
+			try {
+				let result = cache.get( key );
+				if ( ! result ) {
+					const response = await ( window.LieveTransport?.fetch || fetch )( lieveContext.config.elementPreviewUrl, { method: 'POST', credentials: 'same-origin', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': lieveContext.config.nonce }, body: JSON.stringify( { node: previewNodeData( node ), listingProjection: true } ) } );
+					result = await response.json(); if ( ! response.ok ) { throw new Error( result.message || 'Preview unavailable.' ); }
+					if ( ! live() || controller.signal.aborted ) { return; }
+					if ( cache.size >= 20 ) { cache.delete( cache.keys().next().value ); } cache.set( key, result );
+				}
+				if ( ! live() || controller.signal.aborted ) { return; }
+				const started = performance.now(), data = result.listingProjection, registry = canvasIdentity(), parentOwner = registry.ownerFor( visual );
+				if ( ! parentOwner ) { counts.denied++; return; }
+				let budget = 3000;
+				const validTree = ( projected, canonical ) => Array.isArray( projected ) && projected.length === ( canonical || [] ).length && projected.every( ( item, index ) => {
+					const expected = canonical[ index ], container = containers.has( expected.type ) && ! lieveContext.listingEditor.enabled( expected );
+					return --budget >= 0 && item.id === expected.id && item.type === expected.type && item.kind === ( container ? 'container' : 'opaque' ) && ( container ? item.shell && validTree( item.children, expected.children ) : typeof item.html === 'string' );
+				} );
+				const seen = new Set();
+				if ( typeof result.html !== 'string' || ! data || data.version !== 1 || data.owner !== node.id || data.query !== node.props.listing.query || data.revision !== lieveContext.config.queryRevision || ! Array.isArray( data.items ) || data.items.length > 20 || JSON.stringify( data ).length > 1048576 || ! data.items.every( ( item, index ) => {
+					const identity = item.type + ':' + item.result;
+					if ( seen.has( identity ) ) { return false; } seen.add( identity );
+					return [ 'posts', 'current', 'terms', 'users', 'comments' ].includes( item.type ) && /^[1-9][0-9]*$/.test( item.result ) && item.position === index + 1 && Number.isSafeInteger( item.count ) && item.count >= data.items.length && validTree( item.children, node.children );
+				} ) ) { throw new Error( 'Listing preview provenance is unavailable. Refresh the query library and try again.' ); }
+				const shell = ( type, attributes ) => {
+					const element = document.createElement( type === 'section' ? 'section' : 'div' );
+					for ( const key of [ 'id', 'class', 'style', 'data-lieve-id', 'data-lieve-node', 'data-lieve-listing-source', 'data-lieve-listing', 'data-listing-mode', 'data-listing-autoplay', 'data-listing-interval', 'data-listing-advance', 'data-listing-rewind', 'data-listing-drag', 'data-listing-scrollbar', 'data-listing-motion', 'role', 'aria-label' ] ) { if ( typeof attributes?.[ key ] === 'string' ) { element.setAttribute( key, attributes[ key ] ); } }
+					return element;
+				};
+				const fragment = document.createDocumentFragment(), parsed = document.createElement( 'template' ); parsed.innerHTML = result.html || '';
+				parsed.content.querySelectorAll( 'style' ).forEach( style => fragment.appendChild( style.cloneNode( true ) ) );
+				const root = shell( node.type, data.shell ), track = document.createElement( 'div' ); track.dataset.lieveListingTrack = ''; root.appendChild( track ); fragment.appendChild( root );
+				prepareEditorRoot( root, node, false, true ); // Presentation/compiler hooks; never identity authority.
+				root.removeAttribute( 'style' ); // Owner styles follow the existing local editor compiler.
+				window.LieveListings?.destroy( visual ); visual.replaceChildren( fragment );
+				const build = ( projected, canonical, parent, owner, occurrence, row, modelParent = node, lineage = [] ) => projected.forEach( ( item, index ) => {
+					const child = canonical[ index ]; let elements, bounds;
+					if ( item.kind === 'container' ) { elements = [ shell( child.type, item.shell ) ]; bounds = elements; parent.appendChild( elements[0] ); }
+					else {
+						// This complete field belongs to ONE verified canonical leaf. Its
+						// roots receive only that leaf's opaque fallback, never identities
+						// inferred from their tags/attributes or descendants. Keep ordinary
+						// single-root widget markup intact for structural CSS selectors.
+						const body = document.createElement( 'template' ); body.innerHTML = item.html;
+						const visible = Array.from( body.content.children ).filter( element => ! [ 'STYLE', 'SCRIPT', 'LINK' ].includes( element.tagName ) );
+						if ( visible.length && visible.length <= 16 && ! Array.from( body.content.childNodes ).some( node => node.nodeType === 3 && node.textContent.trim() ) ) { elements = visible; bounds = visible; parent.appendChild( body.content ); }
+						else { const boundary = document.createElement( 'div' ); boundary.style.display = 'contents'; boundary.appendChild( body.content ); parent.appendChild( boundary ); elements = [ boundary ]; bounds = Array.from( boundary.children ).filter( element => ! [ 'STYLE', 'SCRIPT', 'LINK' ].includes( element.tagName ) ); }
+					}
+					const element = elements[0];
+					const path = [ ...lineage, { parent: modelParent, children: canonical, index, node: child } ];
+					const valid = () => live() && path.every( entry => entry.parent.children === entry.children && entry.children[ entry.index ] === entry.node ) && elements.every( element => element.parentElement === parent ) && row.parentElement === track && track.parentElement === root && root.parentElement === visual;
+					const token = registry.owner( { id: child.id, selectId: child.id, type: child.type, kind: 'listing-child', context: { scope: 'listing-model', postId: lieveContext.config.postId, queryId: data.query, listingId: node.id, listingOccurrence: true, resultType: occurrence.type, resultId: occurrence.result, position: occurrence.position, contents: 'unmapped' } }, owner, valid );
+					elements.forEach( element => registry.register( element, token, 'opaque' ) );
+					if ( item.kind === 'container' ) { build( item.children, child.children || [], element, token, occurrence, row, child, path ); }
+					bounds.forEach( bound => prepareEditorRoot( bound, child, false, true ) );
+					const record = { node: child, element, parent, bounds, occurrence, live: valid }; elements.forEach( element => records.set( element, record ) );
+					if ( ! roots.has( child.id ) ) { roots.set( child.id, [] ); } roots.get( child.id ).push( record ); counts.nodes++;
+				} );
+				data.items.forEach( item => {
+					const row = document.createElement( 'div' ); row.dataset.lieveListingItem = ''; row.dataset.listingPosition = String( item.position ); track.appendChild( row );
+					if ( data.shell?.['data-listing-mode'] === 'slider' ) { row.setAttribute( 'role', 'group' ); row.setAttribute( 'aria-roledescription', 'slide' ); row.setAttribute( 'aria-label', item.position + ' of ' + item.count ); }
+					const occurrence = Object.freeze( { owner: node.id, query: data.query, type: item.type, result: item.result, position: item.position } );
+					build( item.children, node.children || [], row, parentOwner, occurrence, row );
+				} );
+				// Unmapped controls/empty state keep their old presentation and authority.
+				const oldRoot = Array.from( parsed.content.children ).find( element => element.tagName !== 'STYLE' );
+				if ( ! data.items.length ) { root.replaceChildren( ...Array.from( oldRoot?.childNodes || [] ) ); }
+				else { oldRoot?.querySelectorAll( ':scope > [data-lieve-listing-controls], :scope > [data-editor-ui]' ).forEach( element => root.appendChild( element ) ); }
+				window.LieveListings?.mount( visual, true );
+				// Preserve the existing executable-portal contract for complex previews:
+				// contents can address this Listing owner only, never infer a child ID.
+				const portalBinding = Object.freeze( { id: node.id, node, model, root: visual, live, current: () => live() && registry.active( visual ) } );
+				window.LieveCodePreview?.mount( visual, { binding: portalBinding, select: id => { if ( ! portalBinding.current() ) { return; } lieveContext.closeContextMenu(); selectElement( id ); }, contextMenu: ( id, x, y, origin ) => { if ( portalBinding.current() ) { lieveContext.openContextMenu( id, x, y ); lieveContext.contextReturnFocus = origin; } }, resize: () => { updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); } } );
+				counts.mounts++; counts.buildMs += performance.now() - started; if ( visual.isConnected ) { renderCanvasStyles(); }
+			} catch ( error ) {
+				if ( ! live() || controller.signal.aborted ) { return; }
+				cache.delete( key );
+				visual.textContent = error.message; counts.denied++;
+			} finally { pending.delete( controller ); }
+		}
+		const api = Object.freeze( { active: () => ! dead, reset, destroy() { reset(); cache.clear(); dead = true; preference = null; }, stats() { return { ...counts, records: Array.from( roots.values() ).reduce( ( sum, entries ) => sum + entries.length, 0 ), hosts: hosts.size, listeners: 0, observers: 0, timers: 0, frames: 0, pending: pending.size, cache: cache.size, selected: chosen && current( chosen ) ? { ...chosen.occurrence, id: chosen.node.id } : null, dead }; } } );
+		listingProjection = { api, load, select, outline }; return api;
+	}
 	// Passive until a trusted host opts in. Only this renderer can register controls.
 	function canvasControls() {
 		if ( controlRegistry ) { return controlRegistry.api; }
@@ -294,6 +450,7 @@
 		identityRegistry ||= createCanvasIdentity( { root: lieveContext.canvas, readDocument: () => lieveContext.state.document } );
 		return identityRegistry;
 	}
+	function canvasSelectionElement() { return listingProjection?.outline()?.[0] || null; }
 	const previewVisual = ( node, owner, visual = document.createElement( 'div' ) ) => {
 		visual.className = 'lieve-element-preview';
 		canvasIdentity().register( visual, owner, 'opaque' );
@@ -365,8 +522,10 @@
 		if ( listing || node.props?.savedQuery ) { context.queryId = listing ? node.props.listing.query || null : node.props.savedQuery; }
 		if ( node.type === 'slot' ) { context.slotKey = node.props?.slotKey || node.id; }
 		if ( listing || ! [ 'section', 'container', 'block', 'div', 'slot', 'heading', 'button', 'image', 'spacer' ].includes( node.type ) ) { context.contents = 'unmapped'; }
+		const listingModel = listingProjection?.api.active() && listing ? lieveContext.state.document : null;
+		const listingKey = listingModel ? listingAuthorityKey( node ) : null, queryRevision = config.queryRevision;
 		const owner = registry.owner( { id: node.id, selectId: node.id, type: node.type, kind: listing ? 'listing' : node.type,
-			context }, parentOwner );
+			context }, parentOwner, listingModel ? () => listingModel === lieveContext.state.document && lieveContext.findNode( listingModel.children, node.id ) === node && listingAuthorityKey( node ) === listingKey && config.queryRevision === queryRevision : null );
 		registry.register( wrapper, owner );
 
 		let visual;
@@ -543,6 +702,7 @@
 	}
 
 	async function loadElementPreview( node, visual, immediate = false ) {
+		if ( listingProjection && lieveContext.listingEditor?.enabled( node ) ) { return listingProjection.load( node, visual ); }
 		// CSS changes are applied locally, without a new REST request or preview flash.
 		const previewNode = previewNodeData( node );
 		const key = previewKey( node );
@@ -634,12 +794,13 @@
 		}
 	}
 
-	function selectElement( id ) {
+	function selectElement( id, origin = null ) {
+		if ( listingProjection && ! listingProjection.select( id, origin ) ) { return; }
 		lieveContext.richTextController?.flush(); lieveContext.codeFields?.flush();
 		// Explicitly clicking even the auto-selected element chooses a new insertion context.
 		lieveContext.catalogueInsertion = null;
 		const wasPopup = lieveContext.popupPanelOpen; lieveContext.popupPanelOpen = false; document.getElementById( 'lieve-popup-settings' )?.setAttribute( 'aria-expanded', 'false' );
-		if ( lieveContext.state.selectedId === id && ! wasPopup ) { return; }
+		if ( lieveContext.state.selectedId === id && ! wasPopup ) { if ( listingProjection ) { updateSelectionOutline(); } return; }
 		lieveContext.activeClassId = null; if ( lieveContext.styleState === 'disabled' ) { lieveContext.styleState = 'normal'; } lieveContext.classWorkspace?.breakGroup();
 		lieveContext.liveEdit = null; lieveContext.state.selectedId = id;
 		const type = lieveContext.findNode( lieveContext.state.document.children, id )?.type;
@@ -694,7 +855,9 @@
 	function updateSelectionOutline() {
 		if ( ! lieveContext.selectionOutline ) { lieveContext.selectionOutline = document.createElement( 'div' ); lieveContext.selectionOutline.className = 'lieve-selection-outline'; lieveContext.selectionOutline.setAttribute( 'aria-hidden', 'true' ); lieveContext.selectionOutline.innerHTML = '<span></span>'; lieveContext.app.appendChild( lieveContext.selectionOutline ); }
 		let roots = lieveContext.state.selectedId ? Array.from( lieveContext.canvas.querySelectorAll( '[data-editor-root="' + window.CSS.escape( lieveContext.state.selectedId ) + '"]' ) ) : [];
-		if ( roots.some( root => root.closest?.( '[data-lieve-listing-item][data-listing-position]' ) ) ) { const all = roots; const position = lieveContext.selectedListingPosition || roots[0]?.closest( '[data-lieve-listing-item]' )?.dataset.listingPosition; roots = roots.filter( root => root.closest( '[data-lieve-listing-item]' )?.dataset.listingPosition === position ); roots = [ roots[0] || all[0] ]; all.forEach( root => root.classList.toggle( 'is-selected', roots.includes( root ) ) ); }
+		const projected = listingProjection?.outline();
+		if ( projected ) { roots = projected; }
+		else if ( roots.some( root => root.closest?.( '[data-lieve-listing-item][data-listing-position]' ) ) ) { const all = roots; const position = lieveContext.selectedListingPosition || roots[0]?.closest( '[data-lieve-listing-item]' )?.dataset.listingPosition; roots = roots.filter( root => root.closest( '[data-lieve-listing-item]' )?.dataset.listingPosition === position ); roots = [ roots[0] || all[0] ]; all.forEach( root => root.classList.toggle( 'is-selected', roots.includes( root ) ) ); }
 		observeSelectionLayout( roots );
 		const rects = roots.map( ( root ) => lieveContext.viewport ? lieveContext.viewport.toParent( root.getBoundingClientRect() ) : root.getBoundingClientRect() ).filter( ( rect ) => rect.width && rect.height );
 		if ( ! rects.length ) { lieveContext.selectionOutline.hidden = true; return; }
@@ -721,6 +884,7 @@
 	function renderCanvas() {
 		if ( identityRegistry?.stats().destroyed ) { return; }
 		canvasIdentity().reset();
+		listingProjection?.api.reset();
 		controlRegistry?.reset();
 		lieveContext.motionEditor?.stop();
 		window.LieveListings?.destroy( lieveContext.canvas );
@@ -767,6 +931,6 @@
 		revealSelectedPreview();
 		renderCanvasStyles();
 	}
-	return { canvasIdentity, canvasControls, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
+	return { canvasIdentity, canvasControls, canvasListingProjection, canvasSelectionElement, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
 	};
 } )();

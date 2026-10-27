@@ -505,13 +505,13 @@
 			let hit, x = event.clientX, y = event.clientY;
 			if ( event.type === 'keydown' ) {
 				if ( event.target !== surface || ! ( event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey ) ) { return; }
-				const id = context.state.selectedId, root = context.canvas.querySelector( '[data-editor-root="' + window.CSS.escape( id || '' ) + '"]' );
+				const id = context.state.selectedId, root = controller.canvasSelectionElement?.() || context.canvas.querySelector( '[data-editor-root="' + window.CSS.escape( id || '' ) + '"]' );
 				if ( ! root || controller.canvasIdentity().resolve( root ).identity?.selectId !== id ) { return; } const rect = context.viewport.toParent( root.getBoundingClientRect() ); x = rect.left + 8; y = rect.top + 8; hit = { element: root };
 			} else { hit = resolveAt( x, y ); }
 			pending = null; cancelDrag(); event.preventDefault();
 			const identity = hit?.element && controller.canvasIdentity().resolve( hit.element ), id = identity?.identity?.selectId;
 			if ( ! [ 'resolved', 'opaque' ].includes( identity?.status ) || ! id || ! context.findNode( context.state.document.children, id ) || ! once( event ) ) { closeMenu(); counters.denials++; return; }
-			const start = performance.now(); context.openContextMenu( id, x, y ); context.contextReturnFocus = surface;
+			const start = performance.now(); context.openContextMenu( id, x, y, hit.element ); context.contextReturnFocus = surface;
 			menuOwner = { element: hit.element, instance: identity.identity.instance, model: context.state.document }; counters.menus++; sample( 'context-menu', start );
 			if ( menuElement !== context.contextMenu ) {
 				menuElement = context.contextMenu; listen( menuElement, 'click', guardMenuAction, true ); listen( menuElement, 'keydown', guardMenuAction, true );
@@ -642,7 +642,7 @@
 			const hit = commands ? selectable( resolved ) ? { ...resolved, id: resolved.status === 'canvas' ? null : resolved.identity.identity.selectId } : null : hitTest( event.clientX, event.clientY ); if ( ! hit ) { return; }
 			try {
 				event.preventDefault(); surface.focus( { preventScroll: true } );
-				const before = performance.now(); controller.selectElement( hit.id ); const controllerMs = performance.now() - before;
+				const before = performance.now(); controller.selectElement( hit.id, hit.element ); const controllerMs = performance.now() - before;
 				if ( ! nativeMouse ) { drag?.pointerDown( event, hit ); } // Never invent a pointer ID/capture from a MouseEvent.
 				queueOutline(); diagnostics.selections++; sample( 'events', { trusted: true, id: hit.id, startedAt: started, controllerMs, totalMs: performance.now() - started } );
 			} catch ( failure ) { suspend(); report( 'SELECTION_FAILED' ); }

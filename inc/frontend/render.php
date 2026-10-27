@@ -258,6 +258,17 @@ function lieve_node_class_attributes( $node, $base ) {
  * @param array $node Sanitized node.
  */
 function lieve_render_node( $node ) {
+	// Editor-only structured provenance. Public rendering has no collector.
+	$projection = $GLOBALS['lieve_editor_listing_projection'] ?? null;
+	if ( ! empty( $GLOBALS['lieve_element_preview'] ) && $projection instanceof Lieve_Editor_Listing_Projection ) {
+		$projection->render( $node, static function() use ( $node ) { lieve_render_node_content( $node ); } );
+		return;
+	}
+	lieve_render_node_content( $node );
+}
+
+/** Original rendering path, also used by the bounded editor collector. */
+function lieve_render_node_content( $node ) {
 	if ( empty( $node['_lieveTemplateNodePrepared'] ) ) {
 		$plan = lieve_prepare_template_document( array( 'children' => array( $node ) ) );
 		if ( ! empty( $plan['_lieveTemplateFailed'] ) ) { lieve_template_expansion_fallback(); return; }

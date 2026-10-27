@@ -56,6 +56,9 @@ function lieve_rest_preview_element( $request ) {
 	$node = lieve_sanitize_node( $payload['node'] ?? null, 0, $count );
 	$post = get_post( (int) $request['id'] );
 	if ( ! $node || ! $post ) { return new WP_Error( 'lieve_invalid_preview', __( 'Invalid element preview.', 'lieve-builder' ), array( 'status' => 400 ) ); }
+	if ( true === ( $payload['listingProjection'] ?? false ) && lieve_listing_enabled( $node ) ) {
+		return rest_ensure_response( lieve_editor_listing_preview( $node, $post ) );
+	}
 	return rest_ensure_response( array( 'html' => lieve_render_editor_preview( $node, $post, true === ( $payload['executeCustomCode'] ?? false ) ) ) );
 }
 

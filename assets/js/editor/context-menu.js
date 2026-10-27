@@ -125,9 +125,9 @@
 		}
 	}
 
-	function openContextMenu( id, x, y ) {
+	function openContextMenu( id, x, y, origin = null ) {
 		lieveContext.treeRename?.finish( true );
-		lieveContext.selectElement( id ); const node = lieveContext.findNode( lieveContext.state.document.children, id ); if ( ! node ) { return; }
+		lieveContext.selectElement( id, origin ); const node = lieveContext.findNode( lieveContext.state.document.children, id ); if ( ! node ) { return; }
 		menuOwner = { model: lieveContext.state.document, node };
 		lieveContext.contextReturnFocus = lieveContext.canvas.querySelector( '.lieve-editor-node[data-id="' + window.CSS.escape( id ) + '"]' );
 		if ( ! lieveContext.contextMenu ) {

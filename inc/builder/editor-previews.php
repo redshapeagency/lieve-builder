@@ -2,6 +2,101 @@
 /** Preview rendering. Custom PHP requires an explicit, authenticated code-preview request. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+/**
+ * Transient editor projection collected during the REAL listing render/query.
+ * HTML is presentation only. Tree edges come from renderer calls matched against
+ * the sanitized model, never from attributes, comments or authored HTML.
+ */
+final class Lieve_Editor_Listing_Projection {
+	private $model;
+	private $stack = array();
+	private $root;
+	private $valid = true;
+	private $bytes = 0;
+	private $nodes = 0;
+
+	public function __construct( $model ) { $this->model = $model; }
+
+	public function render( $node, $render ) {
+		$parent = end( $this->stack );
+		if ( $parent && ! in_array( $parent->kind, array( 'container', 'item' ), true ) ) { $render(); return; }
+		if ( ! $parent && $this->root ) { $this->valid = false; $render(); return; }
+		$expected = $parent ? ( $parent->model['children'][ $parent->index++ ] ?? null ) : $this->model;
+		if ( ! $expected || ( $node['_lieveListingSourceId'] ?? $node['id'] ) !== $expected['id'] || $node['type'] !== $expected['type'] ) {
+			$this->valid = false; $render(); return;
+		}
+		$kind = ! $parent ? 'listing' : ( ! lieve_listing_enabled( $node ) && in_array( $node['type'], array( 'section', 'container', 'block', 'div', 'slot' ), true ) ? 'container' : 'opaque' );
+		$frame = (object) array( 'model' => $expected, 'index' => 0, 'kind' => $kind, 'children' => array(), 'items' => array(), 'html' => '' );
+		if ( $parent ) { $parent->children[] = $frame; } else { $this->root = $frame; }
+		$this->stack[] = $frame; $level = ob_get_level();
+		try { ob_start(); $render(); $html = ob_get_clean(); }
+		finally { while ( ob_get_level() > $level ) { ob_end_clean(); } array_pop( $this->stack ); }
+		$frame->html = $html;
+		if ( 'opaque' !== $kind ) { $frame->shell = $this->shell( $frame ); $frame->html = ''; }
+		$this->bytes += 'opaque' === $kind ? strlen( $html ) : 0;
+		if ( ++$this->nodes > 3000 || $this->bytes > 524288 || in_array( $kind, array( 'container', 'item' ), true ) && $frame->index !== count( $expected['children'] ?? array() ) ) { $this->valid = false; }
+		echo $html;
+	}
+
+	public function begin_item( $owner, $type, $result, $position ) {
+		$parent = end( $this->stack );
+		// Nested/unmapped previews do not acquire internal identities.
+		if ( $parent !== $this->root || 'listing' !== $parent->kind || $owner['id'] !== $this->model['id'] ) { return; }
+		$frame = (object) array( 'kind' => 'item', 'model' => $this->model, 'index' => 0, 'children' => array(), 'type' => $type, 'result' => (string) $result, 'position' => $position, 'count' => (int) ( $GLOBALS['lieve_listing_context']['count'] ?? $position ) );
+		$parent->items[] = $frame; $this->stack[] = $frame;
+	}
+
+	public function end_item( $owner ) {
+		$frame = end( $this->stack );
+		if ( $owner['id'] !== $this->model['id'] || ! $frame || 'item' !== $frame->kind ) { return; }
+		if ( $frame->index !== count( $this->model['children'] ?? array() ) ) { $this->valid = false; }
+		array_pop( $this->stack );
+	}
+
+	private function node_data( $frame ) {
+		$data = array( 'id' => $frame->model['id'], 'type' => $frame->model['type'], 'kind' => $frame->kind );
+		if ( 'opaque' === $frame->kind ) { $data['html'] = $frame->html; }
+		else { $data['shell'] = $frame->shell; $data['children'] = array_map( array( $this, 'node_data' ), $frame->children ); }
+		return $data;
+	}
+
+	private function shell( $frame ) {
+		// Presentation attributes only; the client creates the actual registered shell.
+		$p = new WP_HTML_Tag_Processor( $frame->html ); $attributes = array();
+		while ( $p->next_tag() ) {
+			if ( 'STYLE' === $p->get_tag() ) { continue; }
+			foreach ( array( 'id', 'class', 'style', 'data-lieve-id', 'data-lieve-node', 'data-lieve-listing-source', 'data-lieve-listing', 'data-listing-mode', 'data-listing-autoplay', 'data-listing-interval', 'data-listing-advance', 'data-listing-rewind', 'data-listing-drag', 'data-listing-scrollbar', 'data-listing-motion', 'role', 'aria-label' ) as $key ) {
+				$value = $p->get_attribute( $key ); if ( is_string( $value ) ) { $attributes[ $key ] = $value; }
+			}
+			break;
+		}
+		return $attributes;
+	}
+
+	public function result() {
+		if ( ! $this->valid || ! $this->root || $this->stack || count( $this->root->items ) > 20 ) { return null; }
+		$items = array();
+		foreach ( $this->root->items as $item ) {
+			$items[] = array( 'type' => $item->type, 'result' => $item->result, 'position' => $item->position, 'count' => $item->count, 'children' => array_map( array( $this, 'node_data' ), $item->children ) );
+		}
+		return array( 'version' => 1, 'owner' => $this->model['id'], 'query' => $this->model['props']['listing']['query'], 'shell' => $this->root->shell, 'items' => $items );
+	}
+}
+
+/** Authenticated REST opt-in only. Never seeded or enabled in ordinary startup. */
+function lieve_editor_listing_preview( $node, $post ) {
+	$before = $GLOBALS['lieve_editor_listing_projection'] ?? null;
+	$revision = lieve_queries_revision();
+	$collector = new Lieve_Editor_Listing_Projection( $node );
+	$GLOBALS['lieve_editor_listing_projection'] = $collector;
+	try {
+		$html = lieve_render_editor_preview( $node, $post ); $data = $collector->result();
+		if ( $data && hash_equals( $revision, lieve_queries_revision() ) ) { $data['revision'] = $revision; } else { $data = null; }
+		return array( 'html' => $html, 'listingProjection' => $data );
+	}
+	finally { if ( null === $before ) { unset( $GLOBALS['lieve_editor_listing_projection'] ); } else { $GLOBALS['lieve_editor_listing_projection'] = $before; } }
+}
+
 /** Match the client cache input: styles compile separately, HTML wrapper choice does not. */
 function lieve_editor_preview_node( $node, $listing = false ) {
 	$listing = $listing || function_exists( 'lieve_listing_enabled' ) && lieve_listing_enabled( $node );

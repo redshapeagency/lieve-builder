@@ -2,23 +2,23 @@
 	'use strict';
 	window.LieveEditorControllers ||= {};
 	window.LieveEditorControllers[ 'structure' ] = function create( lieveContext ) {
-	let canvasDragHandoff = null, treeGeneration = 0;
+	let canvasDragHandoff = null, nativeTreeSource = null, nativeTreeOwner = null, treeGeneration = 0;
 	// Application-lifetime presentation cache. Only renderer-created rows enter
 	// this map; a full render drops the previous model, paths and row references.
 	// Neither the map nor its selected-row projection is document authority.
-	let treeRows = null, treeProjection = null, structureDisposed = false;
+	let treeRows = new Map(), treeProjection = null, structureDisposed = false;
 	// Passive creation seam: only closures installed on actual renderer-created rows
 	// can offer a source. Copied attributes/rows and native payloads cannot mint one.
 	function bindCanvasDrag( start ) {
 		if ( structureDisposed || typeof start !== 'function' || canvasDragHandoff ) { return null; }
 		canvasDragHandoff = start;
-		return () => { if ( canvasDragHandoff === start ) { canvasDragHandoff = null; } };
+		return () => { if ( canvasDragHandoff === start ) { canvasDragHandoff = nativeTreeSource = null; } };
 	}
 	// Terminal application teardown only. Persisted pagehide retains its current
 	// projection; a later render still verifies every exact model/path reference.
 	function destroyStructure() {
 		if ( structureDisposed ) { return; } structureDisposed = true; treeGeneration++;
-		treeProjection = null; treeRows = null; canvasDragHandoff = null;
+		treeProjection = null; treeRows = null; canvasDragHandoff = nativeTreeSource = nativeTreeOwner = null;
 		lieveContext.treeRename?.deactivate(); lieveContext.treeRename = null;
 		clearTreeDragMotion(); clearTreeDragPreview(); clearTreeDropPlaceholder();
 	}
@@ -304,10 +304,11 @@
 
 	function applyTreeDrop() {
 		clearTreeDragMotion();
-		if ( validTreeDrop( lieveContext.treeDropIntent ) ) { moveTreeElement( lieveContext.treeDropIntent ); }
+		const moved = validTreeDrop( lieveContext.treeDropIntent ) ? moveTreeElement( lieveContext.treeDropIntent ) : false;
 		lieveContext.state.draggingId = null; lieveContext.structure.classList.remove( 'is-dragging' );
 		lieveContext.structure.querySelectorAll( '.lieve-tree-branch.is-dragging' ).forEach( ( branch ) => branch.classList.remove( 'is-dragging' ) );
 		clearTreeDragPreview(); lieveContext.clearDropIndicators();
+		return moved;
 	}
 
 	function handleTreeDragOver( event ) {
@@ -322,10 +323,15 @@
 		else { event.dataTransfer.dropEffect = 'none'; }
 	}
 
-	function handleTreeDrop( event ) {
+	function handleTreeDrop( event, expectedModels = null ) {
 		if ( ! lieveContext.state.draggingId ) { return; }
 		event.preventDefault(); event.stopPropagation();
-		showTreeDropPlaceholder( resolveTreeDrop( event ) ); applyTreeDrop();
+		const intent = resolveTreeDrop( event );
+		// Only the private native handoff supplies an acquisition-time reference map.
+		// A same-ID replacement cannot inherit a destination's old authority. This
+		// release-only check does not add model scans to dragover or change legacy DnD.
+		const stale = expectedModels && ( ! intent || [ intent.targetId, intent.parentId, intent.beforeId ].some( id => id && lieveContext.findNode( lieveContext.state.document.children, id ) !== expectedModels.get( id ) ) || lieveContext.config.componentMode && ! intent.parentId && lieveContext.findParent( lieveContext.state.document.children, intent.draggingId ) );
+		showTreeDropPlaceholder( stale ? null : intent ); return applyTreeDrop();
 	}
 
 	function cancelTreeDrag( event ) {
@@ -468,8 +474,40 @@
 				if ( rejectStaleRow( event ) ) { return; }
 				if ( event.target.closest( '.lieve-tree-toggle, .lieve-tree-actions, .lieve-tree-rename' ) ) { event.preventDefault(); return; }
 				if ( canvasDragHandoff ) {
+					const handoff = canvasDragHandoff, token = {};
+					if ( event.isTrusted ) { nativeTreeSource = token; }
+					const current = () => nativeTreeSource === token && canvasDragHandoff === handoff && currentRow() && sourcePath.at( -2 )?.node.type !== 'component';
+					const owns = input => {
+						if ( ! current() || lieveContext.state.draggingId !== sourceId || ! input.isTrusted || input.target?.ownerDocument !== document || ! [ 'dragenter', 'dragover', 'drop' ].includes( input.type ) ) { return false; }
+						const panel = lieveContext.structure.parentElement;
+						if ( ! panel?.isConnected || input.target !== panel && ! lieveContext.structure.contains( input.target ) ) { return false; }
+						const bounds = panel.getBoundingClientRect(), top = Math.max( bounds.top, lieveContext.structure.getBoundingClientRect().top );
+						if ( input.clientX < bounds.left || input.clientX >= bounds.right || input.clientY < top || input.clientY >= bounds.bottom ) { return false; }
+						const target = input.target.closest?.( '.lieve-tree-branch[data-id]' );
+						if ( ! target ) {
+							if ( input.target !== panel && input.target !== lieveContext.structure ) { return false; }
+							// Whitespace belongs to the actual root, but its first/last
+							// anchors must still be the privately created canonical branches.
+							// Inspect only the two ends; never scan the tree on dragover.
+							const nodes = lieveContext.state.document.children, first = treeRows?.get( nodes[0]?.id ), last = treeRows?.get( nodes.at( -1 )?.id ), children = lieveContext.structure.children;
+							let end = children.length - 1;
+							while ( end >= 0 && ( children[ end ] === lieveContext.treeDropPlaceholder || children[ end ] === lieveContext.treeDragPreview ) ) { end--; }
+							return Boolean( first && last && children[0] === first.branch && children[ end ] === last.branch && first.branch.dataset.id === first.node.id && last.branch.dataset.id === last.node.id && first.current() && last.current() );
+						}
+						// Attributes only locate a private record; exact created DOM, model,
+						// ancestor path and generation decide. Cloned rows never enter it.
+						const entry = treeRows?.get( target.dataset.id ), targetRow = input.target.closest?.( '.lieve-tree-row[data-id]' );
+						return Boolean( entry && entry.branch === target && ( ! targetRow || targetRow === entry.row ) && entry.current() );
+					};
+					const tree = Object.freeze( {
+						owns,
+						over( input ) { if ( ! owns( input ) ) { return false; } nativeTreeOwner = token; lieveContext.structure.classList.add( 'is-dragging' ); handleTreeDragOver( input ); return true; },
+						drop( input, models ) { if ( ! owns( input ) || input.type !== 'drop' || ! models?.get ) { return false; } nativeTreeOwner = token; return handleTreeDrop( input, models ); },
+						leave() { if ( nativeTreeOwner !== token ) { return; } nativeTreeOwner = null; clearTreeDragMotion(); clearTreeDropPlaceholder(); lieveContext.structure.classList.remove( 'is-dragging' ); },
+						end() { tree.leave(); if ( nativeTreeSource === token ) { nativeTreeSource = null; } },
+					} );
 					if ( canvasDragHandoff( event, Object.freeze( { kind: 'move', id: sourceId, node, element: row,
-					current: () => currentRow() && sourcePath.at( -2 )?.node.type !== 'component',
+					current, tree,
 					} ) ) ) { if ( ! event.defaultPrevented && event.dataTransfer?.setDragImage ) { setTreeDragPreview( row, event ); } event.stopPropagation(); return; }
 				}
 				event.stopPropagation();
@@ -484,7 +522,9 @@
 				window.setTimeout( () => { if ( lieveContext.state.draggingId === node.id && lieveContext.structure.contains( branch ) ) { branch.classList.add( 'is-dragging' ); } }, 0 );
 			} );
 			row.addEventListener( 'dragend', () => {
-				if ( ! currentRow() ) { return; }
+				// The private native adapter owns its whole session, including end.
+				// A late row callback must not clear another source's dragging state.
+				if ( ! currentRow() || canvasDragHandoff ) { return; }
 				lieveContext.state.draggingId = null;
 				clearTreeDragMotion();
 				clearTreeDragPreview();

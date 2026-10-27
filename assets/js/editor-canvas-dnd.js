@@ -182,7 +182,7 @@
 		let overlay = null, marker = null, caption = null, ghost = null, intent = null, geometry = null, dirtyGeometry = true;
 		let mutation = null, resize = null, lastTime = 0, suppressClick = false, nativeEnded = null;
 		let canvas = viewport.canvas, doc = viewport.document, owner = viewport.frame.ownerDocument, win = owner.defaultView, app = context.app;
-		const guards = [], listeners = [], sources = [], data = { acquisitions: [], activations: [], moves: [], nativeMoves: [], zones: [], commits: [], errors: [], starts: 0, nativeStarts: 0, nativeZeroFrames: 0, nativeSmallFrames: 0, completed: 0, cancelled: 0, scans: 0, measurements: 0, validations: 0, pointermoves: 0 };
+		const guards = [], listeners = [], sources = [], data = { acquisitions: [], activations: [], moves: [], nativeMoves: [], ownerships: [], zones: [], commits: [], errors: [], starts: 0, nativeStarts: 0, nativeZeroFrames: 0, nativeSmallFrames: 0, completed: 0, cancelled: 0, scans: 0, measurements: 0, validations: 0, pointermoves: 0 };
 		const sample = ( key, value ) => { if ( data[ key ].length < 2000 ) { data[ key ].push( value ); } };
 		const listen = ( list, target, type, callback, options ) => { target.addEventListener( type, callback, options ); list.push( () => target.removeEventListener( type, callback, options ) ); };
 		const clear = list => list.splice( 0 ).forEach( remove => remove() );
@@ -304,10 +304,11 @@
 				} else if ( session.native ) { session.scrollDelta = 0; }
 			} catch ( error ) { cancel( 'error' ); report( 'DRAG_UPDATE_FAILED' ); }
 		}
-		function schedule() { if ( frame || phase !== 'dragging' ) { return; } const generation = epoch; frame = win.requestAnimationFrame( time => { if ( generation === epoch ) { tick( time ); } } ); }
+		function schedule() { if ( frame || phase !== 'dragging' || session?.native && session.destination !== 'canvas' ) { return; } const generation = epoch; frame = win.requestAnimationFrame( time => { if ( generation === epoch ) { tick( time ); } } ); }
 		function invalidate() { dirtyGeometry = true; if ( phase === 'dragging' ) { schedule(); } }
 		function cleanup() {
 			epoch++; win.cancelAnimationFrame( frame ); frame = 0; clear( listeners ); mutation?.disconnect(); resize?.disconnect(); mutation = resize = null;
+			if ( session?.native ) { session.source.tree?.end(); }
 			if ( external && session?.native ) { nativeEnded = { model: new WeakSet( [ context.state.document ] ), generation: registry().stats().generation }; }
 			if ( session?.native && session.kind === 'move' ) { structure.clearTreeDragPreview(); }
 			const pointer = session?.pointerId; session = null; geometry = intent = null; lastTime = 0;
@@ -316,12 +317,12 @@
 			if ( context && context.state.draggingId === data.lastSource ) { context.state.draggingId = null; }
 		}
 		function cancel( reason = 'cancelled' ) { if ( ! session ) { return false; } const active = phase === 'dragging'; phase = 'cancelled'; data.cancelled++; data.lastReason = reason; suppressClick ||= active; cleanup(); return true; }
-		function transactionalMove( destination ) {
+		function transactionalMove( destination, treeEvent = null ) {
 			// The existing commit pushes history before mutation/rendering and cannot roll
 			// back an exception. Protect this transport only, using its real snapshot API.
 			const state = context.state, before = documents.snapshot(), history = [ ...state.history ], future = [ ...state.future ];
 			const selectedId = state.selectedId, collapsed = new Set( state.collapsedIds ), dirty = state.dirty, liveEdit = context.liveEdit, insertion = context.catalogueInsertion;
-			try { return session.kind === 'insert' ? documents.addBlock( session.type, destination ) : structure.moveTreeElement( destination ); }
+			try { return treeEvent ? session.source.tree.drop( treeEvent, geometry.models ) : session.kind === 'insert' ? documents.addBlock( session.type, destination ) : structure.moveTreeElement( destination ); }
 			catch ( error ) {
 				documents.restoreSnapshot( before ); state.history = history; state.future = future; state.selectedId = selectedId; state.collapsedIds = collapsed; state.dirty = dirty; context.liveEdit = liveEdit; context.catalogueInsertion = insertion;
 				try { context.renderAll(); } catch ( renderError ) { report( 'ROLLBACK_RENDER_FAILED' ); }
@@ -389,7 +390,7 @@
 				geometry = indexGeometry(); dirtyGeometry = true; feedback(); ghost.hidden = true;
 				if ( event.dataTransfer ) { event.dataTransfer.effectAllowed = source.kind === 'insert' ? 'copy' : 'move'; }
 				listen( listeners, owner, 'dragenter', nativeOver, true ); listen( listeners, owner, 'dragover', nativeOver, true );
-				listen( listeners, owner, 'drop', e => { if ( ! e.isTrusted ) { e.preventDefault(); e.stopImmediatePropagation(); return; } e.preventDefault(); e.stopImmediatePropagation(); finishDrop( e ); }, true );
+				listen( listeners, owner, 'drop', nativeDrop, true );
 				listen( listeners, owner, 'dragend', e => { if ( e.isTrusted && source.element.contains( e.target ) ) { cancel( 'dragend' ); } }, true );
 				listen( listeners, owner, 'dragleave', e => { if ( ! e.relatedTarget && ( e.clientX <= 0 || e.clientY <= 0 || e.clientX >= win.innerWidth || e.clientY >= win.innerHeight ) ) { cancel( 'window-left' ); } }, true );
 				listen( listeners, owner, 'keydown', e => { if ( e.key === 'Escape' ) { e.preventDefault(); e.stopPropagation(); cancel( 'escape' ); } }, true );
@@ -404,14 +405,46 @@
 		}
 		function nativeOver( event ) {
 			if ( ! session?.native ) { return; }
-			const started = performance.now(); event.preventDefault(); event.stopImmediatePropagation();
-			if ( ! event.isTrusted || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { event.preventDefault(); cancel( 'invalid-native-input' ); return; }
+			const started = performance.now();
+			if ( ! event.isTrusted || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { event.preventDefault(); event.stopImmediatePropagation(); cancel( 'invalid-native-input' ); return; }
 			try {
+				if ( ! validSession() ) { cancel( 'stale' ); return; }
+				const destination = nativeDestination( event );
+				if ( destination === 'tree' ) {
+					// Deliver the actual event to the original Structure controller before
+					// consuming it. No synthetic dispatch or duplicate movement algorithm.
+					hide(); win.cancelAnimationFrame( frame ); frame = 0; session.source.tree.over( event );
+					sample( 'nativeMoves', { ms: performance.now() - started, type: event.type, destination } ); return;
+				}
+				session.source.tree?.leave();
+				if ( destination !== 'canvas' ) { hide(); win.cancelAnimationFrame( frame ); frame = 0; if ( event.dataTransfer ) { event.dataTransfer.dropEffect = 'none'; } return; }
 				session.point = { x: event.clientX, y: event.clientY }; refresh();
 				if ( intent ) { event.preventDefault(); if ( event.dataTransfer ) { event.dataTransfer.dropEffect = session.kind === 'insert' ? 'copy' : 'move'; } schedule(); }
 				else { if ( event.dataTransfer ) { event.dataTransfer.dropEffect = 'none'; } win.cancelAnimationFrame( frame ); frame = 0; }
 				sample( 'nativeMoves', { ms: performance.now() - started, type: event.type } );
 			} catch ( error ) { cancel( 'error' ); report( 'NATIVE_UPDATE_FAILED' ); }
+			finally { event.preventDefault(); event.stopImmediatePropagation(); }
+		}
+		function nativeDestination( event ) {
+			const started = performance.now();
+			const destination = session.kind === 'move' && session.source.tree?.owns( event ) ? 'tree' : surface === event.target || surface.contains( event.target ) ? 'canvas' : 'none';
+			if ( session.destination !== destination ) { sample( 'ownerships', { destination, ms: performance.now() - started } ); session.destination = destination; }
+			return destination;
+		}
+		function nativeDrop( event ) {
+			if ( ! session?.native ) { return; }
+			try {
+				if ( ! event.isTrusted ) { return; }
+				if ( ! validSession() || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ) { cancel( 'invalid-native-drop' ); return; }
+				const destination = nativeDestination( event );
+				if ( destination === 'canvas' ) { session.source.tree?.leave(); finishDrop( event ); return; }
+				if ( destination !== 'tree' ) { cancel( 'outside-drop' ); return; }
+				const started = performance.now(); phase = 'dropping'; suppressClick = true;
+				const moved = transactionalMove( null, event );
+				sample( 'commits', { ms: performance.now() - started, moved, kind: 'tree' } );
+				phase = moved ? 'completed' : 'cancelled'; if ( moved ) { data.completed++; } else { data.cancelled++; } cleanup();
+			} catch ( error ) { cancel( 'error' ); report( 'TREE_DROP_FAILED' ); }
+			finally { event.preventDefault(); event.stopImmediatePropagation(); }
 		}
 		function nativeMouseDown( event ) {
 			if ( ! nativeEnded || state !== 'mounted' || session || ! event.isTrusted || event.type !== 'mousedown' || event.button !== 0 || event.buttons !== 1 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.target.ownerDocument !== owner || ! surface.contains( event.target ) ) { return false; }
