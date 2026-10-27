@@ -264,6 +264,10 @@ function lieve_render_node( $node ) {
 		$projection->render( $node, static function() use ( $node ) { lieve_render_node_content( $node ); } );
 		return;
 	}
+	$expanded = $GLOBALS['lieve_editor_expanded_controls'] ?? null;
+	if ( ! empty( $GLOBALS['lieve_element_preview'] ) && $expanded instanceof Lieve_Editor_Expanded_Controls ) {
+		$expanded->render( $node, static function() use ( $node ) { lieve_render_node_content( $node ); } ); return;
+	}
 	lieve_render_node_content( $node );
 }
 

@@ -207,6 +207,130 @@
 		const api = Object.freeze( { active: () => ! dead, reset, destroy() { reset(); cache.clear(); dead = true; preference = null; }, stats() { return { ...counts, records: Array.from( roots.values() ).reduce( ( sum, entries ) => sum + entries.length, 0 ), hosts: hosts.size, listeners: 0, observers: 0, timers: 0, frames: 0, pending: pending.size, cache: cache.size, selected: chosen && current( chosen ) ? { ...chosen.occurrence, id: chosen.node.id } : null, dead }; } } );
 		listingProjection = { api, load, select, outline }; return api;
 	}
+	let expandedProjection = null;
+	/** Only a guarded host opts in. Expanded sources never become editable page nodes. */
+	function canvasExpandedProjection() {
+		if ( expandedProjection ) { return expandedProjection.api; }
+		let dead = false, epoch = 0, serial = 0, revisionSequence = 0;
+		const mounts = new Map(), cache = new Map(), revisions = new Map(), pending = new Set();
+		const identities = new WeakMap(); let nextIdentity = 0;
+		const identity = value => { if ( ! value || typeof value !== 'object' ) { return 0; } if ( ! identities.has( value ) ) { identities.set( value, ++nextIdentity ); } return identities.get( value ); };
+		const libraries = () => [ lieveContext.state.templates, lieveContext.componentEditor?.revision() || 0 ];
+		const stamp = () => libraries().map( value => typeof value === 'object' ? identity( value ) : value ).join( ':' );
+		const presentationAttribute = name => /^(?:id|class|style|role|title|lang|dir|itemprop|itemscope|itemtype|aria-[a-z0-9_-]+|data-(?!editor|lieve)[a-z0-9_-]+|data-lieve-(?:id|node|scope|tabs))$/i.test( name );
+		const counts = { mounts: 0, denied: 0, buildMs: 0, refreshes: 0 };
+		function revoke( record ) { record.active = false; record.controller?.abort(); record.anchors.forEach( anchor => controlRegistry?.forget( anchor ) ); canvasIdentity().invalidateMany( record.anchors ); record.anchors.length = 0; }
+		function reset() { pending.forEach( controller => controller.abort() ); pending.clear(); mounts.forEach( revoke ); mounts.clear(); }
+		function refresh() {
+			if ( dead ) { return; } const active = [ ...mounts.values() ]; epoch++; counts.refreshes++; reset(); cache.clear();
+			active.forEach( record => { if ( record.visual.isConnected && lieveContext.findNode( lieveContext.state.document.children, record.node.id ) === record.node ) { load( record.node, record.visual ); } } );
+		}
+		let away = false;
+		const onBlur = () => queueMicrotask( () => { if ( ! dead && ! document.hasFocus() ) { away = true; } } );
+		const onFocus = event => { if ( away && event.target === window && document.visibilityState === 'visible' ) { away = false; refresh(); } };
+		const onVisibility = () => { if ( document.visibilityState === 'hidden' ) { away = true; } else if ( away ) { away = false; refresh(); } };
+		window.addEventListener( 'blur', onBlur ); window.addEventListener( 'focus', onFocus ); document.addEventListener( 'visibilitychange', onVisibility );
+		// Existing successful library reads notify this optional experimental layer.
+		lieveContext.config.expandedPreviewRefresh = refresh;
+		async function load( node, visual ) {
+			if ( dead || canvasIdentity().stats().destroyed ) { return; }
+			const previous = mounts.get( node.id ); if ( previous ) { revoke( previous ); }
+			const model = lieveContext.state.document, generation = canvasIdentity().stats().generation, key = previewKey( node ), library = stamp(), operation = ++serial, ownEpoch = epoch;
+			const edges = [], modelChildren = model.children;
+			lieveContext.walkNodes( [ node ], item => edges.push( { node: item, props: item.props, children: item.children, items: [ ...( item.children || [] ) ] } ) );
+			const readClock = revisionSequence;
+			const record = { node, visual, active: true, anchors: [], dependencies: [] }; mounts.set( node.id, record );
+			const live = () => ! dead && visual.isConnected && lieveContext.canvas.contains( visual ) && record.active && mounts.get( node.id ) === record && ownEpoch === epoch && model === lieveContext.state.document && generation === canvasIdentity().stats().generation &&
+				model.children === modelChildren && lieveContext.findNode( model.children, node.id ) === node && edges.every( edge => edge.node.props === edge.props && edge.node.children === edge.children && Array.isArray( edge.node.children ) && edge.items.length === edge.node.children.length && edge.items.every( ( item, index ) => edge.node.children[index] === item ) ) && previewKey( node ) === key && stamp() === library && canvasIdentity().active( visual );
+			const dependenciesCurrent = () => record.dependencies.every( dependency => { const known = revisions.get( dependency.id ); return known?.revision === dependency.revision && known.version === dependency.version; } );
+			const controller = new AbortController(); record.controller = controller; pending.add( controller );
+			try {
+				const cacheKey = key + '|libraries:' + library + '|epoch:' + epoch;
+				let result = cache.get( cacheKey );
+				if ( result && ! result.expandedControls?.dependencies.every( dependency => ! revisions.has( dependency.id ) || revisions.get( dependency.id ).revision === dependency.revision ) ) { result = null; }
+				if ( ! result ) {
+					const response = await ( window.LieveTransport?.fetch || fetch )( lieveContext.config.elementPreviewUrl, { method: 'POST', credentials: 'same-origin', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': lieveContext.config.nonce }, body: JSON.stringify( { node: previewNodeData( node ), expandedControls: true } ) } );
+					result = await response.json(); if ( ! response.ok ) { throw new Error( result.message || 'Preview unavailable.' ); }
+				}
+				await Promise.resolve(); // Cached HTML must be adopted before Task 16 resolves its real anchor.
+				if ( ! live() || controller.signal.aborted ) { return; }
+				const data = result.expandedControls, definition = Number( node.props[ node.type === 'component' ? 'componentId' : 'templateId' ] );
+				if ( ! data || data.version !== 1 || data.owner !== node.id || data.type !== node.type || data.definition !== definition || data.tree?.id !== node.id || typeof result.html !== 'string' || JSON.stringify( data ).length > 1048576 ||
+					! Array.isArray( data.dependencies ) || data.dependencies.length > 1600 || ! data.dependencies.some( item => item.id === definition ) ) { throw new Error( 'Reusable preview provenance is unavailable.' ); }
+				const dependencies = new Map();
+				for ( const dependency of data.dependencies ) {
+					if ( ! Number.isSafeInteger( dependency.id ) || dependency.id < 1 || ! [ 'template', 'component' ].includes( dependency.kind ) || ! /^[a-f0-9]{64}$/.test( dependency.revision ) || dependencies.has( dependency.id ) ||
+						( revisions.get( dependency.id )?.clock > readClock && revisions.get( dependency.id ).revision !== dependency.revision ) ) { throw new Error( 'Reusable preview revision is obsolete.' ); }
+					dependencies.set( dependency.id, dependency );
+				}
+				let budget = 2000;
+				const valid = item => {
+					if ( ! item || --budget < 0 || ! [ 'container', 'tabs', 'opaque' ].includes( item.kind ) || typeof item.id !== 'string' || typeof item.type !== 'string' ) { return false; }
+					if ( item.source && ( ! dependencies.has( item.source.definition ) || dependencies.get( item.source.definition ).revision !== item.source.revision || ! [ 'template', 'component' ].includes( item.source.kind ) || typeof item.source.node !== 'string' || typeof item.source.instance !== 'string' ) ) { return false; }
+					if ( item.kind === 'opaque' ) { return typeof item.html === 'string'; }
+					if ( ! item.shell || ! [ 'div', 'section' ].includes( item.shell.tag ) || ! Object.entries( item.shell ).every( ( [ name, value ] ) => name === 'tag' || presentationAttribute( name ) && typeof value === 'string' ) ) { return false; }
+					if ( item.kind === 'tabs' ) { return item.type === 'tabs' && item.source && typeof item.items === 'string' && ! lieveContext.parseItems( item.items ).some( row => String( row[0] || '' ).includes( '{{' ) ) && typeof item.html === 'string' && typeof item.presentationId === 'string' && /^lieve-[0-9]+$/.test( item.presentationId ); }
+					return Array.isArray( item.children ) && item.children.every( valid );
+				};
+				if ( ! valid( data.tree ) ) { throw new Error( 'Reusable preview structure is ambiguous.' ); }
+				if ( revisions.size + [ ...dependencies.keys() ].filter( id => ! revisions.has( id ) ).length > 1600 ) { throw new Error( 'Reusable preview revision budget exceeded. Reload the editor.' ); }
+				record.dependencies = [ ...dependencies.values() ].map( dependency => {
+					const previous = revisions.get( dependency.id ), changed = previous?.revision !== dependency.revision;
+					const version = changed ? ( previous?.version || 0 ) + 1 : previous.version;
+					const clock = changed ? ++revisionSequence : previous.clock;
+					revisions.set( dependency.id, { revision: dependency.revision, version, clock, operation: Math.max( previous?.operation || 0, operation ) } );
+					return { ...dependency, version };
+				} );
+				if ( cache.size >= 20 ) { cache.delete( cache.keys().next().value ); } cache.set( cacheKey, result );
+				const started = performance.now(), registry = canvasIdentity(), parentOwner = registry.ownerFor( visual ), widgets = [], doc = visual.ownerDocument;
+				if ( ! parentOwner ) { throw new Error( 'Reusable preview owner is obsolete.' ); }
+				const fragment = doc.createDocumentFragment(), parsed = doc.createElement( 'template' ); parsed.innerHTML = result.html;
+				parsed.content.querySelectorAll( 'style[data-lieve-styles]' ).forEach( style => fragment.appendChild( style.cloneNode( true ) ) );
+				function build( item, parent, lineage = [] ) {
+					let root;
+					if ( item.kind === 'container' ) {
+						root = doc.createElement( item.shell.tag );
+						for ( const [ name, value ] of Object.entries( item.shell ) ) { if ( presentationAttribute( name ) ) { root.setAttribute( name, value ); } }
+						parent.appendChild( root ); const path = [ ...lineage, { element: root, parent } ]; item.children.forEach( child => build( child, root, path ) );
+					} else {
+						const body = doc.createElement( 'template' ); body.innerHTML = item.html; body.content.querySelectorAll( 'style[data-lieve-styles]' ).forEach( style => style.remove() );
+						const roots = Array.from( body.content.children ).filter( element => ! [ 'STYLE', 'SCRIPT', 'LINK' ].includes( element.tagName ) ); root = roots[0];
+						if ( item.kind === 'tabs' && ( roots.length !== 1 || root.tagName !== 'DIV' || Array.from( body.content.childNodes ).some( element => element.nodeType === 3 && element.textContent.trim() ) ) ) { throw new Error( 'Reusable Tabs projection is ambiguous.' ); }
+						parent.appendChild( body.content );
+						if ( item.kind === 'tabs' ) { widgets.push( { item, root, path: [ ...lineage, { element: root, parent } ] } ); }
+					}
+					return root;
+				}
+				const root = build( data.tree, fragment ); window.LieveListings?.destroy( visual ); visual.replaceChildren( fragment );
+				if ( root ) { prepareEditorRoot( root, node ); root.removeAttribute( 'style' ); }
+				// Preserve existing UI/style hooks for actual page-owned Slots/content.
+				// These selectors confer NO identity or control capability; only the
+				// private renderer-call records below may register expanded controls.
+				lieveContext.walkNodes( node.children || [], item => visual.querySelectorAll( '[data-lieve-id="' + lieveContext.styles.elementDataId( item ) + '"], [id="' + lieveContext.styles.elementHtmlId( item ) + '"]' ).forEach( element => { prepareEditorRoot( element, item ); element.removeAttribute( 'style' ); } ) );
+				const styles = Array.from( visual.querySelectorAll( 'style[data-lieve-styles]' ), style => style.textContent ).join( '\n' );
+				if ( node.type === 'component' ) { let sheet = doc.querySelector( 'style[data-component-preview="' + window.CSS.escape( node.id ) + '"]' ); if ( ! sheet ) { sheet = doc.createElement( 'style' ); sheet.dataset.componentPreview = node.id; doc.head.insertBefore( sheet, doc.getElementById( 'lieve-canvas-styles' ) ); } sheet.textContent = styles; }
+				visual.querySelectorAll( 'style[data-lieve-styles]' ).forEach( style => style.remove() );
+				for ( const widget of widgets ) {
+					// The fragment's first parent becomes the actual canonical host on adoption.
+					const path = widget.path.map( edge => ( { ...edge, parent: edge.parent === fragment ? visual : edge.parent } ) );
+					const current = () => live() && dependenciesCurrent() && path.every( edge => edge.element.parentElement === edge.parent );
+					const source = Object.freeze( { ...widget.item.source } );
+					const owner = registry.owner( { id: node.id, selectId: node.id, type: node.type, kind: 'expanded-preview', context: { scope: 'expanded-preview', contents: 'unmapped', ...source } }, parentOwner, current );
+					registry.register( widget.root, owner, 'opaque' ); record.anchors.push( widget.root );
+					registerPreviewItems( { id: widget.item.id, type: 'tabs', props: { items: widget.item.items, label: widget.item.label || '', editorLabel: node.props.editorLabel || lieveContext.labels[ node.type ] || node.type }, children: [] }, widget.root,
+						{ root: widget.root, current, presentationId: widget.item.presentationId } );
+				}
+				const binding = Object.freeze( { id: node.id, node, model, root: visual, live, current: () => live() && dependenciesCurrent() } );
+				window.LieveListings?.mount( visual, true );
+				window.LieveCodePreview?.mount( visual, { binding, select: () => { if ( binding.current() ) { lieveContext.closeContextMenu(); selectElement( node.id ); } }, contextMenu: ( id, x, y, origin ) => { if ( binding.current() ) { lieveContext.openContextMenu( node.id, x, y ); lieveContext.contextReturnFocus = origin; } }, resize: () => { updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); } } );
+				counts.mounts++; counts.buildMs += performance.now() - started; if ( visual.isConnected ) { renderCanvasStyles(); }
+			} catch ( error ) { if ( ! live() || controller.signal.aborted ) { return; } revoke( record ); counts.denied++; visual.textContent = error.message; }
+			finally { pending.delete( controller ); }
+		}
+		const api = Object.freeze( { active: () => ! dead, refresh, reset, destroy() { if ( dead ) { return; } reset(); dead = true; cache.clear(); revisions.clear(); window.removeEventListener( 'focus', onFocus ); window.removeEventListener( 'blur', onBlur ); document.removeEventListener( 'visibilitychange', onVisibility ); if ( lieveContext.config.expandedPreviewRefresh === refresh ) { delete lieveContext.config.expandedPreviewRefresh; } }, stats() { return { ...counts, hosts: mounts.size, cache: cache.size, revisions: revisions.size, pending: pending.size, anchors: [ ...mounts.values() ].reduce( ( sum, item ) => sum + item.anchors.length, 0 ), listeners: dead ? 0 : 3, observers: 0, dead }; } } );
+		expandedProjection = { api, load }; return api;
+	}
+
 	// Passive until a trusted host opts in. Only this renderer can register controls.
 	function canvasControls() {
 		if ( controlRegistry ) { return controlRegistry.api; }
@@ -366,12 +490,12 @@
 		} ) );
 		controlRegistry.built( controls.length, start );
 	}
-	function registerPreviewItems( node, visual ) {
-		const start = performance.now(), nested = node.type.endsWith( '-nested' ), tabs = node.type.startsWith( 'tabs' ), root = visual.firstElementChild;
+	function registerPreviewItems( node, visual, expanded = null ) {
+		const start = performance.now(), nested = node.type.endsWith( '-nested' ), tabs = node.type.startsWith( 'tabs' ), root = expanded ? expanded.root : visual.firstElementChild;
 		// This projection grants no authority to a server/authored node. All controls
 		// and panel shells below are newly created from canonical model positions.
 		// Reject ambiguous projections rather than interpreting content as controls.
-		if ( visual.children.length !== 1 || root?.nodeName !== 'DIV' ) { return; }
+		if ( ! expanded && visual.children.length !== 1 || root?.nodeName !== 'DIV' ) { return; }
 		let labels;
 		if ( nested ) { labels = ( node.children || [] ).map( ( child, index ) => String( child.props?.label ?? ( tabs ? 'Tab ' : 'Item ' ) + ( index + 1 ) ) ); }
 		else {
@@ -384,13 +508,13 @@
 		if ( oldItems.length !== labels.length || oldPanels.length !== labels.length || tabs && oldList?.nodeName !== 'DIV' ||
 			oldItems.some( ( item, index ) => tabs ? item.nodeName !== 'BUTTON' || item.textContent !== labels[index] || oldPanels[index].nodeName !== 'DIV' : item.nodeName !== 'DETAILS' || item.firstElementChild?.nodeName !== 'SUMMARY' || item.firstElementChild.textContent !== labels[index] ) ) { return; }
 		const definition = previewKey( node ), owner = canvasIdentity().resolve( visual ).identity, group = Object.freeze( {} ), controls = [], panels = [];
-		const current = () => root.parentElement === visual && lieveContext.findNode( lieveContext.state.document.children, node.id ) === node && previewKey( node ) === definition;
+		const current = expanded ? expanded.current : () => root.parentElement === visual && lieveContext.findNode( lieveContext.state.document.children, node.id ) === node && previewKey( node ) === definition;
 		const doc = visual.ownerDocument, tablist = tabs ? doc.createElement( 'div' ) : null;
 		if ( tabs ) { tablist.setAttribute( 'role', 'tablist' ); tablist.setAttribute( 'aria-label', String( node.props.label || 'Tabs' ) ); }
 		labels.forEach( ( label, index ) => {
 			const control = doc.createElement( tabs ? 'button' : 'summary' ), panel = doc.createElement( 'div' ), details = tabs ? null : doc.createElement( 'details' );
 			const id = 'lieve-preview-' + canvasIdentity().stats().generation + '-' + owner.instance + '-' + index;
-			control.id = id + '-control'; panel.id = id + '-panel'; control.textContent = label;
+			control.id = expanded ? expanded.presentationId + '-tab-' + index : id + '-control'; panel.id = expanded ? expanded.presentationId + '-panel-' + index : id + '-panel'; control.textContent = label;
 			control.setAttribute( 'aria-controls', panel.id ); panel.setAttribute( 'aria-labelledby', control.id ); panel.setAttribute( 'role', tabs ? 'tabpanel' : 'region' );
 			// Move opaque contents only. Never register their descendants or copy a
 			// server button/summary, event handler, command attribute or HTML ID.
@@ -703,6 +827,7 @@
 
 	async function loadElementPreview( node, visual, immediate = false ) {
 		if ( listingProjection && lieveContext.listingEditor?.enabled( node ) ) { return listingProjection.load( node, visual ); }
+		if ( expandedProjection && [ 'template', 'component' ].includes( node.type ) ) { return expandedProjection.load( node, visual ); }
 		// CSS changes are applied locally, without a new REST request or preview flash.
 		const previewNode = previewNodeData( node );
 		const key = previewKey( node );
@@ -885,6 +1010,7 @@
 		if ( identityRegistry?.stats().destroyed ) { return; }
 		canvasIdentity().reset();
 		listingProjection?.api.reset();
+		expandedProjection?.api.reset();
 		controlRegistry?.reset();
 		lieveContext.motionEditor?.stop();
 		window.LieveListings?.destroy( lieveContext.canvas );
@@ -931,6 +1057,6 @@
 		revealSelectedPreview();
 		renderCanvasStyles();
 	}
-	return { canvasIdentity, canvasControls, canvasListingProjection, canvasSelectionElement, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
+	return { canvasIdentity, canvasControls, canvasListingProjection, canvasExpandedProjection, canvasSelectionElement, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
 	};
 } )();

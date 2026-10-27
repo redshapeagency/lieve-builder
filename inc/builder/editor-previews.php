@@ -97,6 +97,105 @@ function lieve_editor_listing_preview( $node, $post ) {
 	finally { if ( null === $before ) { unset( $GLOBALS['lieve_editor_listing_projection'] ); } else { $GLOBALS['lieve_editor_listing_projection'] = $before; } }
 }
 
+/** Renderer-call provenance for reusable previews; never an editable expanded document. */
+final class Lieve_Editor_Expanded_Controls {
+	private $owner;
+	private $stack = array();
+	private $root;
+	private $valid = true;
+	private $forbidden = false;
+	private $dependencies = array();
+	private $nodes = 0;
+	private $bytes = 0;
+
+	public function __construct( $owner ) { $this->owner = $owner; }
+
+	private function dependency( $id, $kind ) {
+		if ( isset( $this->dependencies[$id] ) ) { return $this->dependencies[$id]['revision']; }
+		$post = get_post( $id );
+		$available = $post && LIEVE_TEMPLATE_POST_TYPE === $post->post_type && empty( $post->post_password ) &&
+			( 'publish' === $post->post_status || 'component' === $kind && current_user_can( 'edit_post', $id ) );
+		if ( ! $available || ! current_user_can( 'read_post', $id ) || ( 'component' === $kind && ! lieve_is_component( $id ) ) ) { $this->valid = false; $this->forbidden = true; return null; }
+		$revision = lieve_template_revision( $id );
+		$this->dependencies[$id] = array( 'id' => (int) $id, 'kind' => $kind, 'revision' => $revision );
+		return $revision;
+	}
+
+	public function render( $node, $render ) {
+		$parent = end( $this->stack );
+		if ( $parent && 'container' !== $parent->kind ) { $render(); return; }
+		if ( ! $parent ) {
+			if ( $this->root || $node['id'] !== $this->owner['id'] || empty( $node['_lieveTemplateNodePrepared'] ) ||
+				( 'template' === $this->owner['type'] ? 'template' !== $node['type'] || $node['props']['templateId'] !== $this->owner['props']['templateId'] :
+					(int) ( $node['_lieveComponentPostId'] ?? 0 ) !== (int) $this->owner['props']['componentId'] || ( $node['_lieveComponentScope'] ?? '' ) !== $this->owner['id'] ) ) { $this->valid = false; $render(); return; }
+		} else {
+			$expected = $parent->expected[ $parent->index++ ] ?? null;
+			if ( ! $expected || $expected['id'] !== $node['id'] || $expected['type'] !== $node['type'] ) { $this->valid = false; $render(); return; }
+		}
+		$source = $parent ? $parent->source : null;
+		if ( 'template' === $node['type'] ) {
+			$id = (int) $node['props']['templateId']; $revision = $this->dependency( $id, 'template' );
+			$source = array( 'definition' => $id, 'revision' => $revision, 'instance' => $node['id'], 'kind' => 'template' );
+		} elseif ( ! empty( $node['_lieveComponentPostId'] ) ) {
+			$id = (int) $node['_lieveComponentPostId']; $revision = $this->dependency( $id, 'component' );
+			$source = array( 'definition' => $id, 'revision' => $revision, 'instance' => $node['_lieveComponentScope'], 'kind' => 'component' );
+		}
+		$kind = in_array( $node['type'], array( 'section', 'container', 'block', 'div', 'template' ), true ) && ! lieve_listing_enabled( $node ) ? 'container' : 'opaque';
+		// Slots, nested widgets, listings and authored HTML remain opaque. Dynamic
+		// labels deliberately retain the separate Task 24 blocker.
+		if ( 'tabs' === $node['type'] && ! array_filter( lieve_element_items( $node['props']['items'] ?? '' ), static function( $row ) { return false !== strpos( $row[0] ?? '', '{{' ); } ) ) { $kind = 'tabs'; }
+		$frame = (object) array( 'kind' => $kind, 'node' => $node, 'source' => $source, 'index' => 0, 'children' => array(), 'expected' =>
+			'template' === $node['type'] ? ( $node['_lieveTemplateDocument']['children'] ?? array() ) : ( $node['children'] ?? array() ) );
+		if ( $parent ) { $parent->children[] = $frame; } else { $this->root = $frame; }
+		$this->stack[] = $frame; $level = ob_get_level();
+		try { ob_start(); $render(); $html = ob_get_clean(); }
+		finally { while ( ob_get_level() > $level ) { ob_end_clean(); } array_pop( $this->stack ); }
+		$frame->html = $html;
+		if ( 'opaque' !== $kind ) { $frame->shell = $this->shell( $html, $node ); if ( 'container' === $kind ) { $frame->html = ''; } }
+		$this->bytes += 'container' !== $kind ? strlen( $html ) : 0;
+		if ( ++$this->nodes > 2000 || $this->bytes > 524288 || 'container' === $kind && $frame->index !== count( $frame->expected ) ) { $this->valid = false; }
+		echo $html;
+	}
+
+	private function data( $frame ) {
+		$node = $frame->node; $source = $frame->source; if ( $source ) { $source['node'] = $node['_lieveComponentOriginalId'] ?? $node['id']; }
+		$data = array( 'kind' => $frame->kind, 'id' => $node['id'], 'type' => $node['type'], 'source' => $source );
+		if ( 'opaque' === $frame->kind ) { $data['html'] = $frame->html; return $data; }
+		$data['shell'] = $frame->shell;
+		if ( 'tabs' === $frame->kind ) { $data['items'] = $node['props']['items'] ?? ''; $data['html'] = $frame->html; $data['label'] = $node['props']['label'] ?? ''; $data['presentationId'] = 'lieve-' . lieve_element_number( $node['id'] ); }
+		else { $data['children'] = array_map( array( $this, 'data' ), $frame->children ); }
+		return $data;
+	}
+
+	private function shell( $html, $node ) {
+		$p = new WP_HTML_Tag_Processor( $html ); $shell = array();
+		while ( $p->next_tag() ) {
+			if ( in_array( $p->get_tag(), array( 'STYLE', 'SCRIPT', 'LINK' ), true ) ) { continue; }
+			$shell['tag'] = strtolower( $p->get_tag() );
+			$keys = array( 'id', 'class', 'style', 'data-lieve-id', 'data-lieve-node', 'data-lieve-scope', 'data-lieve-tabs', 'role', 'aria-label' );
+			foreach ( array_keys( $node['props']['attributes'] ?? array() ) as $key ) { if ( preg_match( '/^(?:title|lang|dir|itemprop|itemscope|itemtype|aria-[a-z0-9_-]+|data-(?!editor|lieve)[a-z0-9_-]+)$/iD', $key ) ) { $keys[] = $key; } }
+			foreach ( array_unique( $keys ) as $key ) { $value = $p->get_attribute( $key ); if ( is_string( $value ) || true === $value ) { $shell[$key] = true === $value ? '' : $value; } }
+			break;
+		}
+		return $shell;
+	}
+
+	public function forbidden() { return $this->forbidden; }
+
+	public function result() {
+		foreach ( $this->dependencies as $id => $dependency ) { if ( ! hash_equals( $dependency['revision'], lieve_template_revision( $id ) ) ) { $this->valid = false; } }
+		if ( ! $this->valid || ! $this->root || $this->stack || $this->bytes > 524288 ) { return null; }
+		return array( 'version' => 1, 'owner' => $this->owner['id'], 'type' => $this->owner['type'], 'definition' => (int) $this->owner['props'][ 'component' === $this->owner['type'] ? 'componentId' : 'templateId' ], 'dependencies' => array_values( $this->dependencies ), 'tree' => $this->data( $this->root ) );
+	}
+}
+
+function lieve_editor_expanded_preview( $node, $post ) {
+	$previous = $GLOBALS['lieve_editor_expanded_controls'] ?? null;
+	$collector = new Lieve_Editor_Expanded_Controls( $node ); $GLOBALS['lieve_editor_expanded_controls'] = $collector;
+	try { $html = lieve_render_editor_preview( $node, $post ); $projection = $collector->result(); if ( $collector->forbidden() ) { return new WP_Error( 'lieve_expanded_forbidden', 'This reusable definition is unavailable to the current user.', array( 'status' => 403 ) ); } return array( 'html' => $html, 'expandedControls' => $projection ); }
+	finally { if ( null === $previous ) { unset( $GLOBALS['lieve_editor_expanded_controls'] ); } else { $GLOBALS['lieve_editor_expanded_controls'] = $previous; } }
+}
+
 /** Match the client cache input: styles compile separately, HTML wrapper choice does not. */
 function lieve_editor_preview_node( $node, $listing = false ) {
 	$listing = $listing || function_exists( 'lieve_listing_enabled' ) && lieve_listing_enabled( $node );

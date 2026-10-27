@@ -89,6 +89,7 @@
 
 			lieveContext.state.templates = Array.isArray( result.templates ) ? result.templates : [];
 			lieveContext.state.templateTypes = Array.isArray( result.types ) ? result.types : [];
+			lieveContext.config.expandedPreviewRefresh?.();
 			renderTemplateLibrary();
 		} catch ( error ) {
 			lieveContext.templateLoading.hidden = false;

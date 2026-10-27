@@ -59,6 +59,9 @@ function lieve_rest_preview_element( $request ) {
 	if ( true === ( $payload['listingProjection'] ?? false ) && lieve_listing_enabled( $node ) ) {
 		return rest_ensure_response( lieve_editor_listing_preview( $node, $post ) );
 	}
+	if ( true === ( $payload['expandedControls'] ?? false ) && in_array( $node['type'], array( 'template', 'component' ), true ) ) {
+		return rest_ensure_response( lieve_editor_expanded_preview( $node, $post ) );
+	}
 	return rest_ensure_response( array( 'html' => lieve_render_editor_preview( $node, $post, true === ( $payload['executeCustomCode'] ?? false ) ) ) );
 }
 
