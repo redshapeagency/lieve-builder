@@ -269,7 +269,7 @@
 					if ( item.source && ( ! dependencies.has( item.source.definition ) || dependencies.get( item.source.definition ).revision !== item.source.revision || ! [ 'template', 'component' ].includes( item.source.kind ) || typeof item.source.node !== 'string' || typeof item.source.instance !== 'string' ) ) { return false; }
 					if ( item.kind === 'opaque' ) { return typeof item.html === 'string'; }
 					if ( ! item.shell || ! [ 'div', 'section' ].includes( item.shell.tag ) || ! Object.entries( item.shell ).every( ( [ name, value ] ) => name === 'tag' || presentationAttribute( name ) && typeof value === 'string' ) ) { return false; }
-					if ( item.kind === 'tabs' ) { return item.type === 'tabs' && item.source && typeof item.items === 'string' && ! lieveContext.parseItems( item.items ).some( row => String( row[0] || '' ).includes( '{{' ) ) && typeof item.html === 'string' && typeof item.presentationId === 'string' && /^lieve-[0-9]+$/.test( item.presentationId ); }
+					if ( item.kind === 'tabs' ) { return item.type === 'tabs' && item.source && typeof item.items === 'string' && typeof item.html === 'string' && typeof item.presentationId === 'string' && /^lieve-[0-9]+$/.test( item.presentationId ); }
 					return Array.isArray( item.children ) && item.children.every( valid );
 				};
 				if ( ! valid( data.tree ) ) { throw new Error( 'Reusable preview structure is ambiguous.' ); }
@@ -500,10 +500,18 @@
 		if ( nested ) { labels = ( node.children || [] ).map( ( child, index ) => String( child.props?.label ?? ( tabs ? 'Tab ' : 'Item ' ) + ( index + 1 ) ) ); }
 		else {
 			const source = node.props?.items || '';
-			try { const rows = JSON.parse( source ); if ( rows && typeof rows === 'object' && ( ! Array.isArray( rows ) || rows.some( row => ! Array.isArray( row ) || row.some( value => typeof value !== 'string' ) ) ) ) { return; } } catch ( error ) { if ( /^[\s]*[\[{]/.test( source ) ) { return; } }
+			try { const rows = JSON.parse( source ); if ( rows && typeof rows === 'object' && ( ! Array.isArray( rows ) || rows.some( row => ! Array.isArray( row ) || row.some( value => typeof value !== 'string' ) ) ) ) { return; } } catch ( error ) {
+				// A line-format reference starts with '{{', not a JSON object. Keep
+				// malformed JSON rejected and still require the exact model/shell below.
+				if ( /^[\s]*[\[{]/.test( source ) && ! ( node.type === 'tabs' && /^\s*\{\{lieve:/.test( source ) ) ) { return; }
+			}
 			labels = lieveContext.parseItems( source ).map( row => String( row[0] || '' ).replace( /^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g, '' ) );
 		}
-		if ( ! labels.length || labels.some( label => label.includes( '{{' ) ) ) { return; }
+		// The current PHP items renderer displays references literally. Their syntax
+		// is presentation data, not authority: require the complete exact model/shell
+		// match below and create fresh controls with textContent. Do not resolve a
+		// binding here or accept a different server label as a model item.
+		if ( ! labels.length || node.type !== 'tabs' && labels.some( label => label.includes( '{{' ) ) ) { return; }
 		const oldList = tabs ? root.firstElementChild : null, oldItems = Array.from( tabs ? oldList?.children || [] : root.children ), oldPanels = tabs ? Array.from( root.children ).slice( 1 ) : oldItems;
 		if ( oldItems.length !== labels.length || oldPanels.length !== labels.length || tabs && oldList?.nodeName !== 'DIV' ||
 			oldItems.some( ( item, index ) => tabs ? item.nodeName !== 'BUTTON' || item.textContent !== labels[index] || oldPanels[index].nodeName !== 'DIV' : item.nodeName !== 'DETAILS' || item.firstElementChild?.nodeName !== 'SUMMARY' || item.firstElementChild.textContent !== labels[index] ) ) { return; }

@@ -141,9 +141,10 @@ final class Lieve_Editor_Expanded_Controls {
 			$source = array( 'definition' => $id, 'revision' => $revision, 'instance' => $node['_lieveComponentScope'], 'kind' => 'component' );
 		}
 		$kind = in_array( $node['type'], array( 'section', 'container', 'block', 'div', 'template' ), true ) && ! lieve_listing_enabled( $node ) ? 'container' : 'opaque';
-		// Slots, nested widgets, listings and authored HTML remain opaque. Dynamic
-		// labels deliberately retain the separate Task 24 blocker.
-		if ( 'tabs' === $node['type'] && ! array_filter( lieve_element_items( $node['props']['items'] ?? '' ), static function( $row ) { return false !== strpos( $row[0] ?? '', '{{' ); } ) ) { $kind = 'tabs'; }
+		// Slots, nested widgets, listings and authored HTML remain opaque. Simple
+		// Tabs retain the real items renderer's literal labels, including references.
+		// The client verifies the exact source rows; label text grants no authority.
+		if ( 'tabs' === $node['type'] ) { $kind = 'tabs'; }
 		$frame = (object) array( 'kind' => $kind, 'node' => $node, 'source' => $source, 'index' => 0, 'children' => array(), 'expected' =>
 			'template' === $node['type'] ? ( $node['_lieveTemplateDocument']['children'] ?? array() ) : ( $node['children'] ?? array() ) );
 		if ( $parent ) { $parent->children[] = $frame; } else { $this->root = $frame; }
