@@ -1,8 +1,42 @@
 /* Native scroll-snap listings. No cloned slides, dependencies or background timers after teardown. */
 ( function () {
 	'use strict';
-	const instances = new Map(), rendererPreviews = new WeakSet();
+	const instances = new Map(), rendererPreviews = new WeakSet(), rendererRoots = new WeakSet(), ownership = new WeakMap(), observedDocuments = new Map();
+	const attached = ( root, doc, frame ) => root.isConnected && root.ownerDocument === doc && ( ! frame || frame.isConnected && frame.contentDocument === doc );
+	function observeDocument( doc ) {
+		if ( observedDocuments.has( doc ) || ! window.MutationObserver ) { return; }
+		// A DOM operation may remove and reinsert a live root. Judge removal at
+		// the mutation batch boundary, never during another Listing's mount.
+		const frame = doc.defaultView?.frameElement;
+		const sweep = () => {
+			for ( const [ root, instance ] of instances ) {
+				const owner = ownership.get( instance );
+				if ( owner.doc === doc && ( ! attached( root, doc, frame ) || owner.track.parentElement !== root ) ) { instance.destroy(); }
+			}
+		};
+		const observer = new window.MutationObserver( sweep ); observer.observe( doc, { childList: true, subtree: true } );
+		if ( frame ) { observer.observe( frame.ownerDocument, { childList: true, subtree: true } ); frame.addEventListener( 'load', sweep ); }
+		observedDocuments.set( doc, { observer, frame, sweep } );
+	}
+	function release( root, instance ) {
+		if ( instances.get( root ) !== instance ) { return; }
+		const doc = ownership.get( instance ).doc; instances.delete( root ); ownership.delete( instance );
+		if ( ! Array.from( instances.values() ).some( item => ownership.get( item ).doc === doc ) ) { const scope = observedDocuments.get( doc ); scope?.observer.disconnect(); scope?.frame?.removeEventListener( 'load', scope.sweep ); observedDocuments.delete( doc ); }
+	}
 	function create( root, preview = false, binding = null ) {
+		if ( ! binding && rendererRoots.has( root ) ) { return null; }
+		// No controller, listeners or observers are retained for a pending host.
+		// The renderer calls mount again after adopting its completed fragment.
+		const ownerDocument = root.ownerDocument, ownerFrame = ownerDocument.defaultView?.frameElement;
+		if ( ! ownerDocument.defaultView || ! attached( root, ownerDocument, ownerFrame ) ) { return null; }
+		const previous = instances.get( root );
+		if ( previous ) {
+			// The public API must never return a renderer's private command engine.
+			if ( rendererPreviews.has( previous ) ) { return null; }
+			const owner = ownership.get( previous );
+			if ( owner.doc === root.ownerDocument && owner.track === root.querySelector( ':scope > [data-lieve-listing-track]' ) && root.dataset.listingMode === 'slider' ) { return previous; }
+			previous.destroy();
+		}
 		const track = binding ? binding.track : root.querySelector( ':scope > [data-lieve-listing-track]' );
 		if ( ! track || ( binding ? binding.settings.mode : root.dataset.listingMode ) !== 'slider' ) { return null; }
 		const items = binding ? binding.items.slice() : Array.from( track.children ).filter( item => item.hasAttribute( 'data-lieve-listing-item' ) );
@@ -11,7 +45,7 @@
 		const controls = binding ? binding.controls : root.querySelector( ':scope > [data-lieve-listing-controls]' ), prev = binding ? binding.prev : controls?.querySelector( '[data-listing-prev]' ), next = binding ? binding.next : controls?.querySelector( '[data-listing-next]' ), dots = binding ? binding.dots : controls?.querySelector( '[data-listing-dots]' ), pause = binding ? binding.pause : controls?.querySelector( '[data-listing-pause]' ), status = binding ? binding.status : controls?.querySelector( '[data-listing-status]' );
 		// The script-disabled composition document cannot run its own rAF callbacks.
 		// Only the renderer-owned preview uses the parent clock and verified DOM refs.
-		const clock = binding ? window : win, setting = name => binding ? binding.settings[ name ] : root.dataset[ 'listing' + name[0].toUpperCase() + name.slice( 1 ) ];
+		const clock = preview ? window : win, setting = name => binding ? binding.settings[ name ] : root.dataset[ 'listing' + name[0].toUpperCase() + name.slice( 1 ) ];
 		let dotRecords = [], dotSignature = null, revision = 0, navigationFrame = 0, navigationTicks = 0, lastState = '';
 		const samples = [];
 		let index = 0, destination = null, stopCache = null, stopKey = '', timer = 0, frame = 0, paused = preview, hovering = false, focusing = false, visible = true, dead = false, gesture = null, suppressClick = false;
@@ -20,7 +54,7 @@
 		const positions = () => { const bounds = track.getBoundingClientRect(); const rtl = win.getComputedStyle( track ).direction === 'rtl'; return items.map( item => { const rect = item.getBoundingClientRect(); return rtl ? bounds.right - rect.right : rect.left - bounds.left; } ); };
 		const leading = () => { const bounds = track.getBoundingClientRect(), first = items[0].getBoundingClientRect(); return win.getComputedStyle( track ).direction === 'rtl' ? bounds.right - first.right : first.left - bounds.left; };
 		const end = () => Math.max( 0, track.scrollWidth - track.clientWidth );
-		const current = () => ! dead && ( ! binding || binding.current() );
+		const current = () => ! dead && attached( root, ownerDocument, ownerFrame ) && root.contains( track ) && ( binding ? binding.current() : root.querySelector( ':scope > [data-lieve-listing-track]' ) === track );
 		const canMove = direction => current() && end() > 1 && ( setting( 'rewind' ) === 'true' || ( direction < 0 ? index > 0 : index < stops().length - 1 ) );
 		// Include the terminal partial page exactly once. Dots and arrows share these stops.
 		function stops() {
@@ -58,21 +92,21 @@
 			if ( destination !== null && ++navigationTicks < 120 ) { navigationFrame = clock.requestAnimationFrame( observeNavigation ); }
 		}
 		function go( target ) {
+			if ( ! current() ) { return; }
 			const points = stops(); target = Math.max( 0, Math.min( points.length - 1, target ) ); const rtl = win.getComputedStyle( track ).direction === 'rtl'; destination = target;
 			track.scrollBy( { left: ( points[target].offset + leading() ) * ( rtl ? -1 : 1 ), behavior: media.matches || setting( 'motion' ) === 'instant' ? 'instant' : 'smooth' } );
 			if ( binding ) { sync(); navigationTicks = 0; if ( destination !== null && ! navigationFrame ) { navigationFrame = clock.requestAnimationFrame( observeNavigation ); } }
 		}
 		function schedule() {
 			win.clearTimeout( timer ); timer = 0;
-			if ( ! root.isConnected ) { instances.get( root )?.destroy(); instances.delete( root ); return; }
-			if ( dead || preview || root.dataset.listingAutoplay !== 'true' || paused || hovering || focusing || gesture || ! visible || media.matches || root.ownerDocument.hidden || end() <= 1 ) { return; }
-			timer = win.setTimeout( () => { timer = 0; go( index < stops().length - 1 ? index + 1 : 0 ); schedule(); }, Math.max( 2000, Math.min( 60000, Number( root.dataset.listingInterval ) || 5000 ) ) );
+			if ( ! current() || preview || root.dataset.listingAutoplay !== 'true' || paused || hovering || focusing || gesture || ! visible || media.matches || root.ownerDocument.hidden || end() <= 1 ) { return; }
+			timer = win.setTimeout( () => { timer = 0; if ( ! current() ) { return; } go( index < stops().length - 1 ? index + 1 : 0 ); schedule(); }, Math.max( 2000, Math.min( 60000, Number( root.dataset.listingInterval ) || 5000 ) ) );
 		}
 		function userMove( direction ) { if ( ! canMove( direction ) ) { return; } const last = stops().length - 1, target = ( destination ?? index ) + direction; go( setting( 'rewind' ) === 'true' ? ( target + last + 1 ) % ( last + 1 ) : target ); schedule(); }
 		if ( ! binding ) { listen( prev, 'click', () => userMove( -1 ) ); listen( next, 'click', () => userMove( 1 ) ); }
 		listen( track, 'scroll', () => { if ( ! frame && current() ) { frame = clock.requestAnimationFrame( sync ); } }, { passive: true } );
 		if ( ! binding ) { listen( track, 'keydown', event => {
-			if ( event.target !== track || ! [ 'ArrowLeft', 'ArrowRight', 'Home', 'End' ].includes( event.key ) ) { return; }
+			if ( ! current() || event.target !== track || ! [ 'ArrowLeft', 'ArrowRight', 'Home', 'End' ].includes( event.key ) ) { return; }
 			event.preventDefault(); const rtl = win.getComputedStyle( track ).direction === 'rtl';
 			if ( event.key === 'Home' ) { go( 0 ); } else if ( event.key === 'End' ) { go( stops().length - 1 ); } else { userMove( ( event.key === 'ArrowRight' ? 1 : -1 ) * ( rtl ? -1 : 1 ) ); } schedule();
 		} );
@@ -87,11 +121,11 @@
 		if ( ! preview && root.dataset.listingDrag !== 'false' ) {
 			listen( track, 'pointerdown', event => {
 				suppressClick = false;
-				if ( event.pointerType !== 'mouse' || event.button !== 0 || end() <= 1 || event.target.closest( 'a,button,input,select,textarea,label,[contenteditable="true"]' ) ) { return; }
+				if ( ! current() || event.pointerType !== 'mouse' || event.button !== 0 || end() <= 1 || event.target.closest( 'a,button,input,select,textarea,label,[contenteditable="true"]' ) ) { return; }
 				destination = null; gesture = { id: event.pointerId, start: event.clientX, last: event.clientX, moved: false }; schedule();
 			} );
 			listen( track, 'pointermove', event => {
-				if ( ! gesture || event.pointerId !== gesture.id ) { return; }
+				if ( ! current() || ! gesture || event.pointerId !== gesture.id ) { return; }
 				if ( ! gesture.moved && Math.abs( event.clientX - gesture.start ) < 6 ) { return; }
 				if ( ! gesture.moved ) { gesture.moved = true; track.classList.add( 'is-listing-dragging' ); track.setPointerCapture?.( event.pointerId ); }
 				event.preventDefault(); track.scrollBy( { left: gesture.last - event.clientX, behavior: 'instant' } ); gesture.last = event.clientX;
@@ -112,7 +146,7 @@
 		const resize = clock.ResizeObserver ? new clock.ResizeObserver( resized ) : null; resize?.observe( track ); resize?.observe( items[0] ); if ( items.length > 1 ) { resize?.observe( items.at( -1 ) ); }
 		const intersection = ! binding && win.IntersectionObserver ? new win.IntersectionObserver( entries => { visible = entries[0]?.isIntersecting !== false; schedule(); } ) : null; intersection?.observe( root );
 		sync(); schedule();
-		const instance = { destroy() { if ( dead ) { return; } dead = true; endDrag(); win.clearTimeout( timer ); clock.cancelAnimationFrame( frame ); clock.cancelAnimationFrame( navigationFrame ); frame = navigationFrame = timer = 0; resize?.disconnect(); intersection?.disconnect(); cleanups.splice( 0 ).forEach( cleanup => cleanup() ); dotRecords = []; if ( instances.get( root ) === instance ) { instances.delete( root ); } } };
+		const instance = { destroy() { if ( dead ) { return; } dead = true; endDrag(); win.clearTimeout( timer ); clock.cancelAnimationFrame( frame ); clock.cancelAnimationFrame( navigationFrame ); frame = navigationFrame = timer = 0; resize?.disconnect(); intersection?.disconnect(); cleanups.splice( 0 ).forEach( cleanup => cleanup() ); dotRecords = []; release( root, instance ); binding?.onChange?.( 'destroy' ); } };
 		if ( binding ) {
 			Object.assign( instance, {
 				current, canMove,
@@ -123,12 +157,12 @@
 				stats: () => ( { dead, items: items.length, index, stops: dead ? 0 : stops().length, controls: dotRecords.length, listeners: cleanups.length, observers: ! dead && resize ? 1 : 0, frames: Number( Boolean( frame ) ) + Number( Boolean( navigationFrame ) ), timers: Number( Boolean( timer ) ), samples: samples.slice() } ),
 			} );
 		}
+		instances.set( root, instance ); ownership.set( instance, { doc: ownerDocument, track } ); observeDocument( ownerDocument );
 		return instance;
 	}
 	function mount( scope = document, preview = false ) {
-		for ( const [ root, instance ] of instances ) { if ( ! root.isConnected ) { instance.destroy(); instances.delete( root ); } }
 		const roots = [ ...( scope.matches?.( '[data-lieve-listing]' ) ? [ scope ] : [] ), ...scope.querySelectorAll( '[data-lieve-listing]' ) ];
-		for ( const root of roots ) { if ( ! instances.has( root ) ) { const instance = create( root, preview ); if ( instance ) { instances.set( root, instance ); } } }
+		for ( const root of roots ) { create( root, preview ); }
 	}
 	function destroy( scope ) { for ( const [ root, instance ] of instances ) { if ( ! scope || root === scope || scope.contains( root ) ) { instance.destroy(); instances.delete( root ); } } }
 	// Called only by the opted-in renderer with privately owned refs and guards.
@@ -136,7 +170,7 @@
 	function createPreview( root, binding ) {
 		if ( ! binding || ! Array.isArray( binding.items ) || ! binding.items.length || binding.items.length > 20 || ! binding.current() || binding.track.parentElement !== root || binding.items.some( item => item.parentElement !== binding.track ) ) { return null; }
 		instances.get( root )?.destroy(); instances.delete( root );
-		const instance = create( root, true, binding ); if ( instance ) { instances.set( root, instance ); rendererPreviews.add( instance ); } return instance;
+		const instance = create( root, true, binding ); if ( instance ) { instances.set( root, instance ); rendererPreviews.add( instance ); rendererRoots.add( root ); } return instance;
 	}
 	window.LieveListings = { mount, destroy, create, createPreview };
 	if ( document.readyState === 'loading' ) { document.addEventListener( 'DOMContentLoaded', () => mount(), { once: true } ); } else { mount(); }

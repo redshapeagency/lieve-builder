@@ -132,7 +132,10 @@
 			const topology = Array.from( controls.children );
 			const current = () => live() && root.parentElement === visual && track.parentElement === root && canvasIdentity().active( visual ) && ( ! topology.length || controls.parentElement === root && topology.length === controls.children.length && topology.every( ( element, index ) => controls.children[index] === element ) );
 			const validate = () => current() && track.children.length === rows.length && rows.every( ( row, index ) => track.children[index] === row ) && validChildren.every( valid => valid() );
-			const changed = () => { controlRegistry?.changed(); updateSelectionOutline(); lieveContext.canvasDrag?.invalidate(); };
+			const changed = reason => {
+				if ( reason === 'destroy' ) { if ( sliders.get( visual ) === engine ) { sliders.delete( visual ); controlRegistry?.forget( visual ); } return; }
+				controlRegistry?.changed(); updateSelectionOutline(); lieveContext.canvasDrag?.invalidate();
+			};
 			const register = ( entries, revision ) => {
 				controlRegistry.forget( visual ); const started = performance.now();
 				const bind = ( element, kind, index = null ) => {
@@ -1105,6 +1108,7 @@
 		lieveContext.motionEditor?.stop(); window.LieveListings?.destroy( frames[0] );
 		const parentOwner = canvasIdentity().parent( frames[0] ); canvasIdentity().invalidate( frames[0] );
 		frames[0].replaceWith( createNodeElement( node, parentOwner ) );
+		window.LieveListings?.mount( lieveContext.canvas, true );
 		lieveContext.dynamicData?.hydrate( lieveContext.state.document, lieveContext.config.nonce, () => { renderCanvas(); renderCanvasStyles(); } );
 		revealSelectedPreview(); renderCanvasStyles(); window.LieveCodePreview?.refresh?.( lieveContext.canvas ); lieveContext.canvasDrag?.invalidate(); return true;
 	}
@@ -1152,6 +1156,7 @@
 			controlRegistry?.register( empty.querySelector( 'button' ), 'empty-add', lieveContext.canvas, () => ! lieveContext.state.document.children.length );
 			lieveContext.templateContext?.append( 'after', lieveContext.canvas, inheritedIdentity );
 			renderCanvasStyles();
+			window.LieveListings?.mount( lieveContext.canvas, true );
 			return;
 		}
 
@@ -1159,6 +1164,7 @@
 		lieveContext.templateContext?.append( 'after', lieveContext.canvas, inheritedIdentity );
 		revealSelectedPreview();
 		renderCanvasStyles();
+		window.LieveListings?.mount( lieveContext.canvas, true );
 	}
 	return { canvasIdentity, canvasControls, canvasListingProjection, canvasExpandedProjection, canvasSelectionElement, styleString, createChildren, createNodeElement, prepareEditorRoot, prepareHtmlFragment, editorBounds, previewNodeData, previewKey, seedElementPreviews, handlePreviewInteraction, revealSelectedPreview, clearDropIndicators, loadElementPreview, selectElement, renderCanvasStyles, observeSelectionLayout, updateSelectionOutline, renderCanvasElement, renderCanvas };
 	};
