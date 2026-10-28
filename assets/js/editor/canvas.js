@@ -262,6 +262,35 @@
 		if ( expandedProjection ) { return expandedProjection.api; }
 		let dead = false, epoch = 0, serial = 0, revisionSequence = 0;
 		const mounts = new Map(), cache = new Map(), revisions = new Map(), pending = new Set();
+		// Expanded instances share the browser's connection budget with verified
+		// child stylesheets. Limit their transports to preserve resource headroom.
+		// This queue owns no authority: every dispatch still needs its owner's lease.
+		const requests = []; let activeRequests = 0, draining = false;
+		function drainRequests() {
+			if ( draining ) { return; } draining = true;
+			queueMicrotask( () => {
+				draining = false;
+				while ( activeRequests < 4 && requests.length ) {
+					const job = requests.shift();
+					if ( job.controller.signal.aborted || ! job.current() ) { job.cancel(); continue; }
+					job.started = true; activeRequests++; job.controller.signal.removeEventListener( 'abort', job.cancel );
+					let released = false;
+					job.resolve( () => { if ( ! released ) { released = true; activeRequests--; drainRequests(); } } );
+				}
+			} );
+		}
+		function request( controller, current ) {
+			return new Promise( resolve => {
+				const job = { controller, current, resolve, started: false };
+				job.cancel = () => {
+					if ( job.started ) { return; } // The existing transport owns active cancellation.
+					const index = requests.indexOf( job ); if ( index !== -1 ) { requests.splice( index, 1 ); }
+					controller.signal.removeEventListener( 'abort', job.cancel ); resolve( null );
+				};
+				if ( controller.signal.aborted ) { resolve( null ); return; }
+				controller.signal.addEventListener( 'abort', job.cancel, { once: true } ); requests.push( job ); drainRequests();
+			} );
+		}
 		const identities = new WeakMap(); let nextIdentity = 0;
 		const identity = value => { if ( ! value || typeof value !== 'object' ) { return 0; } if ( ! identities.has( value ) ) { identities.set( value, ++nextIdentity ); } return identities.get( value ); };
 		const libraries = () => [ lieveContext.state.templates, lieveContext.componentEditor?.revision() || 0 ];
@@ -298,8 +327,12 @@
 				let result = cache.get( cacheKey );
 				if ( result && ! result.expandedControls?.dependencies.every( dependency => ! revisions.has( dependency.id ) || revisions.get( dependency.id ).revision === dependency.revision ) ) { result = null; }
 				if ( ! result ) {
-					const response = await ( window.LieveTransport?.fetch || fetch )( lieveContext.config.elementPreviewUrl, { method: 'POST', credentials: 'same-origin', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': lieveContext.config.nonce }, body: JSON.stringify( { node: previewNodeData( node ), expandedControls: true } ) } );
-					result = await response.json(); if ( ! response.ok ) { throw new Error( result.message || 'Preview unavailable.' ); }
+					const release = await request( controller, live ); if ( ! release ) { return; }
+					try {
+						if ( controller.signal.aborted || ! live() ) { return; }
+						const response = await ( window.LieveTransport?.fetch || fetch )( lieveContext.config.elementPreviewUrl, { method: 'POST', credentials: 'same-origin', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': lieveContext.config.nonce }, body: JSON.stringify( { node: previewNodeData( node ), expandedControls: true } ) } );
+						result = await response.json(); if ( ! response.ok ) { throw new Error( result.message || 'Preview unavailable.' ); }
+					} finally { release(); }
 				}
 				await Promise.resolve(); // Cached HTML must be adopted before Task 16 resolves its real anchor.
 				if ( ! live() || controller.signal.aborted ) { return; }
@@ -376,7 +409,7 @@
 			} catch ( error ) { if ( ! live() || controller.signal.aborted ) { return; } revoke( record ); counts.denied++; visual.textContent = error.message; }
 			finally { pending.delete( controller ); }
 		}
-		const api = Object.freeze( { active: () => ! dead, refresh, reset, destroy() { if ( dead ) { return; } reset(); dead = true; cache.clear(); revisions.clear(); window.removeEventListener( 'focus', onFocus ); window.removeEventListener( 'blur', onBlur ); document.removeEventListener( 'visibilitychange', onVisibility ); if ( lieveContext.config.expandedPreviewRefresh === refresh ) { delete lieveContext.config.expandedPreviewRefresh; } }, stats() { return { ...counts, hosts: mounts.size, cache: cache.size, revisions: revisions.size, pending: pending.size, anchors: [ ...mounts.values() ].reduce( ( sum, item ) => sum + item.anchors.length, 0 ), listeners: dead ? 0 : 3, observers: 0, dead }; } } );
+		const api = Object.freeze( { active: () => ! dead, refresh, reset, destroy() { if ( dead ) { return; } reset(); dead = true; cache.clear(); revisions.clear(); window.removeEventListener( 'focus', onFocus ); window.removeEventListener( 'blur', onBlur ); document.removeEventListener( 'visibilitychange', onVisibility ); if ( lieveContext.config.expandedPreviewRefresh === refresh ) { delete lieveContext.config.expandedPreviewRefresh; } }, stats() { return { ...counts, hosts: mounts.size, cache: cache.size, revisions: revisions.size, pending: pending.size, queued: requests.length, activeRequests, anchors: [ ...mounts.values() ].reduce( ( sum, item ) => sum + item.anchors.length, 0 ), listeners: dead ? 0 : 3, observers: 0, dead }; } } );
 		expandedProjection = { api, load }; return api;
 	}
 
@@ -979,8 +1012,11 @@
 			lieveContext.latestPreviews.set( node.id, result.html );
 			if ( visual.isConnected ) { display( result.html ); }
 		} catch ( error ) {
-			if ( error.name === 'AbortError' || job.controller.signal.aborted || ! isCurrent() || ! visual.isConnected ) { return; }
-			visual.innerHTML = '<div data-editor-ui class="lieve-editor-preview-message">' + lieveContext.escapeHtml( error.message ) + '</div>';
+			if ( job.controller.signal.aborted || ! isCurrent() || ! visual.isConnected ) { return; }
+			// The transport owns its deadline signal. An AbortError without an owner
+			// cancellation is terminal; keeping the busy placeholder would never settle.
+			const message = error.name === 'AbortError' ? 'Preview request timed out. Edit this element to try again.' : error.message;
+			visual.innerHTML = '<div data-editor-ui class="lieve-editor-preview-message">' + lieveContext.escapeHtml( message ) + '</div>';
 		} finally {
 			if ( lieveContext.previewJobs.get( node.id ) === job ) { lieveContext.previewJobs.delete( node.id ); }
 		}
