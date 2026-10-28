@@ -448,9 +448,11 @@
 					case 'popup-close-settings': lieveContext.openPopupSettings( 'style', 'close' ); break;
 					case 'preview-listing-slide-previous': case 'preview-listing-slide-next': case 'preview-listing-slide-index': {
 						const start = performance.now(), item = record.detail;
-						selectElement( canvasIdentity().resolve( record.anchor ).identity.selectId );
-						const selected = performance.now(); if ( ! valid( record ) || disabled( record ) || ! item.execute() ) { return false; }
-						if ( listingOperations.length < 2000 ) { listingOperations.push( { kind: record.kind, selectionMs: selected - start, ms: performance.now() - selected } ); }
+						// Listing navigation preserves the existing selection, as in the legacy
+						// preview. Authority still comes from the live private owner/ticket.
+						if ( ! valid( record ) || disabled( record ) ) { return false; }
+						const validated = performance.now(); if ( ! item.execute() ) { return false; }
+						if ( listingOperations.length < 2000 ) { listingOperations.push( { kind: record.kind, selectionMs: 0, validationMs: validated - start, ms: performance.now() - validated } ); }
 						updateSelectionOutline(); break;
 					}
 					case 'preview-offcanvas-open': case 'preview-offcanvas-close': {
