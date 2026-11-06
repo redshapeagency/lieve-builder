@@ -5,7 +5,7 @@
 		if ( ! config.recoveryUrl ) { return null; }
 		const newSession = () => 'lr_' + ( window.crypto?.randomUUID ? window.crypto.randomUUID().replaceAll( '-', '' ) : Date.now().toString( 36 ) + Math.random().toString( 36 ).slice( 2 ) + Math.random().toString( 36 ).slice( 2 ) );
 		let session = newSession(), previous = '', running = null, clearing = null, phase = 'active', interval = null, authBlocked = false;
-		let writeEpoch = 0, restoredSession = null, noticeEpoch = 0, dismissNotice = () => {}, resumeNotice = () => {};
+		let writeEpoch = 0, restoredSession = null, restoredCheckpoint = null, noticeEpoch = 0, dismissNotice = () => {}, resumeNotice = () => {};
 		const requests = new Map();
 		const base = () => config.isTemplate ? config.templateRevision : config.documentRevision;
 		async function request( method, payload = {} ) {
@@ -16,7 +16,7 @@
 			try { return await Promise.race( [ aborted, ( async () => {
 				const response = await ( window.LieveTransport?.fetch || fetch )( config.recoveryUrl, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce }, ...( method === 'GET' ? {} : { body: JSON.stringify( payload ) } ), signal: controller.signal } );
 				const result = await response.json();
-				if ( ! response.ok ) { const error = new Error( result.message || 'Recovery copy could not be stored.' ); error.status = response.status; throw error; }
+				if ( ! response.ok ) { const error = new Error( result.message || 'Recovery copy could not be stored.' ); error.status = response.status; error.code = result.code; throw error; }
 				if ( method !== 'GET' && result.success !== true ) { throw new Error( 'Recovery copy could not be confirmed. Your draft is retained.' ); }
 				return result;
 			} )() ] ); } finally { clearTimeout( timer ); controller.signal.removeEventListener( 'abort', cancelled ); requests.delete( controller ); }
@@ -45,14 +45,23 @@
 			if ( phase === 'stopped' ) { return Promise.resolve(); }
 			if ( clearing ) { return clearing; }
 			noticeEpoch++; writeEpoch++; dismissNotice( false );
-			const snapshot = read(), owner = session, restored = restoredSession;
+			const snapshot = read(), owner = session, restored = restoredSession, restoredCopy = restoredCheckpoint;
 			const job = ( async () => {
 				if ( running ) { try { await running; } catch ( error ) {} }
 				if ( phase !== 'active' || read() !== snapshot ) { return; }
 				await request( 'DELETE', { session: owner } );
 				previous = '';
 				if ( phase !== 'active' || read() !== snapshot ) { return; }
-				if ( restored ) { await request( 'DELETE', { session: restored } ); if ( restoredSession === restored ) restoredSession = null; }
+				if ( restored ) {
+					try { await request( 'DELETE', { session: restored, ...restoredCopy } ); }
+					catch ( error ) {
+						// The other tab still owns its newer copy. Relinquish only this old
+						// cleanup claim; a later Save must not retry deleting that new work.
+						if ( error.status === 409 && error.code === 'lieve_recovery_conflict' && restoredSession === restored ) { restoredSession = null; restoredCheckpoint = null; }
+						throw error;
+					}
+					if ( restoredSession === restored ) { restoredSession = null; restoredCheckpoint = null; }
+				}
 			} )().catch( error => {
 				if ( phase !== 'stopped' ) {
 					if ( error.status === 401 || error.status === 403 ) authBlocked = true;
@@ -69,6 +78,7 @@
 		function resume() { if ( phase !== 'suspended' ) return; phase = 'active'; authBlocked = false; startTimer(); resumeNotice(); background(); }
 		function destroy() {
 			if ( phase === 'stopped' ) return; phase = 'stopped'; noticeEpoch++; writeEpoch++; clearInterval( interval ); interval = null;
+			restoredSession = null; restoredCheckpoint = null;
 			window.removeEventListener?.( 'pagehide', onPageHide ); window.removeEventListener?.( 'pageshow', onPageShow ); window.removeEventListener?.( 'online', onOnline );
 			document.removeEventListener?.( 'visibilitychange', onVisibility ); document.removeEventListener?.( 'freeze', suspend ); document.removeEventListener?.( 'resume', resume );
 			requests.forEach( ( method, controller ) => controller.abort() ); dismissNotice( false );
@@ -81,6 +91,22 @@
 		window.addEventListener( 'pagehide', onPageHide ); window.addEventListener( 'pageshow', onPageShow ); window.addEventListener( 'online', onOnline );
 		document.addEventListener( 'visibilitychange', onVisibility ); document.addEventListener( 'freeze', suspend ); document.addEventListener( 'resume', resume );
 		const requestedEpoch = noticeEpoch;
+		function restorableDocument( value ) {
+			// Check before commit: normalization must not empty a malformed draft or
+			// consume Undo/Redo state. Unsupported element properties stay intact.
+			if ( ! value || typeof value !== 'object' || Array.isArray( value ) || value.version !== undefined && value.version !== 1 || ! Array.isArray( value.children ) ) { return false; }
+			const pending = [ { nodes: value.children, depth: 0 } ]; let count = 0;
+			while ( pending.length ) {
+				const { nodes, depth } = pending.pop();
+				for ( const node of nodes ) {
+					// WordPress's associative JSON decoder can round-trip an empty props
+					// object as []; it has no data to discard and normalizes back to {}.
+					if ( ++count > 400 || depth > 12 || ! node || typeof node !== 'object' || Array.isArray( node ) || node.props != null && ( typeof node.props !== 'object' || Array.isArray( node.props ) && node.props.length > 0 ) ) { return false; }
+					if ( node.children != null ) { if ( ! Array.isArray( node.children ) ) { return false; } pending.push( { nodes: node.children, depth: depth + 1 } ); }
+				}
+			}
+			return true;
+		}
 		function showDrafts( result ) {
 			if ( phase !== 'active' || requestedEpoch !== noticeEpoch ) return;
 			const drafts = ( result.drafts || [] ).filter( entry => entry.session !== session ).reverse(); if ( ! drafts.length ) { return; }
@@ -137,7 +163,8 @@
 					if ( ! draft.snapshot ) { const result = await request( 'GET' ); if ( phase !== 'active' || restoreEpoch !== noticeEpoch ) return; draft = ( result.drafts || [] ).find( entry => entry.session === draft.session ); }
 					if ( read() !== restoreSnapshot ) { throw new Error( 'The local draft changed while recovery was loading. Your newer edits are retained; review the copy again.' ); }
 					if ( ! draft?.snapshot?.document ) { throw new Error( 'This recovery copy is no longer available. Close this dialog and reload the editor to refresh the available copies.' ); }
-					restore( JSON.stringify( draft.snapshot ) ); restoredSession = draft.session; remove(); notify( 'Draft restored for review. Save when ready.' );
+					if ( ! restorableDocument( draft.snapshot.document ) ) { throw new Error( 'This recovery copy has an invalid or unsupported document structure. Your current draft is unchanged; the private copy is retained.' ); }
+					restore( JSON.stringify( draft.snapshot ) ); restoredSession = draft.session; restoredCheckpoint = { snapshot: draft.snapshot, baseRevision: draft.baseRevision }; remove(); notify( 'Draft restored for review. Save when ready.' );
 				} catch ( error ) { if ( phase === 'active' && restoreEpoch === noticeEpoch ) notify( 'Draft could not be restored: ' + error.message, true ); }
 				finally { if ( phase === 'active' && modalRoot.parentElement ) setBusy( false ); else busy = false; }
 			} );

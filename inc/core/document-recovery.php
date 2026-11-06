@@ -56,11 +56,27 @@ function lieve_recovery_draft_summaries( $post_id ) {
 
 function lieve_rest_document_recovery( $request ) {
 	$id = (int) $request['id']; $method = $request->get_method();
+	// A read observes the last committed user-meta record; it does not consume a
+	// checkpoint. Only writers need the lease, including Save's cleanup DELETE.
+	// Locking GET can reject a valid read while a resumed checkpoint is stored.
+	if ( 'GET' === $method ) {
+		return rest_ensure_response( array( 'drafts' => array_values( array_filter( lieve_recovery_entries(), static function( $entry ) use ( $id ) { return $entry['postId'] === $id; } ) ) ) );
+	}
 	return lieve_with_template_lock( 'recovery:' . get_current_user_id(), static function() use ( $id, $method, $request ) {
 		$entries = lieve_recovery_entries();
-		if ( 'GET' === $method ) { return rest_ensure_response( array( 'drafts' => array_values( array_filter( $entries, static function( $entry ) use ( $id ) { return $entry['postId'] === $id; } ) ) ) ); }
 		$session = $request->get_param( 'session' );
 		if ( ! is_string( $session ) || ! preg_match( '/^[a-zA-Z0-9_-]{16,80}$/D', $session ) ) { return new WP_Error( 'lieve_recovery_session', __( 'Invalid recovery session.', 'lieve-builder' ), array( 'status' => 400 ) ); }
+		// A different open tab can update a copy after it was explicitly restored.
+		// Bind that Save cleanup to the copy actually read, not just its session ID.
+		if ( 'DELETE' === $method && $request->has_param( 'snapshot' ) ) {
+			$expected = $request->get_param( 'snapshot' ); $base = $request->get_param( 'baseRevision' );
+			if ( ! is_array( $expected ) || ! is_array( $expected['document'] ?? null ) || strlen( wp_json_encode( $expected ) ) > 4000000 || ! is_string( $base ) || ! preg_match( '/^[a-f0-9]{64}$/D', $base ) ) { return new WP_Error( 'lieve_recovery_payload', __( 'Invalid recovery cleanup. The recovery copy is unchanged.', 'lieve-builder' ), array( 'status' => 400 ) ); }
+			foreach ( $entries as $entry ) {
+				if ( $entry['postId'] === $id && $entry['session'] === $session && ( $entry['baseRevision'] !== $base || $entry['snapshot'] !== $expected ) ) {
+					return new WP_Error( 'lieve_recovery_conflict', __( 'This recovery copy changed in another tab. Its newer unsaved work has been retained.', 'lieve-builder' ), array( 'status' => 409 ) );
+				}
+			}
+		}
 		$entries = array_values( array_filter( $entries, static function( $entry ) use ( $id, $session ) { return $entry['postId'] !== $id || $entry['session'] !== $session; } ) );
 		if ( 'DELETE' !== $method ) {
 			$snapshot = $request->get_param( 'snapshot' ); $base = $request->get_param( 'baseRevision' );
