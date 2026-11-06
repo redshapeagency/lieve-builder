@@ -453,7 +453,12 @@
 			event.preventDefault(); event.stopImmediatePropagation(); closeMenu( true ); counters.denials++;
 		}
 		function sync() {
-			if ( ! active() ) { return; } const start = performance.now(), entries = controls.list(), keep = new Set( entries.map( entry => entry.ticket ) );
+			if ( ! active() ) { return; } const start = performance.now(), entries = controls.list().sort( ( left, right ) => {
+				// Registration follows asynchronous adoption. Keyboard presentation follows
+				// the actual verified composition; position never grants command authority.
+				const position = left.element.compareDocumentPosition( right.element );
+				return position & 4 ? -1 : position & 2 ? 1 : 0;
+			} ), keep = new Set( entries.map( entry => entry.ticket ) ), ordered = new Map();
 			pending = null;
 			for ( const [ ticket, button ] of buttons ) { if ( ! keep.has( ticket ) ) { const focused = document.activeElement === button; button.remove(); buttons.delete( ticket ); if ( focused ) { focus(); } } }
 			for ( const entry of entries ) {
@@ -464,7 +469,19 @@
 				if ( entry.kind === 'preview-slide-index' || entry.kind === 'preview-listing-slide-index' ) { if ( entry.selected ) { button.setAttribute( 'aria-current', 'true' ); } else { button.removeAttribute( 'aria-current' ); } }
 				if ( entry.disabled && document.activeElement === button ) { focus(); }
 				button.disabled = entry.disabled;
+				ordered.set( entry.ticket, button );
 			}
+			// Reconcile around the exact focused node, never moving it. Removing and
+			// reinserting a native button can lose focus before a pending Space keyup.
+			const nodes = [ ...ordered.values() ], focused = document.activeElement, pivot = nodes.indexOf( focused );
+			function place( items, before ) {
+				for ( let index = items.length - 1; index >= 0; index-- ) {
+					const button = items[ index ]; if ( button.nextSibling !== before ) { bar.insertBefore( button, before ); } before = button;
+				}
+			}
+			if ( pivot < 0 ) { place( nodes, null ); }
+			else { place( nodes.slice( 0, pivot ), focused ); place( nodes.slice( pivot + 1 ), null ); }
+			buttons = ordered;
 			bar.hidden = ! buttons.size;
 			bar.style.display = buttons.size ? 'flex' : 'none';
 			// Removing/hiding a focused native button need not deliver focusout
@@ -664,7 +681,15 @@
 				listen( inputListeners, surface, 'mousedown', event => { if ( ! commands?.owns( event.target ) && drag.nativeMouseDown( event ) ) { pointerDown( event, true ); } } );
 			}
 			listen( inputListeners, surface, 'wheel', wheel, { passive: false } );
-			listen( inputListeners, surface, 'click', event => { if ( drag?.click( event ) ) { commands?.cancel(); } else { commands?.click( event ); } event.preventDefault(); } );
+			listen( inputListeners, surface, 'click', event => {
+				// A completing pointer click belongs to DnD. A later native keyboard
+				// activation belongs to the exact focused proxy and still validates its
+				// private current ticket in commands.click; it is not a drag completion.
+				const keyboard = event.isTrusted && event.detail === 0 && document.activeElement === event.target && commands?.owns( event.target );
+				if ( ! keyboard && drag?.click( event ) ) { commands?.cancel(); }
+				else { commands?.click( event ); }
+				event.preventDefault();
+			} );
 			listen( inputListeners, stage, 'scroll', queueOutline, { passive: true } );
 		}
 		function mount() {
