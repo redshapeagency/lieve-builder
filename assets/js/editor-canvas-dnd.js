@@ -120,7 +120,7 @@
 			app.classList.remove( 'is-dragging-canvas' ); doc.body.classList.remove( 'is-dragging-canvas' );
 			canvas.querySelectorAll( '.is-canvas-source' ).forEach( root => root.classList.remove( 'is-canvas-source' ) );
 			if ( current?.pointerId !== undefined && canvas.hasPointerCapture?.( current.pointerId ) ) { canvas.releasePointerCapture( current.pointerId ); }
-			if ( current?.active ) { suppressClick = current.pointerId !== undefined; if ( commit && destination && valid( destination ) ) { move( destination ); } finish(); }
+			if ( current?.active ) { suppressClick = current.pointerId !== undefined; if ( commit && destination && valid( destination, true ) ) { move( destination ); } finish(); }
 		}
 		function start( id ) {
 			begin( id ); session.active = true; geometry = null; app.classList.add( 'is-dragging-canvas' ); doc.body.classList.add( 'is-dragging-canvas' );

@@ -1097,9 +1097,9 @@
 		canonical: ( parentId, beforeId ) => treeDropDestination( parentId, beforeId ),
 		valid: treeDropChangesPosition, move: moveTreeElement,
 		finish: () => {
-			state.draggingId = null; clearTreeDragMotion(); clearTreeDragPreview(); clearDropIndicators();
-			structure.classList.remove( 'is-dragging' );
-			structure.querySelectorAll( '.lieve-tree-branch.is-dragging' ).forEach( branch => branch.classList.remove( 'is-dragging' ) );
+			// The same terminal cleanup releases the ordinary native source lease.
+			// Clear the slot first: canvas finish must never execute a tree drop.
+			clearTreeDropPlaceholder(); applyTreeDrop();
 		},
 	} );
 	viewport?.onZoomChange( () => canvasDrag?.invalidate() );

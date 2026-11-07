@@ -2,7 +2,7 @@
 	'use strict';
 	window.LieveEditorControllers ||= {};
 	window.LieveEditorControllers[ 'structure' ] = function create( lieveContext ) {
-	let canvasDragHandoff = null, nativeTreeSource = null, nativeTreeOwner = null, treeGeneration = 0;
+	let canvasDragHandoff = null, nativeTreeSource = null, nativeTreeOwner = null, legacyTreeSource = null, treeGeneration = 0;
 	// Application-lifetime presentation cache. Only renderer-created rows enter
 	// this map; a full render drops the previous model, paths and row references.
 	// Neither the map nor its selected-row projection is document authority.
@@ -18,7 +18,8 @@
 	// projection; a later render still verifies every exact model/path reference.
 	function destroyStructure() {
 		if ( structureDisposed ) { return; } structureDisposed = true; treeGeneration++;
-		treeProjection = null; treeRows = null; canvasDragHandoff = nativeTreeSource = nativeTreeOwner = null;
+		if ( legacyTreeSource ) { legacyTreeSource.models.clear(); legacyTreeSource.current = () => false; }
+		treeProjection = null; treeRows = null; canvasDragHandoff = nativeTreeSource = nativeTreeOwner = legacyTreeSource = null;
 		lieveContext.treeRename?.deactivate(); lieveContext.treeRename = null;
 		clearTreeDragMotion(); clearTreeDragPreview(); clearTreeDropPlaceholder();
 	}
@@ -89,8 +90,18 @@
 		return { draggingId: lieveContext.state.draggingId, parentId, beforeId, mode, depth: parentId ? lieveContext.nodeDepth( parentId ) + 1 : 0, label: mode === 'inside' ? 'Inside ' + name : name };
 	}
 
-	function validTreeDrop( intent ) {
-		if ( ! intent || intent.draggingId !== lieveContext.state.draggingId ) { return false; }
+	function validTreeDrop( intent, release = false ) {
+		if ( structureDisposed || ! intent || intent.draggingId !== lieveContext.state.draggingId ) { return false; }
+		// A persisted ID locates a node; it does not authorize a native gesture.
+		// The ordinary transport keeps the actual acquisition's model/row lease.
+		if ( legacyTreeSource && ! legacyTreeSource.current() ) { return false; }
+		if ( release && legacyTreeSource ) {
+			const models = legacyTreeSource.models; let count = 0;
+			const current = nodes => nodes.every( node => { count++; return models.get( node.id ) === node && current( node.children || [] ); } );
+			// One release-only check also covers replaced destination/ancestor nodes,
+			// including a canvas append slot with no persisted next-sibling ID.
+			if ( ! current( lieveContext.state.document.children ) || count !== models.size ) { return false; }
+		}
 		const dragging = lieveContext.findNode( lieveContext.state.document.children, intent.draggingId );
 		const parent = intent.parentId ? lieveContext.findNode( lieveContext.state.document.children, intent.parentId ) : null;
 		if ( ! dragging || lieveContext.findParent( lieveContext.state.document.children, dragging.id )?.type === 'component' || intent.parentId && ( ! parent || parent.type === 'component' || ! lieveContext.canNest( parent.type ) || lieveContext.containsId( dragging, parent.id ) ) ) { return false; }
@@ -99,8 +110,8 @@
 		return depth + lieveContext.subtreeDepth( dragging ) <= 12 && ( ! intent.beforeId || intent.beforeId !== dragging.id && siblings.some( ( node ) => node.id === intent.beforeId ) );
 	}
 
-	function treeDropChangesPosition( intent ) {
-		if ( ! validTreeDrop( intent ) ) { return false; }
+	function treeDropChangesPosition( intent, release = false ) {
+		if ( ! validTreeDrop( intent, release ) ) { return false; }
 		const oldParent = lieveContext.findParent( lieveContext.state.document.children, intent.draggingId );
 		if ( ( oldParent?.id || null ) !== intent.parentId ) { return true; }
 		const siblings = oldParent ? oldParent.children || [] : lieveContext.state.document.children;
@@ -304,7 +315,9 @@
 
 	function applyTreeDrop() {
 		clearTreeDragMotion();
-		const moved = validTreeDrop( lieveContext.treeDropIntent ) ? moveTreeElement( lieveContext.treeDropIntent ) : false;
+		const moved = validTreeDrop( lieveContext.treeDropIntent, true ) ? moveTreeElement( lieveContext.treeDropIntent ) : false;
+		if ( legacyTreeSource ) { legacyTreeSource.models.clear(); legacyTreeSource.current = () => false; }
+		legacyTreeSource = null;
 		lieveContext.state.draggingId = null; lieveContext.structure.classList.remove( 'is-dragging' );
 		lieveContext.structure.querySelectorAll( '.lieve-tree-branch.is-dragging' ).forEach( ( branch ) => branch.classList.remove( 'is-dragging' ) );
 		clearTreeDragPreview(); lieveContext.clearDropIndicators();
@@ -312,7 +325,7 @@
 	}
 
 	function handleTreeDragOver( event ) {
-		if ( ! lieveContext.state.draggingId ) { return; }
+		if ( event.isTrusted === false || ! lieveContext.state.draggingId ) { return; }
 		event.stopPropagation(); lieveContext.clearDropIndicators( true );
 		const intent = resolveTreeDrop( event );
 		const accepted = showTreeDropPlaceholder( intent );
@@ -324,9 +337,21 @@
 	}
 
 	function handleTreeDrop( event, expectedModels = null ) {
-		if ( ! lieveContext.state.draggingId ) { return; }
+		if ( event.isTrusted === false || ! lieveContext.state.draggingId ) { return; }
 		event.preventDefault(); event.stopPropagation();
 		const intent = resolveTreeDrop( event );
+		if ( legacyTreeSource ) {
+			expectedModels = legacyTreeSource.models;
+			const target = event.target.closest?.( '.lieve-tree-branch[data-id]' ), row = event.target.closest?.( '.lieve-tree-row[data-id]' );
+			const entry = treeRows?.get( target?.dataset.id );
+			const nodes = lieveContext.state.document.children, children = lieveContext.structure.children;
+			let end = children.length - 1;
+			while ( end >= 0 && ( children[ end ] === lieveContext.treeDropPlaceholder || children[ end ] === lieveContext.treeDragPreview ) ) { end--; }
+			const owned = target ? entry?.branch === target && ( ! row || row === entry.row ) && entry.current() :
+				( event.target === lieveContext.structure || event.target === lieveContext.structure.parentElement ) &&
+				children[0] === treeRows?.get( nodes[0]?.id )?.branch && children[ end ] === treeRows?.get( nodes.at( -1 )?.id )?.branch;
+			if ( ! owned ) { clearTreeDropPlaceholder(); return applyTreeDrop(); }
+		}
 		// Only the private native handoff supplies an acquisition-time reference map.
 		// A same-ID replacement cannot inherit a destination's old authority. This
 		// release-only check does not add model scans to dragover or change legacy DnD.
@@ -470,8 +495,10 @@
 				if ( rejectStaleRow( event ) ) { return; }
 				handleTreeKeyDown( event, node );
 			}, true );
+			let legacySession = null;
 			row.addEventListener( 'dragstart', ( event ) => {
 				if ( rejectStaleRow( event ) ) { return; }
+				if ( event.isTrusted === false ) { event.preventDefault(); return; }
 				if ( event.target.closest( '.lieve-tree-toggle, .lieve-tree-actions, .lieve-tree-rename' ) ) { event.preventDefault(); return; }
 				if ( canvasDragHandoff ) {
 					const handoff = canvasDragHandoff, token = {};
@@ -512,6 +539,15 @@
 				}
 				event.stopPropagation();
 				clearTreeDragMotion(); clearTreeDropPlaceholder();
+				if ( legacyTreeSource ) { legacyTreeSource.models.clear(); legacyTreeSource.current = () => false; }
+				const models = new Map(), registry = lieveContext.canvasIdentity?.(), generation = registry?.stats().generation;
+				const frame = lieveContext.viewport?.frame, frameDocument = frame?.contentDocument;
+				const capture = nodes => nodes.forEach( item => { models.set( item.id, item ); capture( item.children || [] ); } );
+				capture( sourceModel.children );
+				const acquired = { models, current: () => legacyTreeSource === acquired && currentRow() && ! lieveContext.state.saving &&
+					lieveContext.state.draggingId === sourceId && ( ! registry || ! registry.stats().destroyed && registry.stats().generation === generation ) &&
+					( ! frame || frame === lieveContext.viewport?.frame && frame.isConnected && frame.contentDocument === frameDocument ) };
+				legacySession = legacyTreeSource = acquired;
 				setTreeDragPreview( row, event );
 				lieveContext.structure.classList.add( 'is-dragging' );
 				lieveContext.state.draggingId = node.id;
@@ -519,17 +555,13 @@
 				event.dataTransfer.setData( 'text/plain', node.id );
 				// Bricks defers pointer-events:none until the native drag has started.
 				// Applying it during dragstart can cancel Chrome's drag session.
-				window.setTimeout( () => { if ( lieveContext.state.draggingId === node.id && lieveContext.structure.contains( branch ) ) { branch.classList.add( 'is-dragging' ); } }, 0 );
+				window.setTimeout( () => { if ( legacyTreeSource === acquired && acquired.current() ) { branch.classList.add( 'is-dragging' ); } }, 0 );
 			} );
-			row.addEventListener( 'dragend', () => {
+			row.addEventListener( 'dragend', event => {
 				// The private native adapter owns its whole session, including end.
 				// A late row callback must not clear another source's dragging state.
-				if ( ! currentRow() || canvasDragHandoff ) { return; }
-				lieveContext.state.draggingId = null;
-				clearTreeDragMotion();
-				clearTreeDragPreview();
-				branch.classList.remove( 'is-dragging' ); lieveContext.structure.classList.remove( 'is-dragging' );
-				lieveContext.clearDropIndicators();
+				if ( event?.isTrusted === false || canvasDragHandoff || ! legacySession || legacyTreeSource !== legacySession ) { return; }
+				clearTreeDropPlaceholder(); applyTreeDrop();
 			} );
 			branch.appendChild( row ); fragment.appendChild( branch );
 			treeRows?.set( sourceId, { row, branch, node, path: sourcePath, current: currentRow, toggle: toggleCurrent } );
