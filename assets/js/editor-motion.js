@@ -89,14 +89,14 @@
 		shelf.addEventListener( 'pointercancel', cancelDrag );
 		shelf.addEventListener( 'keydown', event => { if ( event.key === 'Escape' ) { if ( drag ) { cancelDrag(); } else { stop(); } return; } const target = event.target.closest( '[data-motion-clip]' ); if ( ! target || ! [ 'ArrowLeft', 'ArrowRight' ].includes( event.key ) ) { return; } event.preventDefault(); event.stopPropagation(); stop(); const step = current().steps.find( item => item.id === target.closest( '[data-track-step]' ).dataset.trackStep ); const key = target.dataset.motionClip === 'move' ? 'start' : 'duration'; const value = Math.max( key === 'duration' ? .01 : 0, Math.min( key === 'duration' ? 120 : 300, Math.round( ( effective( step )[ key ] + ( event.key === 'ArrowRight' ? 1 : -1 ) * ( event.shiftKey ? .5 : .05 ) ) * 100 ) / 100 ) ); structural( () => writeTiming( step, key, value ) ); syncShelf(); shelf.querySelector( '[data-track-step="' + step.id + '"] [data-motion-clip="' + target.dataset.motionClip + '"]' )?.focus( { preventScroll: true } ); } );
 		function bind( root, node ) {
-			const group = root.querySelector( '.lieve-motion' ); if ( ! group ) { return { destroy() {} }; } const boundDevice = device(); let live = true;
+			const group = root.querySelector( '.lieve-motion' ); if ( ! group ) { return { destroy() {} }; } const boundDevice = device(), boundDocument = read(); let live = true;
 			if ( current( node )?.trigger === 'scroll' && group.querySelector( '[data-motion-row]' ) ) {
 				group.querySelector( '[data-motion-field="repeat"]' ).disabled = true;
 				group.querySelector( '[data-motion-field="yoyo"]' ).disabled = true;
 				const help = document.createElement( 'p' ); help.className = 'lieve-element-help'; help.textContent = 'Scroll position controls progress. Repeats and alternate direction are unavailable in this mode; their values are kept for other modes.';
 				group.querySelector( '.lieve-motion-yoyo' ).after( help );
 			}
-			const valid = () => live && group.isConnected && selected()?.id === node.id && boundDevice === device();
+			const valid = () => live && group.isConnected && read() === boundDocument && selected() === node && boundDevice === device();
 			const errors = () => {
 				const row = current( node ), issues = row ? model.errors( row ) : {}, output = group.querySelector( '[data-motion-errors]' );
 				if ( output ) { output.textContent = Object.values( issues )[0] || ''; }

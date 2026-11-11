@@ -14,13 +14,13 @@
 		return '';
 	}
 
-	function bindElementId( node, data = false ) {
+	function bindElementId( node, data = false, isCurrent = () => true ) {
 		const field = lieveContext.inspector.querySelector( data ? '[data-data-lieve-id]' : '[data-html-id]' ); if ( ! field ) { return; }
 		const help = lieveContext.inspector.querySelector( data ? '#lieve-data-value-help' : '#lieve-html-id-help' ); const reset = lieveContext.inspector.querySelector( data ? '[data-reset-data-id]' : '[data-reset-html-id]' );
 		const property = data ? 'dataLieveId' : 'htmlId', automatic = data ? automaticDataId( node ) : automaticHtmlId( node );
 		const hint = data ? 'Leave blank to use the automatic data-lieve-id. Start with a letter or underscore.' : 'Leave blank to use the automatic ID. Start with a letter or underscore.';
 		const update = event => {
-			if ( event?.isComposing ) { return; }
+			if ( ! isCurrent() || field.isConnected === false || event?.isComposing ) { return; }
 			const value = field.value.trim(); const error = elementIdError( value, node, data );
 			field.setAttribute( 'aria-invalid', String( Boolean( error ) ) ); field.setCustomValidity( error );
 			help.textContent = error || hint;
@@ -30,8 +30,8 @@
 			syncIdentityControls( node );
 		};
 		field.addEventListener( 'input', update ); field.addEventListener( 'compositionend', update );
-		field.addEventListener( 'blur', () => { lieveContext.liveEdit = null; } );
-		reset.addEventListener( 'click', () => { field.value = ''; update(); field.focus( { preventScroll: true } ); } );
+		field.addEventListener( 'blur', () => { if ( isCurrent() && field.isConnected !== false ) { lieveContext.liveEdit = null; } } );
+		reset.addEventListener( 'click', () => { if ( ! isCurrent() ) { return; } field.value = ''; update(); field.focus( { preventScroll: true } ); } );
 	}
 
 	function customAttributeRows( node ) {
@@ -102,7 +102,7 @@
 		return lieveContext.group( 'Custom attributes', '<div class="lieve-attributes-body"><p id="lieve-attributes-help" class="lieve-element-help">Choose a suggestion or type any attribute name. Leave the value blank for a boolean attribute.</p><div class="lieve-attribute-list">' + fields + '</div>' + ( rows.length ? '' : '<p class="lieve-attributes-empty">No custom attributes added.</p>' ) + '<button type="button" class="lieve-button-secondary lieve-attribute-add" data-attribute-add' + ( rows.length >= 30 ? ' disabled' : '' ) + '>' + customAttributeIcon( 'add' ) + 'Add attribute</button></div>', 'lieve-attributes-group' );
 	}
 
-	function bindCustomAttributes( node ) {
+	function bindCustomAttributes( node, isCurrent = () => true ) {
 		const group = lieveContext.inspector.querySelector( '.lieve-attributes-group' ); if ( ! group ) { return; }
 		const sync = () => {
 			const errors = customAttributeErrors( customAttributeRows( node ) );
@@ -115,7 +115,7 @@
 		};
 		group.querySelectorAll( '[data-attribute-name], [data-attribute-value]' ).forEach( field => {
 			const update = event => {
-				if ( event?.isComposing ) { return; }
+				if ( ! isCurrent() || field.isConnected === false || event?.isComposing ) { return; }
 				const index = Number( field.closest( '[data-attribute-row]' ).dataset.attributeRow );
 				lieveContext.liveChange( node.id + ':attribute:' + index + ':' + ( field.hasAttribute( 'data-attribute-name' ) ? 'name' : 'value' ), () => {
 					const rows = customAttributeRows( node ); rows[ index ][ field.hasAttribute( 'data-attribute-name' ) ? 'name' : 'value' ] = field.value; writeCustomAttributes( node, rows );
@@ -124,9 +124,10 @@
 				sync();
 			};
 			[ 'input', 'change', 'compositionend' ].forEach( type => field.addEventListener( type, update ) );
-			field.addEventListener( 'blur', () => { lieveContext.liveEdit = null; } );
+			field.addEventListener( 'blur', () => { if ( isCurrent() && field.isConnected !== false ) { lieveContext.liveEdit = null; } } );
 		} );
 		group.querySelectorAll( '[data-attribute-action], [data-attribute-add]' ).forEach( button => button.addEventListener( 'click', () => {
+			if ( ! isCurrent() ) { return; }
 			const rows = customAttributeRows( node ); const action = button.dataset.attributeAction || 'add'; const index = action === 'add' ? rows.length : Number( button.closest( '[data-attribute-row]' ).dataset.attributeRow );
 			if ( action !== 'delete' && rows.length >= 30 ) { return; }
 			if ( action === 'delete' ) { rows.splice( index, 1 ); }
@@ -182,8 +183,9 @@
 		const label = lieveContext.inspector.querySelector( '[data-element-html-id]' ); if ( label ) { label.textContent = identityEnabled( node.props, 'outputHtmlId' ) ? '#' + lieveContext.styles.elementHtmlId( node ) : 'HTML ID output off'; label.title = label.textContent; }
 	}
 
-	function bindIdentityControls( node ) {
+	function bindIdentityControls( node, isCurrent = () => true ) {
 		lieveContext.inspector.querySelectorAll( '[data-reset-identity]' ).forEach( button => button.addEventListener( 'click', () => {
+			if ( ! isCurrent() ) { return; }
 			lieveContext.liveEdit = null; lieveContext.liveChange( node.id + ':identity:reset:' + button.dataset.resetIdentity, () => { delete node.props[ button.dataset.resetIdentity ]; } ); lieveContext.liveEdit = null; syncIdentityControls( node );
 		} ) );
 	}
@@ -218,7 +220,7 @@
 		return markupResetButton( 'data-reset-markup-classes', 'Reset to global', ! Object.keys( node.props.markupClasses || {} ).length, 'Reset all system class overrides to global' );
 	}
 
-	function bindMarkupClasses( node ) {
+	function bindMarkupClasses( node, isCurrent = () => true ) {
 		const sync = () => {
 			const overrides = node.props.markupClasses || {};
 			elementMarkupClassOptions( node ).forEach( option => {
@@ -229,8 +231,8 @@
 			} );
 			const reset = lieveContext.inspector.querySelector( '[data-reset-markup-classes]' ); if ( reset ) { reset.disabled = ! Object.keys( overrides ).length; }
 		};
-		lieveContext.inspector.querySelectorAll( '[data-markup-class]' ).forEach( field => field.addEventListener( 'change', () => { lieveContext.liveEdit = null; lieveContext.liveChange( node.id + ':markup:' + field.dataset.markupClass, () => { node.props.markupClasses = { ...node.props.markupClasses, [ field.dataset.markupClass ]: field.checked }; } ); lieveContext.liveEdit = null; sync(); } ) );
-		lieveContext.inspector.querySelectorAll( '[data-reset-markup-class], [data-reset-markup-classes]' ).forEach( button => button.addEventListener( 'click', () => { lieveContext.liveEdit = null; lieveContext.liveChange( node.id + ':markup:reset', () => { if ( button.dataset.resetMarkupClass ) { delete node.props.markupClasses?.[ button.dataset.resetMarkupClass ]; if ( ! Object.keys( node.props.markupClasses || {} ).length ) { delete node.props.markupClasses; } } else { delete node.props.markupClasses; } } ); lieveContext.liveEdit = null; sync(); } ) );
+		lieveContext.inspector.querySelectorAll( '[data-markup-class]' ).forEach( field => field.addEventListener( 'change', () => { if ( ! isCurrent() ) { return; } lieveContext.liveEdit = null; lieveContext.liveChange( node.id + ':markup:' + field.dataset.markupClass, () => { node.props.markupClasses = { ...node.props.markupClasses, [ field.dataset.markupClass ]: field.checked }; } ); lieveContext.liveEdit = null; sync(); } ) );
+		lieveContext.inspector.querySelectorAll( '[data-reset-markup-class], [data-reset-markup-classes]' ).forEach( button => button.addEventListener( 'click', () => { if ( ! isCurrent() ) { return; } lieveContext.liveEdit = null; lieveContext.liveChange( node.id + ':markup:reset', () => { if ( button.dataset.resetMarkupClass ) { delete node.props.markupClasses?.[ button.dataset.resetMarkupClass ]; if ( ! Object.keys( node.props.markupClasses || {} ).length ) { delete node.props.markupClasses; } } else { delete node.props.markupClasses; } } ); lieveContext.liveEdit = null; sync(); } ) );
 	}
 	return { elementIdError, bindElementId, customAttributeRows, customAttributeNameAllowed, customAttributeValueAllowed, customAttributeErrors, writeCustomAttributes, customAttributeIcon, customAttributesControl, bindCustomAttributes, validateCustomAttributes, automaticHtmlId, automaticDataId, identityEnabled, elementIdentityControl, syncIdentityControls, bindIdentityControls, elementMarkupClassOptions, markupResetIcon, markupResetButton, elementMarkupClassesControl, markupClassesResetControl, bindMarkupClasses };
 	};

@@ -188,7 +188,11 @@
 		enhance( category ); filter(); position(); void popup.offsetWidth; popup.classList.add( 'is-open' ); search.focus( { preventScroll: true } );
 	}
 
-	function chooseImage() {
+	function chooseImage( isCurrent = () => true ) {
+		const model = lieveContext.state.document, node = lieveContext.findNode( model.children, lieveContext.state.selectedId );
+		const admitted = typeof isCurrent === 'function' ? isCurrent : () => true;
+		const current = () => admitted() && lieveContext.state.document === model && lieveContext.state.selectedId === node?.id && lieveContext.findNode( model.children, node?.id ) === node;
+		if ( ! node || node.type !== 'image' || ! current() ) { return; }
 		if ( ! window.wp?.media ) {
 			lieveContext.showToast( 'The Media Library is unavailable.', true );
 			return;
@@ -200,6 +204,7 @@
 			multiple: false,
 		} );
 		frame.on( 'select', () => {
+			if ( ! current() ) { return; }
 			const attachment = frame.state().get( 'selection' ).first().toJSON();
 			lieveContext.commit( () => {
 				const node = lieveContext.findNode( lieveContext.state.document.children, lieveContext.state.selectedId );

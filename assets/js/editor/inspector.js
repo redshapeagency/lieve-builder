@@ -142,6 +142,8 @@
 	}
 
 	function renderPopupInspector() {
+		const documentModel = lieveContext.state.document, revision = lieveContext.inspectorRevision, postId = lieveContext.config.postId;
+		const isCurrent = () => lieveContext.state.document === documentModel && lieveContext.inspectorRevision === revision && lieveContext.config.postId === postId && lieveContext.popupPanelOpen && lieveContext.isPopupTemplate() && lieveContext.inspector.isConnected !== false && ! lieveContext.viewport?.readiness?.().destroyed;
 		const settings = lieveContext.state.popupSettings; const node = lieveContext.popupStyleNode(); const model = window.LievePopupSettings;
 		const choice = ( key, label, choices, selected ) => '<div class="lieve-control"><label for="lieve-popup-' + key + '">' + lieveContext.escapeHtml( label ) + '</label><select id="lieve-popup-' + key + '" data-popup-setting="' + key + '">' + Object.entries( choices ).map( ( [ value, text ] ) => '<option value="' + value + '"' + ( String( selected ) === value ? ' selected' : '' ) + '>' + lieveContext.escapeHtml( text ) + '</option>' ).join( '' ) + '</select></div>';
 		const toggle = ( key, label, help ) => '<label class="lieve-checkbox lieve-popup-switch"><span><strong>' + label + '</strong><small>' + help + '</small></span><input type="checkbox" role="switch" data-popup-setting="' + key + '" aria-label="' + label + '"' + ( settings[ key ] ? ' checked' : '' ) + '></label>';
@@ -163,7 +165,7 @@
 		lieveContext.inspector.querySelector( '[data-popup-panel-close]' ).addEventListener( 'click', () => { lieveContext.popupPanelOpen = false; lieveContext.styleTarget = 'root'; lieveContext.styleState = 'normal'; renderInspector(); lieveContext.renderTemplateSettings(); lieveContext.renderCanvasStyles(); document.getElementById( 'lieve-popup-settings' )?.focus( { preventScroll: true } ); } );
 		lieveContext.inspector.querySelectorAll( '[data-popup-setting]' ).forEach( field => {
 			const update = event => {
-				if ( event.isComposing || field.validity?.badInput ) { return; }
+				if ( ! isCurrent() || field.isConnected === false || event.isComposing || field.validity?.badInput ) { return; }
 				const key = field.dataset.popupSetting;
 				if ( key === 'placement' ) { if ( field.value === 'custom' ) { return; } const [ vertical, horizontal ] = field.value.split( ':' ); lieveContext.liveChange( 'popup:placement:' + lieveContext.styleDevice, () => { lieveContext.styles.write( lieveContext.popupStyleNode(), 'frame', lieveContext.styleDevice, 'normal', 'align-items', vertical ); lieveContext.styles.write( lieveContext.popupStyleNode(), 'frame', lieveContext.styleDevice, 'normal', 'justify-items', horizontal ); }, true ); return; }
 				const value = field.type === 'checkbox' ? field.checked : field.type === 'number' ? Number( field.value ) : field.value;
@@ -172,10 +174,10 @@
 				lieveContext.liveChange( 'popup:' + key, () => { lieveContext.state.popupSettings[ key ] = value; }, true );
 				const warning = lieveContext.inspector.querySelector( '.lieve-popup-dismiss-warning' ); warning.hidden = lieveContext.state.popupSettings.closeButton || lieveContext.state.popupSettings.closeOnEscape || lieveContext.state.popupSettings.closeOnBackdrop;
 			};
-			field.addEventListener( 'input', update ); field.addEventListener( 'change', update ); field.addEventListener( 'blur', () => { lieveContext.liveEdit = null; } );
+			field.addEventListener( 'input', update ); field.addEventListener( 'change', update ); field.addEventListener( 'blur', () => { if ( isCurrent() && field.isConnected ) { lieveContext.liveEdit = null; } } );
 		} );
 		lieveContext.inspector.querySelectorAll( '[data-popup-preview]' ).forEach( button => button.addEventListener( 'click', () => { const shell = lieveContext.canvas.querySelector( '[data-editor-popup-shell]' ); if ( shell ) { void window.LievePopups?.preview( shell, lieveContext.state.popupSettings, button.dataset.popupPreview === 'entrance' ); } } ) );
-		lieveContext.bindStyleControls( node ); enhanceInspectorSelects(); refreshInspectorIndicators();
+		lieveContext.bindStyleControls( node, isCurrent ); enhanceInspectorSelects(); refreshInspectorIndicators();
 	}
 
 	function writeCustomCode( id, property, value ) {
@@ -335,8 +337,20 @@
 		lieveContext.hideEditorTooltip();
 		lieveContext.closeTokenPicker();
 		const node = lieveContext.findNode( lieveContext.state.document.children, lieveContext.state.selectedId );
-		const model = lieveContext.state.document, isCurrent = () => lieveContext.state.document === model && lieveContext.findNode( model.children, node?.id ) === node;
+		const model = lieveContext.state.document, path = [];
+		// Bind once to the canonical ancestor path, never rescan the page per input.
+		const locate = nodes => {
+			for ( let index = 0; index < nodes.length; index++ ) {
+				const item = nodes[index]; path.push( { nodes, index, node: item } );
+				if ( item === node || locate( item.children || [] ) ) { return true; }
+				path.pop();
+			}
+			return false;
+		};
+		const located = node && locate( model.children );
+		const isCurrent = () => inspectorOwner === owner && lieveContext.inspector.isConnected !== false && lieveContext.state.selectedId === node?.id && lieveContext.config.postId === owner?.postId && ! lieveContext.viewport?.readiness?.().destroyed && lieveContext.state.document === model && located && path.every( ( entry, index ) => ( index ? path[index - 1].node.children : model.children ) === entry.nodes && entry.nodes[entry.index] === entry.node );
 		inspectorOwner = node ? { node, model, postId: lieveContext.config.postId } : null;
+		const owner = inspectorOwner;
 		if ( ( savedCode || keepCodeOwner ) && expandedCode ) { expandedCode.owner = inspectorOwner; }
 		if ( lieveContext.popupPanelOpen && lieveContext.isPopupTemplate() ) { lieveContext.activeClassId = null; renderPopupInspector(); return; }
 		if ( lieveContext.popupPanelOpen ) { lieveContext.styleTarget = 'root'; lieveContext.styleState = 'normal'; }
@@ -425,7 +439,7 @@
 				if ( property === 'className' ) { lieveContext.syncElementClassSummary(); lieveContext.classSelector?.refresh(); }
 			};
 			field.addEventListener( 'input', update ); field.addEventListener( 'change', update ); field.addEventListener( 'compositionend', update );
-			field.addEventListener( 'blur', () => { lieveContext.liveEdit = null; } );
+			field.addEventListener( 'blur', () => { if ( isCurrent() && field.isConnected ) { lieveContext.liveEdit = null; } } );
 		} );
 		const phpToggle = lieveContext.inspector.querySelector( '[data-prop="phpPreview"]' ); if ( phpToggle ) { phpToggle.disabled = ! lieveContext.config.customCode?.phpEnabled || ! lieveContext.config.customCode?.canAuthor; }
 		lieveContext.inspector.querySelectorAll( '[data-clear-code]' ).forEach( button => button.addEventListener( 'click', () => { if ( ! isCurrent() ) { return; } lieveContext.liveEdit = null; writeCustomCode( node.id, button.dataset.clearCode, '' ); lieveContext.liveEdit = null; lieveContext.codeEditor?.refresh(); } ) );
@@ -439,55 +453,57 @@
 			const options = expandedCodeOptions( node, property, field, button );
 			expandedCode = { owner: inspectorOwner, options, property }; lieveContext.codeEditor.open( options );
 		} ) );
-		lieveContext.bindStyleControls( node );
-		lieveContext.listingEditor?.bind( { root: lieveContext.inspector, node, device: lieveContext.styleDevice, read: () => lieveContext.findNode( lieveContext.state.document.children, node.id ), change: lieveContext.liveChange, refresh: () => preserveInspectorScroll( renderInspector ) } );
+		lieveContext.bindStyleControls( node, isCurrent );
+		lieveContext.listingEditor?.bind( { root: lieveContext.inspector, node, device: lieveContext.styleDevice, read: () => isCurrent() ? node : null, change: ( ...args ) => { if ( isCurrent() ) { lieveContext.liveChange( ...args ); } }, refresh: () => { if ( isCurrent() ) { preserveInspectorScroll( renderInspector ); } } } );
 		lieveContext.inspector.querySelectorAll( '[data-dynamic-style], [data-dynamic-prop]' ).forEach( button => {
-			button.addEventListener( 'click', () => lieveContext.openDynamicPicker( button ) );
+			button.addEventListener( 'click', () => { if ( isCurrent() ) { lieveContext.openDynamicPicker( button ); } } );
 			const property = button.dataset.dynamicStyle || button.dataset.dynamicProp;
 			const field = lieveContext.inspector.querySelector( '[' + ( button.hasAttribute( 'data-dynamic-style' ) ? 'data-style-prop' : 'data-prop' ) + '="' + window.CSS.escape( property ) + '"]' );
 			field?.addEventListener( 'input', () => button.setAttribute( 'aria-pressed', String( Boolean( lieveContext.dynamicData.parse( field.value ) ) ) ) );
 		} );
-		lieveContext.bindElementId( node );
-		lieveContext.bindElementId( node, true );
-		lieveContext.bindIdentityControls( node );
-		lieveContext.bindMarkupClasses( node );
-		lieveContext.bindCustomAttributes( node );
-		lieveContext.inspector.querySelector( '[data-element-class-list]' )?.addEventListener( 'click', event => { const button = event.target.closest( '[data-summary-class-edit]' ); if ( button ) { lieveContext.changeClassTarget( button.dataset.summaryClassEdit === lieveContext.activeClassId ? null : button.dataset.summaryClassEdit ); } } );
-		lieveContext.inspector.querySelector( '[data-exit-class-styles]' )?.addEventListener( 'click', () => lieveContext.changeClassTarget( null ) );
+		lieveContext.bindElementId( node, false, isCurrent );
+		lieveContext.bindElementId( node, true, isCurrent );
+		lieveContext.bindIdentityControls( node, isCurrent );
+		lieveContext.bindMarkupClasses( node, isCurrent );
+		lieveContext.bindCustomAttributes( node, isCurrent );
+		lieveContext.inspector.querySelector( '[data-element-class-list]' )?.addEventListener( 'click', event => { if ( ! isCurrent() ) { return; } const button = event.target.closest( '[data-summary-class-edit]' ); if ( button ) { lieveContext.changeClassTarget( button.dataset.summaryClassEdit === lieveContext.activeClassId ? null : button.dataset.summaryClassEdit ); } } );
+		lieveContext.inspector.querySelector( '[data-exit-class-styles]' )?.addEventListener( 'click', () => { if ( isCurrent() ) { lieveContext.changeClassTarget( null ); } } );
 		lieveContext.motionController = lieveContext.motionEditor?.bind( lieveContext.inspector, node ) || null;
-		lieveContext.elementConditionController = window.LieveElementConditionEditor?.bind( { root: lieveContext.inspector, node, read: () => lieveContext.findNode( lieveContext.state.document.children, node.id ), change: ( key, change, discrete ) => { if ( discrete ) { lieveContext.liveEdit = null; } lieveContext.liveChange( key, change, 'metadata' ); if ( discrete ) { lieveContext.liveEdit = null; } }, structural: ( change, after ) => preserveInspectorScroll( () => { if ( change ) { lieveContext.commit( change, true ); } after?.(); }, ! change ), refresh: renderInspector, openDynamic: lieveContext.openDynamicPicker, url: lieveContext.config.elementConditionUrl, nonce: lieveContext.config.nonce } ) || null;
+		lieveContext.elementConditionController = window.LieveElementConditionEditor?.bind( { root: lieveContext.inspector, node, read: () => isCurrent() ? node : null, change: ( key, change, discrete ) => { if ( ! isCurrent() ) { return; } if ( discrete ) { lieveContext.liveEdit = null; } lieveContext.liveChange( key, change, 'metadata' ); if ( discrete ) { lieveContext.liveEdit = null; } }, structural: ( change, after ) => { if ( ! isCurrent() ) { return; } return preserveInspectorScroll( () => { if ( change ) { lieveContext.commit( change, true ); } after?.(); }, ! change ); }, refresh: () => { if ( isCurrent() ) { renderInspector(); } }, openDynamic: lieveContext.openDynamicPicker, url: lieveContext.config.elementConditionUrl, nonce: lieveContext.config.nonce } ) || null;
 		lieveContext.motionEditor?.sync();
-		lieveContext.interactController = window.LieveInteractEditor?.bind( { root: lieveContext.inspector, node, read: () => lieveContext.findNode( lieveContext.state.document.children, node.id ), elements: interactionElementChoices(), popupChoices: lieveContext.config.popupChoices || {}, refreshPopups: lieveContext.refreshPopupChoices, change: ( key, change, discrete ) => { if ( discrete ) { lieveContext.liveEdit = null; } lieveContext.liveChange( key, change, 'metadata' ); if ( discrete ) { lieveContext.liveEdit = null; } }, structural: ( change, after ) => preserveInspectorScroll( () => { if ( change ) { lieveContext.commit( change, true ); } after?.(); }, ! change ), refresh: renderInspector, notice: lieveContext.showToast } ) || null;
-		lieveContext.classSelector = window.LieveClasses?.bind( { root: lieveContext.inspector, workspace: lieveContext.classWorkspace, app: lieveContext.app, editing: () => lieveContext.activeClassId, edit: lieveContext.changeClassTarget, read: () => lieveContext.findNode( lieveContext.state.document.children, node.id )?.props.classIds || [], change: ids => { if ( lieveContext.activeClassId && ! ids.includes( lieveContext.activeClassId ) ) { lieveContext.activeClassId = null; } lieveContext.commit( () => { const current = lieveContext.findNode( lieveContext.state.document.children, node.id ); if ( current ) { current.props.classIds = ids; } }, true ); lieveContext.syncElementClassSummary(); }, readManual: () => lieveContext.findNode( lieveContext.state.document.children, node.id )?.props.className || '', changeManual: value => { lieveContext.commit( () => { const current = lieveContext.findNode( lieveContext.state.document.children, node.id ); if ( current ) { if ( value ) { current.props.className = value; } else { delete current.props.className; } } }, true ); const field = lieveContext.inspector.querySelector( '[data-prop="className"]' ); if ( field ) { field.value = value; } lieveContext.syncElementClassSummary(); } } );
+		lieveContext.interactController = window.LieveInteractEditor?.bind( { root: lieveContext.inspector, node, read: () => isCurrent() ? node : null, elements: interactionElementChoices(), popupChoices: lieveContext.config.popupChoices || {}, refreshPopups: lieveContext.refreshPopupChoices, change: ( key, change, discrete ) => { if ( ! isCurrent() ) { return; } if ( discrete ) { lieveContext.liveEdit = null; } lieveContext.liveChange( key, change, 'metadata' ); if ( discrete ) { lieveContext.liveEdit = null; } }, structural: ( change, after ) => { if ( ! isCurrent() ) { return; } return preserveInspectorScroll( () => { if ( change ) { lieveContext.commit( change, true ); } after?.(); }, ! change ); }, refresh: () => { if ( isCurrent() ) { renderInspector(); } }, notice: lieveContext.showToast } ) || null;
+		lieveContext.classSelector = window.LieveClasses?.bind( { root: lieveContext.inspector, workspace: lieveContext.classWorkspace, app: lieveContext.app, editing: () => lieveContext.activeClassId, edit: lieveContext.changeClassTarget, read: () => lieveContext.findNode( lieveContext.state.document.children, node.id )?.props.classIds || [], change: ids => { if ( ! isCurrent() ) { return; } if ( lieveContext.activeClassId && ! ids.includes( lieveContext.activeClassId ) ) { lieveContext.activeClassId = null; } lieveContext.commit( () => { const current = lieveContext.findNode( lieveContext.state.document.children, node.id ); if ( current ) { current.props.classIds = ids; } }, true ); lieveContext.syncElementClassSummary(); }, readManual: () => lieveContext.findNode( lieveContext.state.document.children, node.id )?.props.className || '', changeManual: value => { if ( ! isCurrent() ) { return; } lieveContext.commit( () => { const current = lieveContext.findNode( lieveContext.state.document.children, node.id ); if ( current ) { if ( value ) { current.props.className = value; } else { delete current.props.className; } } }, true ); const field = lieveContext.inspector.querySelector( '[data-prop="className"]' ); if ( field ) { field.value = value; } lieveContext.syncElementClassSummary(); } } );
 		lieveContext.inspector.querySelectorAll( 'button[title], a[title]' ).forEach( button => { button.dataset.tooltip = button.title; button.removeAttribute( 'title' ); } );
-		lieveContext.componentEditor?.bind( lieveContext.inspector, node );
-		lieveContext.inspector.querySelector('[data-slot-reset]')?.addEventListener('click',()=>{if(node.children.length&&!window.confirm('Remove the local Slot content and inherit the model content? Undo restores it.'))return;lieveContext.commit(()=>{node.children=[];delete node.props.slotOverride;});});
+		lieveContext.componentEditor?.bind( lieveContext.inspector, node, isCurrent );
+		lieveContext.inspector.querySelector('[data-slot-reset]')?.addEventListener('click',()=>{if(!isCurrent())return;if(node.children.length&&!window.confirm('Remove the local Slot content and inherit the model content? Undo restores it.'))return;lieveContext.commit(()=>{node.children=[];delete node.props.slotOverride;});});
 		enhanceInspectorSelects(); mountInspectorRichText( node, richRestore ); mountInspectorCode( node, codeRestore );
-		lieveContext.inspector.querySelectorAll( '[data-enable-html-wrapper]' ).forEach( button => button.addEventListener( 'click', () => lieveContext.commit( () => { const current = lieveContext.findNode( lieveContext.state.document.children, node.id ); if ( current ) { current.props.wrapHtml = true; } } ) ) );
+		lieveContext.inspector.querySelectorAll( '[data-enable-html-wrapper]' ).forEach( button => button.addEventListener( 'click', () => { if ( isCurrent() ) { lieveContext.commit( () => { node.props.wrapHtml = true; } ); } } ) );
 		function editItems( change, preserve = false ) {
+			if ( ! isCurrent() ) { return; }
 			lieveContext.commit( () => { const current = lieveContext.findNode( lieveContext.state.document.children, node.id ); if ( current ) { const rows = lieveContext.parseItems( current.props.items ); change( rows ); current.props.items = JSON.stringify( rows ); } }, preserve );
 		}
 		lieveContext.inspector.querySelector( '[data-item-add]' )?.addEventListener( 'click', () => editItems( ( rows ) => rows.push( node.type === 'form' ? [ 'New field', 'text', '' ] : [ 'New item', '' ] ) ) );
 		lieveContext.inspector.querySelectorAll( '[data-item-index]' ).forEach( ( item ) => {
 			const index = Number( item.dataset.itemIndex );
 			item.querySelectorAll( '[data-item-column]' ).forEach( ( input ) => {
-				const update = ( event ) => { if ( event.isComposing ) { return; } lieveContext.liveChange( node.id + ':items:' + index + ':' + input.dataset.itemColumn, () => { const rows = lieveContext.parseItems( node.props.items ); rows[ index ][ Number( input.dataset.itemColumn ) ] = input.type === 'checkbox' ? ( input.checked ? 'required' : '' ) : input.value; node.props.items = JSON.stringify( rows ); } ); if ( input.dataset.itemColumn === '0' ) { item.querySelector( 'summary > span' ).textContent = input.value || 'Item ' + ( index + 1 ); } };
-				input.addEventListener( 'input', update ); input.addEventListener( 'change', update ); input.addEventListener( 'compositionend', update ); input.addEventListener( 'blur', () => { lieveContext.liveEdit = null; } );
+				const update = ( event ) => { if ( ! isCurrent() || ! input.isConnected || event.isComposing ) { return; } lieveContext.liveChange( node.id + ':items:' + index + ':' + input.dataset.itemColumn, () => { const rows = lieveContext.parseItems( node.props.items ); rows[ index ][ Number( input.dataset.itemColumn ) ] = input.type === 'checkbox' ? ( input.checked ? 'required' : '' ) : input.value; node.props.items = JSON.stringify( rows ); } ); if ( input.dataset.itemColumn === '0' ) { item.querySelector( 'summary > span' ).textContent = input.value || 'Item ' + ( index + 1 ); } };
+				input.addEventListener( 'input', update ); input.addEventListener( 'change', update ); input.addEventListener( 'compositionend', update ); input.addEventListener( 'blur', () => { if ( isCurrent() && input.isConnected ) { lieveContext.liveEdit = null; } } );
 			} );
 			item.querySelectorAll( '[data-item-action]' ).forEach( ( button ) => button.addEventListener( 'click', () => editItems( ( rows ) => { if ( button.dataset.itemAction === 'remove' ) { rows.splice( index, 1 ); } else { const next = index + ( button.dataset.itemAction === 'up' ? -1 : 1 ); if ( next >= 0 && next < rows.length ) { [ rows[ index ], rows[ next ] ] = [ rows[ next ], rows[ index ] ]; } } } ) ) );
 		} );
 
-		lieveContext.inspector.querySelector( '[data-action="up"]' )?.addEventListener( 'click', () => lieveContext.moveSelected( -1 ) );
-		lieveContext.inspector.querySelector( '[data-action="down"]' )?.addEventListener( 'click', () => lieveContext.moveSelected( 1 ) );
-		lieveContext.inspector.querySelector( '[data-action="duplicate"]' )?.addEventListener( 'click', lieveContext.duplicateSelected );
-		lieveContext.inspector.querySelector( '[data-action="delete"]' )?.addEventListener( 'click', lieveContext.deleteSelected );
-		lieveContext.inspector.querySelector( '#lieve-choose-image' )?.addEventListener( 'click', lieveContext.chooseImage );
+		lieveContext.inspector.querySelector( '[data-action="up"]' )?.addEventListener( 'click', () => { if ( isCurrent() ) { lieveContext.moveSelected( -1 ); } } );
+		lieveContext.inspector.querySelector( '[data-action="down"]' )?.addEventListener( 'click', () => { if ( isCurrent() ) { lieveContext.moveSelected( 1 ); } } );
+		lieveContext.inspector.querySelector( '[data-action="duplicate"]' )?.addEventListener( 'click', () => { if ( isCurrent() ) { lieveContext.duplicateSelected(); } } );
+		lieveContext.inspector.querySelector( '[data-action="delete"]' )?.addEventListener( 'click', () => { if ( isCurrent() ) { lieveContext.deleteSelected(); } } );
+		lieveContext.inspector.querySelector( '#lieve-choose-image' )?.addEventListener( 'click', () => { if ( isCurrent() ) { lieveContext.chooseImage( isCurrent ); } } );
 		lieveContext.inspector.querySelector( '[data-gallery-media]' )?.addEventListener( 'click', () => {
+			if ( ! isCurrent() ) { return; }
 			if ( ! window.wp?.media ) { lieveContext.showToast( 'The Media Library is unavailable.', true ); return; }
 			const frame = window.wp.media( { title: 'Choose gallery images', button: { text: 'Add images' }, library: { type: 'image' }, multiple: true } );
 			frame.on( 'select', () => editItems( rows => { frame.state().get( 'selection' ).toJSON().slice( 0, Math.max( 0, 100 - rows.length ) ).forEach( item => rows.push( [ item.url, item.caption || '', item.alt || '', '', String( item.id ) ] ) ); } ) ); frame.open();
 		} );
-		lieveContext.inspector.querySelector( '[data-element-menu]' )?.addEventListener( 'click', ( event ) => { const rect = event.currentTarget.getBoundingClientRect(); lieveContext.openContextMenu( node.id, rect.left, rect.bottom + 6 ); } );
+		lieveContext.inspector.querySelector( '[data-element-menu]' )?.addEventListener( 'click', ( event ) => { if ( ! isCurrent() ) { return; } const rect = event.currentTarget.getBoundingClientRect(); lieveContext.openContextMenu( node.id, rect.left, rect.bottom + 6 ); } );
 		refreshInspectorIndicators();
 	}
 
