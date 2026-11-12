@@ -45,6 +45,12 @@
 			if ( bounds ) layer.style.clipPath = 'inset(' + Math.max( 0, bounds.top ) + 'px ' + Math.max( 0, window.innerWidth - bounds.right ) + 'px ' + Math.max( 0, window.innerHeight - bounds.bottom ) + 'px ' + Math.max( 0, bounds.left ) + 'px)';
 			layer.hidden = ! frames.size || ! outer?.isConnected || ! outer.classList.contains( 'is-ready' ) || !! top.querySelector( '.lieve-workspace.is-dragging-canvas' ) || arbiter?.active() === false;
 			if ( layer.hidden ) return;
+			if ( arbiter ) {
+				// Renderer transfers can change handle order while preserving live
+				// opaque documents. Update stacking without reparenting those iframes.
+				Array.from( frames.values() ).filter( current ).sort( ( a, b ) => a.frame.compareDocumentPosition( b.frame ) & 4 ? -1 : 1 )
+					.forEach( ( record, index ) => { record.portal.style.zIndex = String( index ); } );
+			}
 			const viewport = outer.getBoundingClientRect(), sx = viewport.width / outer.clientWidth, sy = viewport.height / outer.clientHeight;
 			frames.forEach( ( record, frame ) => {
 				const rect = frame.getBoundingClientRect(), projected = arbiter?.project( rect );
@@ -148,7 +154,20 @@
 							if ( record.loads++ ) { arbiter?.release( record ); record.generation = generation(); record.sequence = record.revision = 0; record.context = null; record.ready = record.shown = false; portal.style.visibility = 'hidden'; portal.setAttribute( 'aria-hidden', 'true' ); portal.tabIndex = -1; watch( record ); }
 							context( record.frame, true ); layout();
 						};
-						portal.addEventListener( 'load', record.load ); portal.srcdoc = source || ''; layer.appendChild( pending ); layer.appendChild( portal ); counters.created++;
+						portal.addEventListener( 'load', record.load ); portal.srcdoc = source || '';
+						// Parent-owned projections may finish REST requests out of order.
+						// Insert only the new iframe at its renderer handle's position;
+						// moving a live sibling iframe would reset native state and focus.
+						let following = null;
+						if ( arbiter ) {
+							for ( const candidate of frames.values() ) {
+								if ( candidate === record || ! current( candidate ) || ! ( frame.compareDocumentPosition( candidate.frame ) & 4 ) ) continue;
+								if ( ! following || candidate.frame.compareDocumentPosition( following.frame ) & 4 ) following = candidate;
+							}
+						}
+						if ( following ) { layer.insertBefore( pending, following.portal ); layer.insertBefore( portal, following.portal ); }
+						else { layer.appendChild( pending ); layer.appendChild( portal ); }
+						counters.created++;
 						watch( record );
 					} else { Object.assign( frames.get( frame ), callbacks ); } context( frame );
 				} ); layout();
